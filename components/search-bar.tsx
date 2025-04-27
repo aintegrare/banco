@@ -24,11 +24,11 @@ export function SearchBar() {
 
   return (
     <div className="relative mb-4">
-      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-primary" />
       <Input
         type="search"
         placeholder="Buscar contatos..."
-        className="pl-8"
+        className="pl-8 border-primary/30 focus-visible:ring-primary/30"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
       />
