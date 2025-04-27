@@ -18,7 +18,7 @@ export function ImportContacts({ onSuccess }: { onSuccess?: () => void }) {
   const [isUploading, setIsUploading] = useState(false)
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<{ total: number; added: number } | null>(null)
+  const [success, setSuccess] = useState<{ total: number; added: number; skipped: number } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
@@ -73,11 +73,12 @@ export function ImportContacts({ onSuccess }: { onSuccess?: () => void }) {
         setSuccess({
           total: result.total || 0,
           added: result.added || 0,
+          skipped: result.skipped || 0,
         })
 
         toast({
           title: "Importação concluída",
-          description: `${result.added} de ${result.total} contatos foram importados com sucesso.`,
+          description: `${result.added} de ${result.total} contatos foram importados com sucesso. ${result.skipped || 0} contatos foram ignorados por já existirem.`,
         })
 
         if (onSuccess) {
@@ -129,6 +130,9 @@ export function ImportContacts({ onSuccess }: { onSuccess?: () => void }) {
             <AlertTitle>Importação concluída</AlertTitle>
             <AlertDescription>
               {success.added} de {success.total} contatos foram importados com sucesso.
+              {success.skipped > 0 && (
+                <p className="mt-1">{success.skipped} contatos foram ignorados por já existirem.</p>
+              )}
             </AlertDescription>
           </Alert>
         )}

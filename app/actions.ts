@@ -204,17 +204,29 @@ const localInteractions: Interaction[] = [
   },
 ]
 
-// Função para acessar o D1 com fallback para armazenamento local
+// Modificar apenas a função getStorage para melhorar o tratamento de erros
 async function getStorage() {
   try {
     // Obter a instância do D1Database
     const db = getD1Database()
 
     if (db && typeof db.prepare === "function") {
-      console.log("Usando banco de dados D1")
-      return {
-        type: "d1",
-        db,
+      // Testar a conexão com o banco de dados
+      try {
+        await db.prepare("SELECT 1 as test").first()
+        console.log("Conexão com D1 estabelecida com sucesso")
+        return {
+          type: "d1",
+          db,
+        }
+      } catch (dbError) {
+        console.error("Erro ao testar conexão com D1:", dbError)
+        console.log("Usando armazenamento local devido a erro na conexão com D1")
+        return {
+          type: "local",
+          db: null,
+          error: dbError,
+        }
       }
     } else {
       console.log("D1_DATABASE não encontrado ou inválido, usando armazenamento local")
@@ -224,10 +236,11 @@ async function getStorage() {
       }
     }
   } catch (error) {
-    console.log("Erro ao acessar D1, usando armazenamento local", error)
+    console.error("Erro ao acessar D1, usando armazenamento local:", error)
     return {
       type: "local",
       db: null,
+      error,
     }
   }
 }
@@ -394,7 +407,7 @@ export async function getContacts(
       pagination: {
         total: 0,
         page: 1,
-        pageSize,
+        pageSize: 0,
         pageCount: 0,
       },
     }
@@ -788,6 +801,7 @@ export async function exportContactsToCSV() {
 
 // Adicione esta função ao arquivo actions.ts
 export async function importContacts(formData: FormData) {
+  let addedCount = 0 // Declare addedCount here
   try {
     const file = formData.get("file") as File
     if (!file) {
@@ -874,11 +888,51 @@ export async function importContacts(formData: FormData) {
 
     // Adicionar contatos ao banco de dados
     const storage = await getStorage()
-    let addedCount = 0
 
     if (storage.type === "d1") {
       // Usando D1 - Inserir em lote
-      const batch = validContacts.map((contact) => {
+      // Primeiro, verificar quais emails já existem para evitar duplicatas
+      const emailsToCheck = validContacts.map((contact) => contact.email)
+
+      // Consulta para verificar emails existentes
+      let existingEmails: string[] = []
+      if (emailsToCheck.length > 0) {
+        try {
+          // Dividir em lotes menores para evitar problemas com consultas muito grandes
+          const batchSize = 50
+          for (let i = 0; i < emailsToCheck.length; i += batchSize) {
+            const batch = emailsToCheck.slice(i, i + batchSize)
+            const placeholders = batch.map(() => "?").join(",")
+
+            const query = `SELECT email FROM contacts WHERE email IN (${placeholders})`
+            const { results } = await storage.db
+              .prepare(query)
+              .bind(...batch)
+              .all()
+
+            existingEmails = existingEmails.concat(results.map((r: any) => r.email))
+          }
+        } catch (error) {
+          console.error("Erro ao verificar emails existentes:", error)
+        }
+      }
+
+      // Filtrar contatos que já existem
+      const newContacts = validContacts.filter((contact) => !existingEmails.includes(contact.email))
+      console.log(`${existingEmails.length} contatos já existem e serão ignorados.`)
+
+      if (newContacts.length === 0) {
+        return {
+          success: true,
+          total: validContacts.length,
+          added: 0,
+          skipped: existingEmails.length,
+          message: "Todos os contatos já existem no banco de dados.",
+        }
+      }
+
+      // Preparar as inserções apenas para novos contatos
+      const batch = newContacts.map((contact) => {
         return storage.db
           .prepare(`
             INSERT INTO contacts (
@@ -908,13 +962,15 @@ export async function importContacts(formData: FormData) {
 
       try {
         // Executar as inserções em lote
-        await storage.db.batch(batch)
-        addedCount = validContacts.length
+        if (batch.length > 0) {
+          await storage.db.batch(batch)
+          addedCount = newContacts.length
+        }
       } catch (error) {
         console.error("Erro ao inserir contatos em lote:", error)
 
         // Tentar inserir um por um para identificar quais falharam
-        for (const contact of validContacts) {
+        for (const contact of newContacts) {
           try {
             await storage.db
               .prepare(`
@@ -949,9 +1005,25 @@ export async function importContacts(formData: FormData) {
           }
         }
       }
+
+      return {
+        success: true,
+        total: validContacts.length,
+        added: addedCount,
+        skipped: existingEmails.length,
+        errors: errors.length > 0 ? errors : undefined,
+      }
     } else {
       // Usando armazenamento local
-      for (const contact of validContacts) {
+      // Verificar emails existentes
+      const existingEmails = localContacts.map((c) => c.email)
+
+      // Filtrar contatos que já existem
+      const newContacts = validContacts.filter((contact) => !existingEmails.includes(contact.email))
+      console.log(`${validContacts.length - newContacts.length} contatos já existem e serão ignorados.`)
+
+      // Adicionar apenas novos contatos
+      for (const contact of newContacts) {
         try {
           const newContact = {
             ...contact,
@@ -972,14 +1044,15 @@ export async function importContacts(formData: FormData) {
           console.error(`Erro ao inserir contato ${contact.email}:`, err)
         }
       }
-    }
 
-    revalidatePath("/")
-    return {
-      success: true,
-      total: validContacts.length,
-      added: addedCount,
-      errors: errors.length > 0 ? errors : undefined,
+      revalidatePath("/")
+      return {
+        success: true,
+        total: validContacts.length,
+        added: addedCount,
+        skipped: validContacts.length - newContacts.length,
+        errors: errors.length > 0 ? errors : undefined,
+      }
     }
   } catch (error) {
     console.error("Erro ao importar contatos:", error)

@@ -12,10 +12,13 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  webpack: (config) => {
-    // Configuração adicional do webpack se necessário
-    return config;
+  // Adicionar configuração para lidar com erros
+  onDemandEntries: {
+    // Período em ms em que a página será mantida em buffer
+    maxInactiveAge: 25 * 1000,
+    // Número de páginas que devem ser mantidas em buffer
+    pagesBufferLength: 2,
   },
-};
+}
 
-export default nextConfig;
+export default nextConfig

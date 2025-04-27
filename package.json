@@ -60,11 +60,11 @@
     "zod": "latest",
     "uuid": "latest",
     "xlsx": "latest",
-    "json2csv": "latest",
-    "csv-parse": "latest",
     "child_process": "latest",
     "fs": "latest",
-    "path": "latest"
+    "path": "latest",
+    "json2csv": "latest",
+    "csv-parse": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

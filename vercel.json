@@ -1,12 +1,6 @@
 {
-  "buildCommand": "bash .vercel/build.sh && next build",
-  "outputDirectory": ".next",
-  "installCommand": "npm install",
+  "buildCommand": "next build",
+  "installCommand": "npm install --no-audit --no-fund",
   "framework": "nextjs",
-  "devCommand": "next dev",
-  "git": {
-    "deploymentEnabled": {
-      "main": true
-    }
-  }
+  "outputDirectory": ".next"
 }
