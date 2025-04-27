@@ -1,0 +1,8 @@
+name = "banco"
+main = "src/index.ts"
+compatibility_date = "2025-04-27"
+
+[[d1_databases]]
+binding = "D1_DATABASE"
+database_name = "banco-contatos"
+database_id = "3476ca28-17ef-416d-9f79-6b43936108ed"
