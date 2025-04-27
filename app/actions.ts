@@ -7,6 +7,9 @@ import { parse } from "json2csv"
 import { parse as csvParse } from "csv-parse/sync"
 import * as XLSX from "xlsx"
 
+// Importar a função para obter o D1Database
+import { getD1Database } from "@/lib/db"
+
 export type Contact = {
   id: string
   name: string
@@ -204,17 +207,17 @@ const localInteractions: Interaction[] = [
 // Função para acessar o D1 com fallback para armazenamento local
 async function getStorage() {
   try {
-    // @ts-ignore - D1 é uma binding do Cloudflare
-    const db = process.env.D1_DATABASE
+    // Obter a instância do D1Database
+    const db = getD1Database()
 
-    if (db) {
+    if (db && typeof db.prepare === "function") {
       console.log("Usando banco de dados D1")
       return {
         type: "d1",
         db,
       }
     } else {
-      console.log("D1_DATABASE não encontrado, usando armazenamento local")
+      console.log("D1_DATABASE não encontrado ou inválido, usando armazenamento local")
       return {
         type: "local",
         db: null,

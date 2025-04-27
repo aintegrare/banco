@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    instrumentationHook: true,
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -9,6 +12,10 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-}
+  webpack: (config) => {
+    // Configuração adicional do webpack se necessário
+    return config;
+  },
+};
 
-export default nextConfig
+export default nextConfig;
