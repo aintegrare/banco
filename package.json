@@ -61,7 +61,8 @@
     "uuid": "latest",
     "xlsx": "latest",
     "json2csv": "latest",
-    "csv-parse": "latest"
+    "csv-parse": "latest",
+    "@cloudflare/workers-types": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
