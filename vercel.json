@@ -1,0 +1,12 @@
+{
+  "buildCommand": "bash .vercel/build.sh && next build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "devCommand": "next dev",
+  "git": {
+    "deploymentEnabled": {
+      "main": true
+    }
+  }
+}

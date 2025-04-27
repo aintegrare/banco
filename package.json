@@ -60,9 +60,11 @@
     "zod": "latest",
     "uuid": "latest",
     "xlsx": "latest",
-    "@cloudflare/workers-types": "latest",
     "json2csv": "latest",
-    "csv-parse": "latest"
+    "csv-parse": "latest",
+    "child_process": "latest",
+    "fs": "latest",
+    "path": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
