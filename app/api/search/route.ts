@@ -86,17 +86,31 @@ export async function POST(request: NextRequest) {
     // 2. Buscar o conteúdo completo de cada documento selecionado
     console.log("API Search: Buscando conteúdo dos documentos selecionados")
     const documentContents = []
+    let hasSimulatedContent = false
+
     for (const doc of relevantDocuments) {
       try {
         const content = await getDocumentContent(doc.id)
         if (content.length > 0) {
+          // Verificar se o conteúdo parece ser simulado
+          const joinedContent = content.join("\n\n")
+          const isSimulated =
+            joinedContent.includes("Este é um texto extraído do arquivo") ||
+            joinedContent.includes("Este é apenas um texto de exemplo para teste do sistema")
+
+          if (isSimulated) {
+            console.warn(`API Search: Documento ${doc.id} contém conteúdo simulado`)
+            hasSimulatedContent = true
+          }
+
           documentContents.push({
             id: doc.id,
             title: doc.title,
             url: doc.url,
             source_type: doc.source_type,
-            content: content.join("\n\n"),
+            content: joinedContent,
             relevance_score: doc.relevance_score,
+            isSimulated: isSimulated,
           })
         }
       } catch (error) {
@@ -107,6 +121,10 @@ export async function POST(request: NextRequest) {
 
     console.log(`API Search: Conteúdo obtido para ${documentContents.length} documentos`)
 
+    if (hasSimulatedContent) {
+      console.warn("API Search: Alguns documentos contêm conteúdo simulado")
+    }
+
     if (documentContents.length === 0) {
       console.log("API Search: Nenhum conteúdo encontrado nos documentos selecionados")
       return NextResponse.json({
@@ -116,28 +134,14 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Verificar se o conteúdo parece ser texto real ou simulado
-    let hasRealContent = false
-    for (const doc of documentContents) {
-      // Verificar se o conteúdo parece ser texto real
-      // (não contém frases específicas que indicam texto simulado)
-      if (
-        doc.content.length > 100 &&
-        !doc.content.includes("Este é um texto extraído do arquivo") &&
-        !doc.content.includes("Este é apenas um texto de exemplo para teste do sistema")
-      ) {
-        hasRealContent = true
-        break
-      }
-    }
+    // Filtrar documentos com conteúdo simulado se houver documentos reais disponíveis
+    const realDocuments = documentContents.filter((doc) => !doc.isSimulated)
 
-    if (!hasRealContent) {
-      console.warn("API Search: Possível conteúdo simulado detectado nos documentos")
-      // Continuar mesmo com conteúdo simulado, mas registrar o aviso
-    }
+    // Usar apenas documentos reais se houver algum disponível
+    const documentsToUse = realDocuments.length > 0 ? realDocuments : documentContents
 
     // 3. Preparar o contexto para a IA
-    const context = documentContents.map((doc) => `Fonte: ${doc.title} (${doc.source_type})\n${doc.content}`)
+    const context = documentsToUse.map((doc) => `Fonte: ${doc.title} (${doc.source_type})\n${doc.content}`)
 
     // 4. Gerar embeddings para a consulta (para compatibilidade com o código existente)
     let queryEmbedding
@@ -164,6 +168,20 @@ export async function POST(request: NextRequest) {
     try {
       aiResponse = await getAIResponse(query, context)
       console.log("API Search: Resposta da IA gerada com sucesso")
+
+      // Verificar se a resposta contém indicações de conteúdo simulado
+      if (
+        aiResponse.includes("não encontrei informações relevantes") &&
+        aiResponse.includes("texto era um exemplo simulado")
+      ) {
+        console.warn("API Search: A resposta da IA indica que está usando conteúdo simulado")
+
+        // Se todos os documentos são simulados, informar ao usuário
+        if (realDocuments.length === 0) {
+          aiResponse =
+            "Não foi possível encontrar informações reais sobre sua consulta. Os documentos disponíveis contêm apenas texto simulado. Por favor, adicione documentos com conteúdo real ao sistema."
+        }
+      }
     } catch (aiError) {
       console.error("API Search: Erro ao gerar resposta da IA:", aiError)
       aiResponse =
@@ -171,7 +189,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. Formatar resultados para exibição
-    const results = documentContents.map((doc) => ({
+    const results = documentsToUse.map((doc) => ({
       id: doc.id,
       title: doc.title,
       url: doc.url,
@@ -179,6 +197,7 @@ export async function POST(request: NextRequest) {
       source: doc.source_type,
       sourceIcon: doc.source_type === "pdf" ? "FileText" : "Globe",
       relevance_score: doc.relevance_score,
+      isSimulated: doc.isSimulated,
     }))
 
     // Ordenar resultados por relevância
@@ -187,8 +206,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       results,
       aiResponse,
-      documentCount: relevantDocuments.length,
-      usedDocuments: relevantDocuments.map((d) => ({ id: d.id, title: d.title })),
+      documentCount: documentsToUse.length,
+      usedDocuments: documentsToUse.map((d) => ({ id: d.id, title: d.title })),
+      hasSimulatedContent: hasSimulatedContent,
+      realDocumentsCount: realDocuments.length,
     })
   } catch (error) {
     console.error("API Search: Erro ao processar busca:", error)

@@ -38,6 +38,7 @@ export async function extractPDFText(pdfUrl: string): Promise<string> {
       console.log(`PDF Extractor: Amostra do texto: ${text.substring(0, 200)}...`)
     }
 
+    // IMPORTANTE: Nunca retornar texto simulado
     return text
   } catch (error) {
     console.error("PDF Extractor: Erro na extração:", error)
@@ -55,17 +56,17 @@ async function extractTextFromPDFBuffer(pdfBuffer: Buffer): Promise<string> {
     }
 
     // Implementação melhorada para extrair texto de PDFs
-    // Esta abordagem busca por strings entre parênteses e outros padrões comuns em PDFs
     let text = ""
+    const pdfString = pdfBuffer.toString("utf8", 0, Math.min(pdfBuffer.length, 5000000)) // Limitar para evitar problemas de memória
 
-    // Buscar por strings entre parênteses (comum em PDFs)
+    // Método 1: Buscar por strings entre parênteses (comum em PDFs)
     let inString = false
     let currentString = ""
     let escapeNext = false
     let depth = 0
 
     // Percorrer o buffer procurando por strings entre parênteses
-    for (let i = 0; i < pdfBuffer.length; i++) {
+    for (let i = 0; i < Math.min(pdfBuffer.length, 1000000); i++) {
       const byte = pdfBuffer[i]
 
       if (escapeNext) {
@@ -115,45 +116,13 @@ async function extractTextFromPDFBuffer(pdfBuffer: Buffer): Promise<string> {
           currentString += " "
         }
       }
-
-      // Buscar também por sequências "BT" (Begin Text) e "ET" (End Text)
-      if (i < pdfBuffer.length - 3) {
-        if (
-          pdfBuffer[i] === 66 &&
-          pdfBuffer[i + 1] === 84 && // "BT"
-          (pdfBuffer[i - 1] === 32 || pdfBuffer[i - 1] === 10 || pdfBuffer[i - 1] === 13)
-        ) {
-          // Encontrou um marcador de início de texto
-          let j = i + 2
-          let textContent = ""
-
-          // Buscar até encontrar "ET" ou outro marcador
-          while (j < pdfBuffer.length - 1) {
-            if (pdfBuffer[j] === 69 && pdfBuffer[j + 1] === 84) {
-              // "ET"
-              break
-            }
-
-            // Capturar texto entre "BT" e "ET"
-            if (pdfBuffer[j] >= 32 && pdfBuffer[j] <= 126) {
-              textContent += String.fromCharCode(pdfBuffer[j])
-            }
-            j++
-          }
-
-          // Adicionar o texto encontrado se parecer válido
-          if (textContent.length > 2 && /[a-zA-Z]{2,}/.test(textContent)) {
-            text += textContent + " "
-          }
-        }
-      }
     }
 
-    // Buscar por padrões de texto em PDFs (TJ, Tj operadores)
+    // Método 2: Buscar por padrões de texto em PDFs (TJ, Tj operadores)
     const tjPattern = /\[(.*?)\]\s*TJ/g
-    const tjText = pdfBuffer.toString().match(tjPattern)
-    if (tjText) {
-      for (const match of tjText) {
+    const tjMatches = pdfString.match(tjPattern)
+    if (tjMatches) {
+      for (const match of tjMatches) {
         // Extrair texto entre colchetes
         const content = match.substring(1, match.length - 3)
         // Limpar caracteres não imprimíveis
@@ -164,16 +133,48 @@ async function extractTextFromPDFBuffer(pdfBuffer: Buffer): Promise<string> {
       }
     }
 
-    // Limpar o texto extraído
-    text = text.replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")").trim()
+    // Método 3: Buscar por operadores Tj
+    const tjSinglePattern = /$$(.*?)$$\s*Tj/g
+    const tjSingleMatches = pdfString.match(tjSinglePattern)
+    if (tjSingleMatches) {
+      for (const match of tjSingleMatches) {
+        // Extrair texto entre parênteses
+        const content = match.substring(1, match.length - 3)
+        // Limpar caracteres não imprimíveis
+        const cleaned = content.replace(/[^\x20-\x7E]/g, " ")
+        if (cleaned.length > 2) {
+          text += cleaned + " "
+        }
+      }
+    }
 
-    // Se não encontramos texto suficiente, tentar uma abordagem mais agressiva
+    // Método 4: Buscar por sequências de texto entre BT e ET (Begin Text/End Text)
+    const btEtPattern = /BT\s*(.*?)\s*ET/gs
+    const btEtMatches = pdfString.match(btEtPattern)
+    if (btEtMatches) {
+      for (const match of btEtMatches) {
+        // Extrair texto entre BT e ET
+        const content = match.substring(2, match.length - 2)
+        // Buscar por strings entre parênteses dentro do bloco BT/ET
+        const parenthesesPattern = /$$(.*?)$$/g
+        const parenthesesMatches = content.match(parenthesesPattern)
+        if (parenthesesMatches) {
+          for (const pMatch of parenthesesMatches) {
+            const pContent = pMatch.substring(1, pMatch.length - 1)
+            if (pContent.length > 2 && /[a-zA-Z]{2,}/.test(pContent)) {
+              text += pContent + " "
+            }
+          }
+        }
+      }
+    }
+
+    // Método 5: Extrair qualquer sequência de caracteres ASCII imprimíveis
     if (text.length < 100) {
-      // Extrair qualquer sequência de caracteres ASCII imprimíveis
       let simpleText = ""
       let currentWord = ""
 
-      for (let i = 0; i < pdfBuffer.length; i++) {
+      for (let i = 0; i < Math.min(pdfBuffer.length, 1000000); i++) {
         const byte = pdfBuffer[i]
 
         if ((byte >= 65 && byte <= 90) || (byte >= 97 && byte <= 122)) {
@@ -207,18 +208,25 @@ async function extractTextFromPDFBuffer(pdfBuffer: Buffer): Promise<string> {
       }
     }
 
-    // Se ainda não encontramos texto suficiente, informar que precisamos de uma solução melhor
-    if (text.length < 50) {
+    // Limpar o texto extraído
+    text = text.replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")").trim()
+
+    // Se não encontramos texto suficiente, tentar uma abordagem mais agressiva
+    if (text.length < 100) {
       console.warn("PDF Extractor: Extração de texto limitada, texto muito curto encontrado")
 
-      // Gerar um texto de exemplo com base no nome do arquivo para fins de teste
-      // Isso é apenas para garantir que o sistema continue funcionando
-      const fileName = "documento-pdf"
-      text = `Este é um texto extraído do arquivo ${fileName}. A extração de texto real falhou, mas este texto está sendo gerado para permitir que o sistema continue funcionando. Para uma extração completa, é necessário implementar uma solução mais robusta usando uma API externa de extração de PDF.
-      
-      O documento parece conter ${pdfBuffer.length} bytes de dados. A extração de texto de PDFs complexos pode requerer ferramentas especializadas.
-      
-      Este é apenas um texto de exemplo para teste do sistema. Em uma implementação real, você veria o conteúdo real do PDF aqui.`
+      // Extrair qualquer sequência de caracteres que pareça texto
+      const textPattern = /[a-zA-Z]{3,}[a-zA-Z\s.,;:!?'"(){}[\]0-9-]*/g
+      const textMatches = pdfString.match(textPattern)
+      if (textMatches) {
+        text = textMatches.join(" ")
+      }
+    }
+
+    // IMPORTANTE: Se ainda não conseguimos extrair texto suficiente, retornar um erro
+    // em vez de texto simulado
+    if (text.length < 50) {
+      throw new Error("Não foi possível extrair texto suficiente do PDF. O arquivo pode estar protegido ou corrompido.")
     }
 
     return text

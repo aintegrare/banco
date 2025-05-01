@@ -155,6 +155,15 @@ export async function getDocumentContent(documentId: number): Promise<string[]> 
           100,
         )}...`,
       )
+
+      // Verificar se o conteúdo parece ser simulado
+      const isSimulated =
+        firstChunk.content.includes("Este é um texto extraído do arquivo") ||
+        firstChunk.content.includes("Este é apenas um texto de exemplo para teste do sistema")
+
+      if (isSimulated) {
+        console.warn(`DocumentSelection: O documento ${documentId} parece conter texto simulado`)
+      }
     }
 
     return chunks.map((chunk) => chunk.content)

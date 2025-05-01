@@ -205,6 +205,14 @@ export async function processDocument(documentUrl: string, documentType: "pdf" |
     console.log(`Texto extraído com sucesso: ${documentText.length} caracteres`)
     console.log(`Amostra do texto extraído: ${documentText.substring(0, 200)}...`)
 
+    // Verificar se o texto parece ser simulado
+    if (
+      documentText.includes("Este é um texto extraído do arquivo") ||
+      documentText.includes("Este é apenas um texto de exemplo para teste do sistema")
+    ) {
+      throw new Error("O texto extraído parece ser simulado, não real")
+    }
+
     // Dividir o texto em chunks
     const chunks = splitTextIntoChunks(documentText, chunkSize)
     console.log(`Texto dividido em ${chunks.length} chunks`)

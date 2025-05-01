@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { FileText, Loader2, AlertCircle, CheckCircle, Info } from "lucide-react"
+import { FileText, Loader2, AlertCircle, CheckCircle, Info, AlertTriangle } from "lucide-react"
 
 export function PDFExtractorTester() {
   const [url, setUrl] = useState("")
@@ -52,6 +52,17 @@ export function PDFExtractorTester() {
       }
 
       addLog(`Extração concluída! ${data.textLength} caracteres extraídos`)
+
+      if (data.isSimulated) {
+        addLog("AVISO: O texto extraído parece ser simulado, não real")
+      } else {
+        addLog("O texto extraído parece ser real (não simulado)")
+      }
+
+      if (data.diagnostics) {
+        addLog(`Diagnóstico: ${JSON.stringify(data.diagnostics)}`)
+      }
+
       setResult(data)
     } catch (err) {
       console.error("Erro no teste de extração:", err)
@@ -112,7 +123,10 @@ export function PDFExtractorTester() {
           </div>
           <div className="bg-black text-green-400 p-2 rounded font-mono text-xs overflow-auto max-h-40">
             {logs.map((log, index) => (
-              <div key={index} className={log.includes("ERRO") ? "text-red-400" : ""}>
+              <div
+                key={index}
+                className={log.includes("ERRO") ? "text-red-400" : log.includes("AVISO") ? "text-yellow-400" : ""}
+              >
                 {`> ${log}`}
               </div>
             ))}
@@ -138,6 +152,26 @@ export function PDFExtractorTester() {
             <div>
               <p className="font-medium">Extração concluída com sucesso!</p>
               <p className="mt-1">Tamanho do texto: {result.textLength} caracteres</p>
+
+              {result.isSimulated && (
+                <div className="mt-2 flex items-start bg-yellow-100 p-2 rounded-md text-yellow-700">
+                  <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
+                  <p>Aviso: O texto extraído parece ser simulado, não real.</p>
+                </div>
+              )}
+
+              {result.diagnostics && (
+                <div className="mt-2">
+                  <p className="font-medium">Diagnóstico:</p>
+                  <ul className="mt-1 list-disc list-inside text-sm">
+                    <li>Contém caracteres alfanuméricos: {result.diagnostics.hasAlphaNumeric ? "Sim" : "Não"}</li>
+                    <li>Contém palavras: {result.diagnostics.hasWords ? "Sim" : "Não"}</li>
+                    <li>Tamanho médio das palavras: {result.diagnostics.averageWordLength.toFixed(2)}</li>
+                    <li>Número de palavras: {result.diagnostics.wordCount}</li>
+                    <li>Contém palavras comuns: {result.diagnostics.containsCommonWords ? "Sim" : "Não"}</li>
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
 

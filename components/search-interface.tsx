@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { Search, Loader2, AlertCircle, Info, FileText } from "lucide-react"
+import { Search, Loader2, AlertCircle, Info, FileText, AlertTriangle } from "lucide-react"
 import { SearchResults } from "./search-results"
 import { AIResponse } from "./ai-response"
 
@@ -19,6 +19,8 @@ export function SearchInterface() {
   const [documentCount, setDocumentCount] = useState<number>(0)
   const [isDiagnosing, setIsDiagnosing] = useState(false)
   const [diagnosticResult, setDiagnosticResult] = useState<any | null>(null)
+  const [hasSimulatedContent, setHasSimulatedContent] = useState(false)
+  const [realDocumentsCount, setRealDocumentsCount] = useState(0)
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,6 +34,8 @@ export function SearchInterface() {
     setDetailedError(null)
     setUsedDocuments([])
     setDocumentCount(0)
+    setHasSimulatedContent(false)
+    setRealDocumentsCount(0)
 
     try {
       console.log("SearchInterface: Iniciando busca para:", query.trim())
@@ -68,12 +72,16 @@ export function SearchInterface() {
         resultCount: data.results?.length || 0,
         hasAIResponse: !!data.aiResponse,
         documentCount: data.documentCount,
+        hasSimulatedContent: data.hasSimulatedContent,
+        realDocumentsCount: data.realDocumentsCount,
       })
 
       setSearchResults(data.results || [])
       setAIResponse(data.aiResponse || "")
       setUsedDocuments(data.usedDocuments || [])
       setDocumentCount(data.documentCount || 0)
+      setHasSimulatedContent(data.hasSimulatedContent || false)
+      setRealDocumentsCount(data.realDocumentsCount || 0)
 
       // Se não houver resultados mas tiver resposta da IA, mostrar a aba da IA
       if ((data.results?.length || 0) === 0 && data.aiResponse) {
@@ -206,6 +214,32 @@ export function SearchInterface() {
         <div className="text-center py-12">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-[#4b7bb5]" />
           <p className="text-gray-500">Buscando informações relevantes...</p>
+        </div>
+      )}
+
+      {hasSimulatedContent && realDocumentsCount === 0 && !isSearching && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg mb-6 flex items-start">
+          <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium">Aviso: Conteúdo simulado detectado</p>
+            <p>
+              Os documentos disponíveis contêm apenas texto simulado, não real. As respostas podem não ser precisas. Por
+              favor, adicione documentos com conteúdo real ao sistema.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {hasSimulatedContent && realDocumentsCount > 0 && !isSearching && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg mb-6 flex items-start">
+          <Info className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium">Informação</p>
+            <p>
+              Alguns documentos contêm texto simulado, mas {realDocumentsCount} documento(s) com conteúdo real foram
+              encontrados e utilizados para gerar a resposta.
+            </p>
+          </div>
         </div>
       )}
 

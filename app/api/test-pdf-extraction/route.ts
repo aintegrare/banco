@@ -30,11 +30,24 @@ export async function POST(request: NextRequest) {
       // Extrair texto do PDF usando nosso extrator compatível com serverless
       const text = await extractPDFText(url)
 
+      // Verificar se o texto parece ser simulado
+      const isSimulated =
+        text.includes("Este é um texto extraído do arquivo") ||
+        text.includes("Este é apenas um texto de exemplo para teste do sistema")
+
       return NextResponse.json({
         success: true,
         textLength: text.length,
         textSample: text.substring(0, 1000) + "...",
         fullText: text,
+        isSimulated: isSimulated,
+        diagnostics: {
+          hasAlphaNumeric: /[a-zA-Z0-9]/.test(text),
+          hasWords: /[a-zA-Z]{3,}/.test(text),
+          averageWordLength: text.split(/\s+/).reduce((sum, word) => sum + word.length, 0) / text.split(/\s+/).length,
+          wordCount: text.split(/\s+/).length,
+          containsCommonWords: /\b(the|and|or|in|on|at|to|for|with|by)\b/i.test(text),
+        },
       })
     } catch (extractionError) {
       console.error("Erro específico na extração de texto:", extractionError)
