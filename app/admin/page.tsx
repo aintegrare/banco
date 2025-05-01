@@ -1,5 +1,6 @@
 import { DocumentProcessor } from "@/components/admin/document-processor"
 import { DocumentList } from "@/components/admin/document-list"
+import { DocumentDiagnostic } from "@/components/admin/document-diagnostic"
 import Link from "next/link"
 import { FileText, Upload, Settings, Search } from "lucide-react"
 
@@ -94,6 +95,10 @@ export default function AdminPage() {
           </div>
 
           <DocumentProcessor />
+        </div>
+
+        <div className="mb-6">
+          <DocumentDiagnostic />
         </div>
 
         <DocumentList />
