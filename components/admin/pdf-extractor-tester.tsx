@@ -29,12 +29,19 @@ export function PDFExtractorTester() {
         body: JSON.stringify({ url }),
       })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || errorData.error || `Erro: ${response.status}`)
+      // Verificar se a resposta é um JSON válido
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        console.error("Erro ao analisar resposta JSON:", jsonError)
+        throw new Error("Resposta inválida do servidor")
       }
 
-      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.message || data.error || `Erro: ${response.status}`)
+      }
+
       setResult(data)
     } catch (err) {
       console.error("Erro no teste de extração:", err)
@@ -89,6 +96,10 @@ export function PDFExtractorTester() {
           <div>
             <p className="font-medium">Erro na extração:</p>
             <p className="mt-1">{error}</p>
+            <p className="mt-2 text-sm">
+              Nota: A extração de PDF pode falhar por diversos motivos, incluindo PDFs protegidos, mal formatados ou
+              muito grandes.
+            </p>
           </div>
         </div>
       )}

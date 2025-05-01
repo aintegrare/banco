@@ -11,20 +11,31 @@ export async function POST(request: NextRequest) {
 
     console.log(`Teste de extração de PDF: ${url}`)
 
-    // Extrair texto do PDF
-    const text = await extractTextFromPDF(url)
+    try {
+      // Extrair texto do PDF
+      const text = await extractTextFromPDF(url)
 
-    return NextResponse.json({
-      success: true,
-      textLength: text.length,
-      textSample: text.substring(0, 1000) + "...",
-      fullText: text,
-    })
+      return NextResponse.json({
+        success: true,
+        textLength: text.length,
+        textSample: text.substring(0, 1000) + "...",
+        fullText: text,
+      })
+    } catch (extractionError) {
+      console.error("Erro específico na extração de texto:", extractionError)
+      return NextResponse.json(
+        {
+          error: "Erro ao extrair texto do PDF",
+          message: extractionError instanceof Error ? extractionError.message : String(extractionError),
+        },
+        { status: 500 },
+      )
+    }
   } catch (error) {
-    console.error("Erro ao extrair texto do PDF:", error)
+    console.error("Erro geral ao processar requisição:", error)
     return NextResponse.json(
       {
-        error: "Erro ao extrair texto do PDF",
+        error: "Erro ao processar requisição",
         message: error instanceof Error ? error.message : String(error),
       },
       { status: 500 },
