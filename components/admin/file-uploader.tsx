@@ -12,12 +12,14 @@ export function FileUploader() {
   const [processingStatus, setProcessingStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<any | null>(null)
+  const [detailedError, setDetailedError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0])
       setError(null)
+      setDetailedError(null)
       setSuccess(null)
     }
   }
@@ -34,6 +36,7 @@ export function FileUploader() {
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       setFile(e.dataTransfer.files[0])
       setError(null)
+      setDetailedError(null)
       setSuccess(null)
     }
   }
@@ -52,6 +55,7 @@ export function FileUploader() {
     setUploadProgress(0)
     setProcessingStatus(null)
     setError(null)
+    setDetailedError(null)
     setSuccess(null)
 
     try {
@@ -67,30 +71,94 @@ export function FileUploader() {
       formData.append("file", file)
 
       setProcessingStatus("Enviando arquivo...")
+      console.log("FileUploader: Iniciando upload do arquivo", file.name)
 
-      const response = await fetch("/api/upload", {
+      try {
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        })
+
+        clearInterval(progressInterval)
+        setUploadProgress(100)
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          console.error("FileUploader: Erro na resposta da API", errorData)
+          throw new Error(
+            errorData.message || errorData.error || `Erro no servidor: ${response.status} ${response.statusText}`,
+          )
+        }
+
+        const data = await response.json()
+        console.log("FileUploader: Resposta da API recebida", data)
+
+        setProcessingStatus("Indexando conteúdo...")
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+
+        setProcessingStatus("Concluído!")
+        setSuccess(data)
+        clearFile()
+      } catch (fetchError) {
+        console.error("FileUploader: Erro na chamada fetch", fetchError)
+        clearInterval(progressInterval)
+        throw fetchError
+      }
+    } catch (err) {
+      console.error("FileUploader: Erro geral no upload", err)
+      setError(err instanceof Error ? err.message : "Erro desconhecido")
+      setDetailedError(
+        "Detalhes técnicos: " +
+          (err instanceof Error ? `${err.name}: ${err.message}${err.stack ? `\n${err.stack}` : ""}` : String(err)),
+      )
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  // Função para criar um arquivo de teste simples
+  const handleTestUpload = async () => {
+    setIsUploading(true)
+    setUploadProgress(0)
+    setProcessingStatus(null)
+    setError(null)
+    setDetailedError(null)
+    setSuccess(null)
+
+    try {
+      setProcessingStatus("Testando conexão com Bunny.net...")
+      console.log("FileUploader: Iniciando teste de conexão")
+
+      const response = await fetch("/api/test-upload", {
         method: "POST",
-        body: formData,
       })
 
-      clearInterval(progressInterval)
       setUploadProgress(100)
-      setProcessingStatus("Processando documento...")
-
-      const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || data.error || "Erro ao fazer upload")
+        const errorData = await response.json().catch(() => ({}))
+        console.error("FileUploader: Erro no teste de conexão", errorData)
+        throw new Error(
+          errorData.message || errorData.error || `Erro no servidor: ${response.status} ${response.statusText}`,
+        )
       }
 
-      setProcessingStatus("Indexando conteúdo...")
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const data = await response.json()
+      console.log("FileUploader: Teste de conexão bem-sucedido", data)
 
-      setProcessingStatus("Concluído!")
-      setSuccess(data)
-      clearFile()
+      setProcessingStatus("Teste concluído!")
+      setSuccess({
+        fileName: "teste.txt",
+        fileUrl: data.fileUrl,
+        chunksProcessed: 0,
+      })
     } catch (err) {
+      console.error("FileUploader: Erro no teste de conexão", err)
       setError(err instanceof Error ? err.message : "Erro desconhecido")
+      setDetailedError(
+        "Detalhes técnicos: " +
+          (err instanceof Error ? `${err.name}: ${err.message}${err.stack ? `\n${err.stack}` : ""}` : String(err)),
+      )
     } finally {
       setIsUploading(false)
     }
@@ -140,24 +208,55 @@ export function FileUploader() {
         )}
       </div>
 
-      {file && (
+      <div className="flex space-x-2 mt-4">
+        {file && (
+          <button
+            onClick={handleUpload}
+            disabled={isUploading}
+            className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:ring-offset-2 disabled:opacity-50"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Enviando... {uploadProgress}%</span>
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4" />
+                <span>Enviar Arquivo</span>
+              </>
+            )}
+          </button>
+        )}
+
         <button
-          onClick={handleUpload}
+          onClick={handleTestUpload}
           disabled={isUploading}
-          className="mt-4 w-full flex items-center justify-center space-x-2 px-4 py-2 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:ring-offset-2 disabled:opacity-50"
+          className="px-4 py-2 border border-[#4b7bb5] text-[#4b7bb5] rounded-md hover:bg-[#f0f4f9] focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:ring-offset-2 disabled:opacity-50"
         >
-          {isUploading ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Enviando... {uploadProgress}%</span>
-            </>
-          ) : (
-            <>
-              <Upload className="h-4 w-4" />
-              <span>Enviar Arquivo</span>
-            </>
-          )}
+          Testar Conexão
         </button>
+      </div>
+
+      {error && error.includes("URL") && (
+        <div className="mt-2">
+          <button
+            onClick={async () => {
+              try {
+                const response = await fetch("/api/test-bunny-connection")
+                const data = await response.json()
+                setDetailedError(
+                  `Teste de conexão: ${data.success ? "Sucesso" : "Falha"}\n${JSON.stringify(data, null, 2)}`,
+                )
+              } catch (err) {
+                setDetailedError(`Erro ao testar conexão: ${err instanceof Error ? err.message : String(err)}`)
+              }
+            }}
+            className="text-xs text-[#4b7bb5] underline"
+          >
+            Verificar URL da região
+          </button>
+        </div>
       )}
 
       {isUploading && (
@@ -180,6 +279,16 @@ export function FileUploader() {
           <div>
             <p className="font-medium">Erro no upload:</p>
             <p className="mt-1">{error}</p>
+            {detailedError && (
+              <details className="mt-2">
+                <summary className="text-sm cursor-pointer">Detalhes técnicos</summary>
+                <pre className="mt-1 text-xs bg-red-100 p-2 rounded overflow-auto max-h-40">{detailedError}</pre>
+              </details>
+            )}
+            <p className="mt-2 text-sm">
+              Verifique se as variáveis de ambiente BUNNY_API_KEY, BUNNY_STORAGE_ZONE e BUNNY_STORAGE_REGION estão
+              configuradas corretamente.
+            </p>
           </div>
         </div>
       )}
@@ -192,8 +301,20 @@ export function FileUploader() {
             <p className="mt-1">
               Arquivo: {success.fileName}
               <br />
-              {success.chunksProcessed} fragmentos processados e indexados.
+              {success.chunksProcessed > 0 && `${success.chunksProcessed} fragmentos processados e indexados.`}
             </p>
+            {success.fileUrl && (
+              <p className="mt-1">
+                <a
+                  href={success.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  Visualizar arquivo
+                </a>
+              </p>
+            )}
             {success.usedFallbackEmbeddings && (
               <p className="mt-1 text-amber-600 flex items-center">
                 <AlertTriangle className="h-4 w-4 mr-1" />

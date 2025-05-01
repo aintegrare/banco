@@ -13,7 +13,10 @@ import {
   Loader2,
   ExternalLink,
   AlertCircle,
+  FolderPlus,
+  Search,
 } from "lucide-react"
+import { getBunnyPublicUrl } from "@/lib/bunny"
 
 interface BunnyFile {
   ObjectName: string
@@ -28,6 +31,7 @@ interface BunnyFile {
   UserId: string
   DateCreated: string
   StorageZoneId: number
+  PublicUrl?: string
 }
 
 export function FileList() {
@@ -35,6 +39,10 @@ export function FileList() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deletingFile, setDeletingFile] = useState<string | null>(null)
+  const [isCreatingDirectory, setIsCreatingDirectory] = useState(false)
+  const [directoryCreated, setDirectoryCreated] = useState(false)
+  const [directoryInfo, setDirectoryInfo] = useState<any | null>(null)
+  const [isCheckingDirectory, setIsCheckingDirectory] = useState(false)
 
   const fetchFiles = async () => {
     setIsLoading(true)
@@ -52,7 +60,18 @@ export function FileList() {
       const data = await response.json()
       console.log(`Arquivos recebidos: ${data.files?.length || 0}`)
 
-      setFiles(data.files || [])
+      // Adicionar URLs públicas aos arquivos se não existirem
+      const filesWithPublicUrls = (data.files || []).map((file: BunnyFile) => {
+        if (!file.PublicUrl) {
+          return {
+            ...file,
+            PublicUrl: getBunnyPublicUrl(file.Path),
+          }
+        }
+        return file
+      })
+
+      setFiles(filesWithPublicUrls)
     } catch (err) {
       console.error("Erro ao buscar arquivos:", err)
       setError(err instanceof Error ? err.message : "Erro desconhecido ao buscar arquivos")
@@ -91,6 +110,68 @@ export function FileList() {
       setError(err instanceof Error ? err.message : "Erro ao excluir arquivo")
     } finally {
       setDeletingFile(null)
+    }
+  }
+
+  const handleCreateDirectory = async () => {
+    setIsCreatingDirectory(true)
+    setError(null)
+    setDirectoryCreated(false)
+
+    try {
+      const response = await fetch("/api/create-directory", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ directory: "documents" }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || errorData.error || `Erro ao criar diretório: ${response.status}`)
+      }
+
+      setDirectoryCreated(true)
+      await fetchFiles()
+    } catch (err) {
+      console.error("Erro ao criar diretório:", err)
+      setError(err instanceof Error ? err.message : "Erro ao criar diretório")
+    } finally {
+      setIsCreatingDirectory(false)
+    }
+  }
+
+  const handleCheckDirectory = async () => {
+    setIsCheckingDirectory(true)
+    setDirectoryInfo(null)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/check-directory")
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || errorData.error || `Erro ao verificar diretório: ${response.status}`)
+      }
+
+      const data = await response.json()
+      setDirectoryInfo(data)
+
+      // Se o diretório existe e tem arquivos, atualizar a lista
+      if (data.exists && data.files && data.files.length > 0) {
+        setFiles(
+          data.files.map((file: BunnyFile) => ({
+            ...file,
+            PublicUrl: getBunnyPublicUrl(file.Path),
+          })),
+        )
+      }
+    } catch (err) {
+      console.error("Erro ao verificar diretório:", err)
+      setError(err instanceof Error ? err.message : "Erro ao verificar diretório")
+    } finally {
+      setIsCheckingDirectory(false)
     }
   }
 
@@ -172,6 +253,30 @@ export function FileList() {
         <h2 className="text-xl font-bold text-[#4072b0]">Arquivos Armazenados</h2>
         <div className="flex space-x-2">
           <button
+            onClick={handleCheckDirectory}
+            className="flex items-center text-sm text-[#4b7bb5] hover:text-[#3d649e] px-2 py-1 border border-[#4b7bb5] rounded-md"
+            disabled={isCheckingDirectory}
+          >
+            {isCheckingDirectory ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Search className="h-4 w-4 mr-1" />
+            )}
+            Verificar Diretório
+          </button>
+          <button
+            onClick={handleCreateDirectory}
+            className="flex items-center text-sm text-[#4b7bb5] hover:text-[#3d649e] px-2 py-1 border border-[#4b7bb5] rounded-md"
+            disabled={isCreatingDirectory}
+          >
+            {isCreatingDirectory ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <FolderPlus className="h-4 w-4 mr-1" />
+            )}
+            Criar Diretório
+          </button>
+          <button
             onClick={handleCreateTestDirectory}
             className="flex items-center text-sm text-[#4b7bb5] hover:text-[#3d649e] px-2 py-1 border border-[#4b7bb5] rounded-md"
             disabled={isLoading}
@@ -189,6 +294,29 @@ export function FileList() {
         </div>
       </div>
 
+      {directoryCreated && (
+        <div className="bg-green-50 text-green-700 p-4 rounded-md mb-4 flex items-start">
+          <div>
+            <p className="font-medium">Diretório criado com sucesso!</p>
+            <p className="mt-1">O diretório "documents" foi criado e está pronto para receber arquivos.</p>
+          </div>
+        </div>
+      )}
+
+      {directoryInfo && (
+        <div className="bg-blue-50 text-blue-700 p-4 rounded-md mb-4">
+          <h3 className="font-medium">Informações do Diretório:</h3>
+          <p>Status: {directoryInfo.exists ? "Existe" : "Não existe"}</p>
+          {directoryInfo.exists && <p>Quantidade de arquivos: {directoryInfo.fileCount}</p>}
+          <details className="mt-2">
+            <summary className="cursor-pointer">Detalhes técnicos</summary>
+            <pre className="mt-2 p-2 bg-blue-100 rounded text-xs overflow-auto max-h-40">
+              {JSON.stringify(directoryInfo, null, 2)}
+            </pre>
+          </details>
+        </div>
+      )}
+
       {error && (
         <div className="bg-red-50 text-red-700 p-4 rounded-md mb-4 flex items-start">
           <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
@@ -196,9 +324,21 @@ export function FileList() {
             <p className="font-medium">Erro ao carregar arquivos:</p>
             <p className="mt-1">{error}</p>
             <p className="mt-2 text-sm">
-              Verifique se as variáveis de ambiente BUNNY_API_KEY, BUNNY_STORAGE_ZONE e BUNNY_STORAGE_REGION estão
-              configuradas corretamente.
+              Verifique se as variáveis de ambiente BUNNY_API_KEY e BUNNY_STORAGE_ZONE estão configuradas corretamente.
             </p>
+            <p className="mt-2 text-sm">
+              <strong>Importante:</strong> Certifique-se de que você configurou uma Pull Zone no painel do Bunny.net
+              conectada à sua Storage Zone para acessar os arquivos publicamente.
+            </p>
+            <div className="mt-2">
+              <button
+                onClick={handleCreateDirectory}
+                className="text-sm text-red-700 underline"
+                disabled={isCreatingDirectory}
+              >
+                Tentar criar o diretório "documents"
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -212,6 +352,13 @@ export function FileList() {
         <div className="text-center py-8 text-gray-500">
           <p>Nenhum arquivo encontrado.</p>
           <p className="text-sm mt-2">Faça upload de arquivos usando o formulário acima.</p>
+          <button
+            onClick={handleCreateDirectory}
+            className="mt-4 px-4 py-2 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e]"
+            disabled={isCreatingDirectory}
+          >
+            {isCreatingDirectory ? "Criando diretório..." : "Criar diretório 'documents'"}
+          </button>
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -238,7 +385,7 @@ export function FileList() {
                   <td className="py-2 px-2 text-right">
                     <div className="flex justify-end space-x-2">
                       <a
-                        href={`https://${file.StorageZoneName}.b-cdn.net/${file.Path}`}
+                        href={file.PublicUrl || getBunnyPublicUrl(file.Path)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-500 hover:text-blue-700"

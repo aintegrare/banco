@@ -4,10 +4,43 @@ import type React from "react"
 
 import { useState } from "react"
 import { Save, Loader2 } from "lucide-react"
+import Link from "next/link"
 
 export default function ConfiguracoesPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+
+  // Adicionar estado para o teste de conexão
+  const [testingConnection, setTestingConnection] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<{
+    success?: boolean
+    message?: string
+    details?: any
+  } | null>(null)
+
+  // Adicionar função para testar a conexão
+  const testConnection = async () => {
+    try {
+      setTestingConnection(true)
+      setConnectionStatus(null)
+
+      const response = await fetch("/api/test-bunny-connection")
+      const data = await response.json()
+
+      setConnectionStatus({
+        success: data.success,
+        message: data.message,
+        details: data,
+      })
+    } catch (error) {
+      setConnectionStatus({
+        success: false,
+        message: error instanceof Error ? error.message : "Erro ao testar conexão",
+      })
+    } finally {
+      setTestingConnection(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -110,6 +143,68 @@ export default function ConfiguracoesPage() {
                 <div className="mt-4 p-3 bg-green-50 text-green-700 rounded-md">Configurações salvas com sucesso!</div>
               )}
             </form>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <h2 className="text-xl font-bold text-[#4072b0] mb-4">Configurações do Bunny.net</h2>
+
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-1">Pull Zone</h3>
+                <p className="text-xs text-gray-500 mb-2">
+                  Para acessar os arquivos publicamente, é necessário configurar uma Pull Zone no painel do Bunny.net.
+                </p>
+                <Link
+                  href="/admin/configuracoes/bunny"
+                  className="inline-flex items-center px-4 py-2 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:ring-offset-2 text-sm"
+                >
+                  Ver instruções de configuração
+                </Link>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-1">Status da conexão</h3>
+                {connectionStatus ? (
+                  <div
+                    className={`px-4 py-2 rounded-md ${connectionStatus.success ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"} flex items-center`}
+                  >
+                    <span
+                      className={`h-2 w-2 rounded-full mr-2 ${connectionStatus.success ? "bg-green-500" : "bg-red-500"}`}
+                    ></span>
+                    {connectionStatus.message || (connectionStatus.success ? "Conectado" : "Falha na conexão")}
+                  </div>
+                ) : (
+                  <div className="px-4 py-2 bg-yellow-100 rounded-md text-yellow-700 flex items-center">
+                    <span className="h-2 w-2 bg-yellow-500 rounded-full mr-2"></span>
+                    Verificação pendente
+                  </div>
+                )}
+
+                <button
+                  onClick={testConnection}
+                  disabled={testingConnection}
+                  className="mt-2 px-4 py-2 border border-[#4b7bb5] text-[#4b7bb5] rounded-md hover:bg-[#f0f4f9] focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:ring-offset-2 disabled:opacity-50 text-sm"
+                >
+                  {testingConnection ? (
+                    <>
+                      <Loader2 className="h-4 w-4 inline animate-spin mr-1" />
+                      Testando...
+                    </>
+                  ) : (
+                    "Testar conexão agora"
+                  )}
+                </button>
+
+                {connectionStatus?.details && (
+                  <details className="mt-2 text-xs">
+                    <summary className="cursor-pointer text-[#4b7bb5]">Detalhes técnicos</summary>
+                    <pre className="mt-1 p-2 bg-gray-100 rounded overflow-auto max-h-40">
+                      {JSON.stringify(connectionStatus.details, null, 2)}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-md p-6">
