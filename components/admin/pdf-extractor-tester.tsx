@@ -3,13 +3,14 @@
 import type React from "react"
 
 import { useState } from "react"
-import { FileText, Loader2, AlertCircle, CheckCircle } from "lucide-react"
+import { FileText, Loader2, AlertCircle, CheckCircle, Info } from "lucide-react"
 
 export function PDFExtractorTester() {
   const [url, setUrl] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [logs, setLogs] = useState<string[]>([])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -19,8 +20,11 @@ export function PDFExtractorTester() {
     setIsLoading(true)
     setResult(null)
     setError(null)
+    setLogs(["Iniciando extração de texto do PDF..."])
 
     try {
+      addLog(`Enviando requisição para ${url}`)
+
       const response = await fetch("/api/test-pdf-extraction", {
         method: "POST",
         headers: {
@@ -29,19 +33,25 @@ export function PDFExtractorTester() {
         body: JSON.stringify({ url }),
       })
 
+      addLog(`Resposta recebida com status: ${response.status}`)
+
       // Verificar se a resposta é um JSON válido
       let data
       try {
         data = await response.json()
+        addLog("Dados JSON recebidos com sucesso")
       } catch (jsonError) {
+        addLog("ERRO: Falha ao analisar resposta JSON")
         console.error("Erro ao analisar resposta JSON:", jsonError)
         throw new Error("Resposta inválida do servidor")
       }
 
       if (!response.ok) {
+        addLog(`ERRO: ${data.message || data.error || `Erro: ${response.status}`}`)
         throw new Error(data.message || data.error || `Erro: ${response.status}`)
       }
 
+      addLog(`Extração concluída! ${data.textLength} caracteres extraídos`)
       setResult(data)
     } catch (err) {
       console.error("Erro no teste de extração:", err)
@@ -49,6 +59,10 @@ export function PDFExtractorTester() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const addLog = (message: string) => {
+    setLogs((prev) => [...prev, message])
   }
 
   return (
@@ -90,16 +104,29 @@ export function PDFExtractorTester() {
         </button>
       </form>
 
+      {logs.length > 0 && (
+        <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
+          <div className="flex items-start mb-2">
+            <Info className="h-4 w-4 mr-2 text-[#4b7bb5] flex-shrink-0 mt-0.5" />
+            <h3 className="font-medium text-gray-700">Log de processamento:</h3>
+          </div>
+          <div className="bg-black text-green-400 p-2 rounded font-mono text-xs overflow-auto max-h-40">
+            {logs.map((log, index) => (
+              <div key={index} className={log.includes("ERRO") ? "text-red-400" : ""}>
+                {`> ${log}`}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md flex items-start">
           <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
           <div>
             <p className="font-medium">Erro na extração:</p>
             <p className="mt-1">{error}</p>
-            <p className="mt-2 text-sm">
-              Nota: A extração de PDF pode falhar por diversos motivos, incluindo PDFs protegidos, mal formatados ou
-              muito grandes.
-            </p>
+            <p className="mt-2 text-sm">Verifique se o URL é válido e se o PDF está acessível publicamente.</p>
           </div>
         </div>
       )}

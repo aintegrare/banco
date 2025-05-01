@@ -1,7 +1,6 @@
 import { createClient } from "@supabase/supabase-js"
 import { generateSimpleEmbedding } from "./embeddings"
-import { downloadBunnyFile } from "./bunny"
-// Remover a importação direta do pdf-parse que está causando o erro
+import { extractPDFText } from "./pdf-extractor"
 
 // Configuração do cliente Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
@@ -78,62 +77,6 @@ export async function generateEmbeddings(text: string) {
     // Usar o fallback local em caso de erro
     console.log("Usando fallback local para embeddings devido a erro na API")
     return generateSimpleEmbedding(text)
-  }
-}
-
-// Função para extrair texto de um PDF usando uma abordagem alternativa
-export async function extractTextFromPDF(pdfUrl: string) {
-  try {
-    console.log("Extraindo texto do PDF:", pdfUrl)
-
-    // Se o PDF está no Bunny.net, baixar primeiro
-    let pdfBuffer: Buffer
-
-    if (pdfUrl.includes("b-cdn.net") || pdfUrl.includes("storage.bunnycdn.com")) {
-      // Extrair o caminho do arquivo da URL
-      const urlParts = pdfUrl.split("/")
-      const fileName = urlParts[urlParts.length - 1]
-      const filePath = `documents/${fileName}`
-
-      console.log(`Baixando PDF do Bunny.net: ${filePath}`)
-      // Baixar o arquivo do Bunny.net
-      pdfBuffer = await downloadBunnyFile(filePath)
-    } else {
-      console.log(`Baixando PDF de URL externa: ${pdfUrl}`)
-      // Baixar o PDF de uma URL externa
-      const response = await fetch(pdfUrl)
-
-      if (!response.ok) {
-        throw new Error(`Erro ao baixar PDF: ${response.status}`)
-      }
-
-      const arrayBuffer = await response.arrayBuffer()
-      pdfBuffer = Buffer.from(arrayBuffer)
-    }
-
-    console.log(`PDF baixado com sucesso, tamanho: ${pdfBuffer.length} bytes`)
-
-    // Importar pdf-parse dinamicamente apenas quando necessário
-    // Isso evita que o webpack tente resolver as dependências durante a compilação
-    try {
-      // Usar dynamic import para carregar a biblioteca apenas em runtime
-      const pdfParse = await import("pdf-parse").then((module) => module.default || module)
-      const data = await pdfParse(pdfBuffer)
-
-      console.log(`Extração de texto concluída, tamanho total: ${data.text.length} caracteres`)
-      console.log(`Amostra do texto extraído: ${data.text.substring(0, 200)}...`)
-
-      return data.text
-    } catch (parseError) {
-      console.error("Erro ao analisar PDF:", parseError)
-
-      // Implementar um fallback simples para extração de texto
-      // Retornar um texto indicando que a extração falhou, mas permitindo que o fluxo continue
-      return `[Não foi possível extrair o texto do PDF. Erro: ${parseError.message}]`
-    }
-  } catch (error) {
-    console.error(`Erro ao extrair texto do PDF ${pdfUrl}:`, error)
-    throw error
   }
 }
 
@@ -232,7 +175,7 @@ export function splitTextIntoChunks(text: string, chunkSize: number) {
   return chunks
 }
 
-// Atualizar a função processDocument para usar o fallback se necessário
+// Atualizar a função processDocument para usar o novo extrator de PDF
 export async function processDocument(documentUrl: string, documentType: "pdf" | "website", chunkSize = 1000) {
   let documentId = null
   let useSimpleEmbeddings = false
@@ -251,7 +194,8 @@ export async function processDocument(documentUrl: string, documentType: "pdf" |
     if (documentType === "website") {
       documentText = await extractTextFromWebsite(documentUrl)
     } else {
-      documentText = await extractTextFromPDF(documentUrl)
+      // Usar nosso novo extrator de PDF
+      documentText = await extractPDFText(documentUrl)
     }
 
     if (!documentText || documentText.length < 50) {

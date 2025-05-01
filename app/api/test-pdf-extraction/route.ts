@@ -1,9 +1,24 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { extractTextFromPDF } from "@/lib/api"
+import { extractPDFText } from "@/lib/pdf-extractor"
 
 export async function POST(request: NextRequest) {
   try {
-    const { url } = await request.json()
+    // Verificar se o corpo da requisição é válido
+    let body
+    try {
+      body = await request.json()
+    } catch (parseError) {
+      console.error("Erro ao analisar o corpo da requisição:", parseError)
+      return NextResponse.json(
+        {
+          error: "Corpo da requisição inválido",
+          message: "O corpo da requisição não é um JSON válido",
+        },
+        { status: 400 },
+      )
+    }
+
+    const { url } = body
 
     if (!url) {
       return NextResponse.json({ error: "URL é obrigatória" }, { status: 400 })
@@ -12,8 +27,8 @@ export async function POST(request: NextRequest) {
     console.log(`Teste de extração de PDF: ${url}`)
 
     try {
-      // Extrair texto do PDF
-      const text = await extractTextFromPDF(url)
+      // Extrair texto do PDF usando nosso novo extrator
+      const text = await extractPDFText(url)
 
       return NextResponse.json({
         success: true,
@@ -27,6 +42,7 @@ export async function POST(request: NextRequest) {
         {
           error: "Erro ao extrair texto do PDF",
           message: extractionError instanceof Error ? extractionError.message : String(extractionError),
+          stack: extractionError instanceof Error ? extractionError.stack : undefined,
         },
         { status: 500 },
       )
@@ -37,6 +53,7 @@ export async function POST(request: NextRequest) {
       {
         error: "Erro ao processar requisição",
         message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 },
     )
