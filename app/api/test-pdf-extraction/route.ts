@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     console.log(`Teste de extração de PDF: ${url}`)
 
     try {
-      // Extrair texto do PDF usando nosso novo extrator
+      // Extrair texto do PDF usando nosso extrator compatível com serverless
       const text = await extractPDFText(url)
 
       return NextResponse.json({
@@ -42,7 +42,6 @@ export async function POST(request: NextRequest) {
         {
           error: "Erro ao extrair texto do PDF",
           message: extractionError instanceof Error ? extractionError.message : String(extractionError),
-          stack: extractionError instanceof Error ? extractionError.stack : undefined,
         },
         { status: 500 },
       )
@@ -53,7 +52,6 @@ export async function POST(request: NextRequest) {
       {
         error: "Erro ao processar requisição",
         message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 },
     )

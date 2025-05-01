@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`Iniciando processamento de ${type}: ${url}`)
 
+    // Processar o documento usando nossa função atualizada
     const result = await processDocument(url, type as "pdf" | "website", chunkSize || 1000)
 
     console.log(`Processamento concluído com sucesso: ${JSON.stringify(result)}`)

@@ -116,6 +116,26 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Verificar se o conteúdo parece ser texto real ou simulado
+    let hasRealContent = false
+    for (const doc of documentContents) {
+      // Verificar se o conteúdo parece ser texto real
+      // (não contém frases específicas que indicam texto simulado)
+      if (
+        doc.content.length > 100 &&
+        !doc.content.includes("Este é um texto extraído do arquivo") &&
+        !doc.content.includes("Este é apenas um texto de exemplo para teste do sistema")
+      ) {
+        hasRealContent = true
+        break
+      }
+    }
+
+    if (!hasRealContent) {
+      console.warn("API Search: Possível conteúdo simulado detectado nos documentos")
+      // Continuar mesmo com conteúdo simulado, mas registrar o aviso
+    }
+
     // 3. Preparar o contexto para a IA
     const context = documentContents.map((doc) => `Fonte: ${doc.title} (${doc.source_type})\n${doc.content}`)
 

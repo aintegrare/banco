@@ -194,7 +194,7 @@ export async function processDocument(documentUrl: string, documentType: "pdf" |
     if (documentType === "website") {
       documentText = await extractTextFromWebsite(documentUrl)
     } else {
-      // Usar nosso novo extrator de PDF
+      // Usar nosso novo extrator de PDF compatível com serverless
       documentText = await extractPDFText(documentUrl)
     }
 
