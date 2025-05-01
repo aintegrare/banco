@@ -1,6 +1,6 @@
 import type { Config } from "tailwindcss"
 
-const config: Config = {
+const config = {
   darkMode: ["class"],
   content: [
     "./pages/**/*.{ts,tsx}",
@@ -25,18 +25,8 @@ const config: Config = {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "#4b7bb5", // Azul principal da Integrare
-          foreground: "#f2f1ef", // Branco da Integrare
-          50: "#f0f4f9",
-          100: "#d1dff0",
-          200: "#a3bee0",
-          300: "#6b91c1", // Azul mais claro da Integrare
-          400: "#527eb7", // Azul médio da Integrare
-          500: "#4b7bb5", // Azul principal da Integrare
-          600: "#4072b0", // Azul médio-escuro da Integrare
-          700: "#3d649e", // Azul escuro da Integrare
-          800: "#345186",
-          900: "#2c436f",
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -62,6 +52,16 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        integrare: {
+          blue1: "#4b7bb5",
+          blue2: "#527eb7",
+          blue3: "#3d649e",
+          blue4: "#4072b0",
+          blue5: "#6b91c1",
+          white: "#f2f1ef",
+          dark: "#2c3e50",
+          darkBlue: "#1e3a5f",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -70,21 +70,45 @@ const config: Config = {
       },
       keyframes: {
         "accordion-down": {
-          from: { height: "0" },
+          from: { height: 0 },
           to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
           from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
+          to: { height: 0 },
+        },
+        "fade-in": {
+          from: { opacity: 0 },
+          to: { opacity: 1 },
+        },
+        "fade-up": {
+          from: { opacity: 0, transform: "translateY(20px)" },
+          to: { opacity: 1, transform: "translateY(0)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.5s ease-out",
+        "fade-up": "fade-up 0.5s ease-out",
+      },
+      typography: {
+        DEFAULT: {
+          css: {
+            maxWidth: "65ch",
+            color: "var(--tw-prose-body)",
+            lineHeight: "1.75",
+          },
+        },
+      },
+      boxShadow: {
+        elegant: "0 10px 30px -10px rgba(0, 0, 0, 0.1)",
+        card: "0 4px 20px rgba(0, 0, 0, 0.08)",
+        "card-hover": "0 10px 30px rgba(0, 0, 0, 0.12)",
       },
     },
   },
   plugins: [require("tailwindcss-animate")],
-}
+} satisfies Config
 
 export default config

@@ -1,4 +1,0 @@
-nome,email,telefone,cpf,cidade,categoria,categoria_negocio,temperatura,valor_cliente,preferencia_contato,fonte_captacao,ultimo_contato,data_descoberta,observacoes
-João Silva,joao@exemplo.com,(11) 98765-4321,123.456.789-00,São Paulo,2,7,3,3,1,2,2023-04-15,2023-01-10,Cliente interessado em expandir negócios
-Maria Oliveira,maria@exemplo.com,(21) 91234-5678,987.654.321-00,Rio de Janeiro,3,5,2,2,3,1,2023-03-22,2023-02-05,Advogada especializada em direito empresarial
-Carlos Santos,carlos@exemplo.com,(31) 99876-5432,111.222.333-44,Belo Horizonte,1,2,1,1,2,3,2023-05-10,2023-03-15,Médico interessado em investimentos
