@@ -21,7 +21,10 @@ export async function uploadFileToBunny(
       throw new Error("Configurações do Bunny.net incompletas. Verifique as variáveis de ambiente.")
     }
 
-    const url = `${BUNNY_STORAGE_URL}/${filePath}`
+    // Normalizar o caminho do arquivo
+    const normalizedPath = filePath.replace(/\/+/g, "/").replace(/^\//, "")
+
+    const url = `${BUNNY_STORAGE_URL}/${normalizedPath}`
     console.log(`Bunny Upload: Tentando fazer upload para: ${url}`)
     console.log(
       `Bunny Upload: Tamanho do conteúdo: ${typeof fileContent === "string" ? fileContent.length : fileContent.length} bytes`,
@@ -59,7 +62,7 @@ export async function uploadFileToBunny(
       }
 
       // Retorna a URL pública do arquivo através da Pull Zone
-      const publicUrl = `${BUNNY_PULLZONE_URL}/${filePath}`
+      const publicUrl = `${BUNNY_PULLZONE_URL}/${normalizedPath}`
       console.log(`Bunny Upload: Upload concluído com sucesso. URL pública: ${publicUrl}`)
       return publicUrl
     } catch (fetchError) {
@@ -79,8 +82,15 @@ export async function listBunnyFiles(directory = ""): Promise<any[]> {
       throw new Error("Configurações do Bunny.net incompletas. Verifique as variáveis de ambiente.")
     }
 
+    // Normalizar o diretório
+    const normalizedDirectory = directory.replace(/\/+/g, "/").replace(/^\//, "")
+
     // Garantir que o diretório termine com uma barra se não estiver vazio
-    const formattedDirectory = directory ? (directory.endsWith("/") ? directory : `${directory}/`) : ""
+    const formattedDirectory = normalizedDirectory
+      ? normalizedDirectory.endsWith("/")
+        ? normalizedDirectory
+        : `${normalizedDirectory}/`
+      : ""
 
     // Construir a URL correta para a API do Bunny.net
     const url = `${BUNNY_STORAGE_URL}/${formattedDirectory}`
@@ -133,10 +143,20 @@ export async function listBunnyFiles(directory = ""): Promise<any[]> {
 
       // Adicionar a URL pública para cada arquivo
       if (Array.isArray(files)) {
-        return files.map((file) => ({
-          ...file,
-          PublicUrl: `${BUNNY_PULLZONE_URL}/${file.Path}`,
-        }))
+        return files.map((file) => {
+          // Garantir que o Path esteja completo
+          const fullPath = file.IsDirectory
+            ? `${formattedDirectory}${file.ObjectName}/`
+            : `${formattedDirectory}${file.ObjectName}`
+
+          return {
+            ...file,
+            // Garantir que o Path esteja correto
+            Path: fullPath,
+            // Gerar URL pública correta
+            PublicUrl: `${BUNNY_PULLZONE_URL}/${fullPath}`,
+          }
+        })
       }
 
       return Array.isArray(files) ? files : []
@@ -157,14 +177,37 @@ export async function deleteBunnyFile(filePath: string): Promise<boolean> {
       throw new Error("Configurações do Bunny.net incompletas. Verifique as variáveis de ambiente.")
     }
 
-    const url = `${BUNNY_STORAGE_URL}/${filePath}`
-    console.log(`Bunny Delete: Tentando excluir arquivo: ${url}`)
+    // Normalizar o caminho do arquivo (remover barras duplas, etc.)
+    const normalizedPath = filePath.replace(/\/+/g, "/").replace(/^\//, "")
+
+    console.log(`Bunny Delete: Tentando excluir arquivo: ${normalizedPath}`)
+
+    const url = `${BUNNY_STORAGE_URL}/${normalizedPath}`
+    console.log(`Bunny Delete: URL completa: ${url}`)
 
     // Verificar se a URL é válida
     try {
       new URL(url)
     } catch (e) {
       throw new Error(`URL de exclusão inválida: ${url}`)
+    }
+
+    // Verificar se o arquivo existe antes de tentar excluí-lo
+    try {
+      const checkResponse = await fetch(url, {
+        method: "GET",
+        headers: {
+          AccessKey: BUNNY_API_KEY,
+        },
+      })
+
+      if (checkResponse.status === 404) {
+        console.log(`Bunny Delete: Arquivo não encontrado: ${normalizedPath}`)
+        return true // Retornar true se o arquivo já não existe
+      }
+    } catch (checkError) {
+      console.warn(`Bunny Delete: Erro ao verificar existência do arquivo: ${checkError}`)
+      // Continuar com a exclusão mesmo se a verificação falhar
     }
 
     try {
@@ -177,6 +220,12 @@ export async function deleteBunnyFile(filePath: string): Promise<boolean> {
 
       console.log(`Bunny Delete: Resposta recebida - Status: ${response.status}`)
 
+      // Considerar 404 como sucesso, já que o objetivo é que o arquivo não exista
+      if (response.status === 404) {
+        console.log(`Bunny Delete: Arquivo já não existe: ${normalizedPath}`)
+        return true
+      }
+
       if (!response.ok) {
         let errorText = ""
         try {
@@ -187,7 +236,7 @@ export async function deleteBunnyFile(filePath: string): Promise<boolean> {
         throw new Error(`Erro ao excluir arquivo do Bunny.net: ${response.status} - ${errorText}`)
       }
 
-      console.log(`Bunny Delete: Arquivo excluído com sucesso: ${filePath}`)
+      console.log(`Bunny Delete: Arquivo excluído com sucesso: ${normalizedPath}`)
       return true
     } catch (fetchError) {
       console.error("Bunny Delete: Erro na chamada fetch:", fetchError)
@@ -206,7 +255,10 @@ export async function downloadBunnyFile(filePath: string): Promise<Buffer> {
       throw new Error("Configurações do Bunny.net incompletas. Verifique as variáveis de ambiente.")
     }
 
-    const url = `${BUNNY_STORAGE_URL}/${filePath}`
+    // Normalizar o caminho do arquivo
+    const normalizedPath = filePath.replace(/\/+/g, "/").replace(/^\//, "")
+
+    const url = `${BUNNY_STORAGE_URL}/${normalizedPath}`
     console.log(`Bunny Download: Tentando baixar arquivo: ${url}`)
 
     // Verificar se a URL é válida
@@ -251,5 +303,7 @@ export async function downloadBunnyFile(filePath: string): Promise<Buffer> {
 
 // Função para obter a URL pública de um arquivo
 export function getBunnyPublicUrl(filePath: string): string {
-  return `${BUNNY_PULLZONE_URL}/${filePath}`
+  // Normalizar o caminho do arquivo
+  const normalizedPath = filePath ? filePath.replace(/\/+/g, "/").replace(/^\//, "") : ""
+  return `${BUNNY_PULLZONE_URL}/${normalizedPath}`
 }

@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js"
 import { generateSimpleEmbedding } from "./embeddings"
 import { downloadBunnyFile } from "./bunny"
+// Importar pdf-parse com require para evitar problemas de importação
+const pdfParse = require("pdf-parse")
 
 // Configuração do cliente Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
@@ -21,40 +23,57 @@ export async function generateEmbeddings(text: string) {
     // Limitar o tamanho do texto para evitar erros com a API
     const limitedText = text.slice(0, 100000) // Limitar a 100k caracteres
 
-    // CORREÇÃO: Usar o endpoint correto da API Anthropic para embeddings
-    // O endpoint correto para embeddings do Claude é v1/messages com o parâmetro system_prompt
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY || "",
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-3-haiku-20240307",
-        max_tokens: 1024,
-        messages: [
-          {
-            role: "user",
-            content: limitedText,
-          },
-        ],
-        system: "Gere um embedding semântico para este texto. Responda apenas com o embedding.",
-      }),
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      console.error("Erro na resposta da API de embeddings:", errorData)
-      throw new Error(errorData.error?.message || `Erro ao gerar embeddings: ${response.status}`)
+    // Verificar se a chave da API está disponível
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.log("Chave da API Anthropic não encontrada, usando fallback local para embeddings")
+      return generateSimpleEmbedding(text)
     }
 
-    const data = await response.json()
+    try {
+      // Tentar usar a API Anthropic com timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 segundos de timeout
 
-    // Como a API de mensagens não retorna embeddings diretamente,
-    // vamos usar o fallback local em vez de tentar extrair embeddings da resposta
-    console.log("Usando fallback local para embeddings devido à limitação da API")
-    return generateSimpleEmbedding(text)
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-3-haiku-20240307",
+          max_tokens: 1024,
+          messages: [
+            {
+              role: "user",
+              content: limitedText,
+            },
+          ],
+          system: "Gere um embedding semântico para este texto. Responda apenas com o embedding.",
+        }),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("Erro na resposta da API de embeddings:", errorData)
+        throw new Error(errorData.error?.message || `Erro ao gerar embeddings: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      // Como a API de mensagens não retorna embeddings diretamente,
+      // vamos usar o fallback local em vez de tentar extrair embeddings da resposta
+      console.log("Usando fallback local para embeddings devido à limitação da API")
+      return generateSimpleEmbedding(text)
+    } catch (apiError) {
+      console.error("Erro ao chamar API de embeddings:", apiError)
+      console.log("Usando fallback local para embeddings após erro na API")
+      return generateSimpleEmbedding(text)
+    }
   } catch (error) {
     console.error("Erro ao gerar embeddings:", error)
     // Usar o fallback local em caso de erro
@@ -63,7 +82,7 @@ export async function generateEmbeddings(text: string) {
   }
 }
 
-// Função para extrair texto de um PDF
+// Função para extrair texto de um PDF usando pdf-parse
 export async function extractTextFromPDF(pdfUrl: string) {
   try {
     console.log("Extraindo texto do PDF:", pdfUrl)
@@ -77,9 +96,11 @@ export async function extractTextFromPDF(pdfUrl: string) {
       const fileName = urlParts[urlParts.length - 1]
       const filePath = `documents/${fileName}`
 
+      console.log(`Baixando PDF do Bunny.net: ${filePath}`)
       // Baixar o arquivo do Bunny.net
       pdfBuffer = await downloadBunnyFile(filePath)
     } else {
+      console.log(`Baixando PDF de URL externa: ${pdfUrl}`)
       // Baixar o PDF de uma URL externa
       const response = await fetch(pdfUrl)
 
@@ -91,11 +112,18 @@ export async function extractTextFromPDF(pdfUrl: string) {
       pdfBuffer = Buffer.from(arrayBuffer)
     }
 
-    // Em um ambiente real, você usaria uma biblioteca como pdf-parse
-    // Aqui vamos simular a extração para demonstração
-    const text = `Conteúdo simulado de PDF para ${pdfUrl}. Este é um texto de exemplo para demonstrar o processamento de documentos.`
+    console.log(`PDF baixado com sucesso, tamanho: ${pdfBuffer.length} bytes`)
 
-    return text
+    // Extrair texto usando pdf-parse
+    try {
+      const data = await pdfParse(pdfBuffer)
+      console.log(`Extração de texto concluída, tamanho total: ${data.text.length} caracteres`)
+      console.log(`Amostra do texto extraído: ${data.text.substring(0, 200)}...`)
+      return data.text
+    } catch (parseError) {
+      console.error("Erro ao analisar PDF:", parseError)
+      throw new Error(`Erro ao analisar PDF: ${parseError.message}`)
+    }
   } catch (error) {
     console.error(`Erro ao extrair texto do PDF ${pdfUrl}:`, error)
     throw error
@@ -224,6 +252,7 @@ export async function processDocument(documentUrl: string, documentType: "pdf" |
     }
 
     console.log(`Texto extraído com sucesso: ${documentText.length} caracteres`)
+    console.log(`Amostra do texto extraído: ${documentText.substring(0, 200)}...`)
 
     // Dividir o texto em chunks
     const chunks = splitTextIntoChunks(documentText, chunkSize)
@@ -355,36 +384,57 @@ export async function getAIResponse(query: string, context: string[]) {
   try {
     const contextText = context.join("\n\n")
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY || "",
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-3-sonnet-20240229",
-        max_tokens: 1000,
-        messages: [
-          {
-            role: "user",
-            content: `Com base nas seguintes informações, responda à pergunta: "${query}"\n\nInformações:\n${contextText}\n\nForneça uma resposta detalhada e bem estruturada, usando listas numeradas quando apropriado. Cite as fontes específicas quando relevante.`,
-          },
-        ],
-      }),
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      console.error("Erro na resposta da API Claude:", errorData)
-      throw new Error(errorData.error?.message || `Erro ao obter resposta da IA: ${response.status}`)
+    // Verificar se a chave da API está disponível
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.error("Chave da API Anthropic não encontrada")
+      return "Não foi possível gerar uma resposta porque a chave da API não está configurada. Por favor, configure a variável de ambiente ANTHROPIC_API_KEY."
     }
 
-    const data = await response.json()
-    return data.content[0].text
+    try {
+      // Tentar usar a API Anthropic com timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 segundos de timeout
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-3-sonnet-20240229",
+          max_tokens: 1000,
+          messages: [
+            {
+              role: "user",
+              content: `Com base nas seguintes informações, responda à pergunta: "${query}"\n\nInformações:\n${contextText}\n\nForneça uma resposta detalhada e bem estruturada, usando listas numeradas quando apropriado. Cite as fontes específicas quando relevante.`,
+            },
+          ],
+        }),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("Erro na resposta da API Claude:", errorData)
+        throw new Error(errorData.error?.message || `Erro ao obter resposta da IA: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return data.content[0].text
+    } catch (apiError) {
+      console.error("Erro ao chamar API Claude:", apiError)
+      if (apiError.name === "AbortError") {
+        return "A solicitação excedeu o tempo limite. Por favor, tente novamente mais tarde."
+      }
+      throw apiError
+    }
   } catch (error) {
     console.error("Erro ao obter resposta da IA:", error)
-    throw error
+    return "Ocorreu um erro ao processar sua consulta. Por favor, tente novamente mais tarde."
   }
 }
 

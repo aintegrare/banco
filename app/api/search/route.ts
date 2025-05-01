@@ -1,11 +1,26 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { generateEmbeddings, getAIResponse } from "@/lib/api"
+import { getAIResponse } from "@/lib/api"
 import { generateSimpleEmbedding } from "@/lib/embeddings"
 import { selectRelevantDocuments, getDocumentContent, diagnoseDocumentAccess } from "@/lib/document-selection"
 
 export async function POST(request: NextRequest) {
   try {
-    const { query } = await request.json()
+    // Verificar se o corpo da requisição é válido
+    let body
+    try {
+      body = await request.json()
+    } catch (parseError) {
+      console.error("API Search: Erro ao analisar o corpo da requisição:", parseError)
+      return NextResponse.json(
+        {
+          error: "Corpo da requisição inválido",
+          message: "O corpo da requisição não é um JSON válido",
+        },
+        { status: 400 },
+      )
+    }
+
+    const { query } = body
 
     if (!query || typeof query !== "string") {
       return NextResponse.json({ error: "Query inválida" }, { status: 400 })
@@ -14,8 +29,20 @@ export async function POST(request: NextRequest) {
     console.log("API Search: Processando consulta:", query)
 
     // Diagnóstico de acesso aos documentos
-    const diagnosticResult = await diagnoseDocumentAccess()
-    console.log("API Search: Resultado do diagnóstico:", diagnosticResult)
+    let diagnosticResult
+    try {
+      diagnosticResult = await diagnoseDocumentAccess()
+      console.log("API Search: Resultado do diagnóstico:", diagnosticResult)
+    } catch (diagError) {
+      console.error("API Search: Erro no diagnóstico:", diagError)
+      // Continuar mesmo com erro no diagnóstico
+      diagnosticResult = {
+        success: false,
+        documentsCount: 0,
+        chunksCount: 0,
+        error: diagError instanceof Error ? diagError.message : String(diagError),
+      }
+    }
 
     if (!diagnosticResult.success || diagnosticResult.documentsCount === 0) {
       console.error("API Search: Problema detectado no acesso aos documentos")
@@ -29,9 +56,23 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. Selecionar documentos relevantes (entre 2 e 5)
-    console.log("API Search: Selecionando documentos relevantes")
-    const relevantDocuments = await selectRelevantDocuments(query, 2, 5)
-    console.log(`API Search: ${relevantDocuments.length} documentos selecionados`)
+    let relevantDocuments = []
+    try {
+      console.log("API Search: Selecionando documentos relevantes")
+      relevantDocuments = await selectRelevantDocuments(query, 2, 5)
+      console.log(`API Search: ${relevantDocuments.length} documentos selecionados`)
+    } catch (selectError) {
+      console.error("API Search: Erro ao selecionar documentos:", selectError)
+      return NextResponse.json(
+        {
+          error: "Erro ao selecionar documentos relevantes",
+          message: selectError instanceof Error ? selectError.message : String(selectError),
+          aiResponse: "Ocorreu um erro ao buscar documentos relevantes. Por favor, tente novamente mais tarde.",
+          results: [],
+        },
+        { status: 500 },
+      )
+    }
 
     if (relevantDocuments.length === 0) {
       console.log("API Search: Nenhum documento relevante encontrado")
@@ -60,6 +101,7 @@ export async function POST(request: NextRequest) {
         }
       } catch (error) {
         console.error(`API Search: Erro ao buscar conteúdo do documento ${doc.id}:`, error)
+        // Continuar com os próximos documentos
       }
     }
 
@@ -81,10 +123,19 @@ export async function POST(request: NextRequest) {
     let queryEmbedding
     try {
       console.log("API Search: Gerando embeddings para a consulta")
-      queryEmbedding = await generateEmbeddings(query)
-    } catch (embeddingError) {
-      console.error("API Search: Erro ao gerar embeddings, usando fallback:", embeddingError)
+      // Usar diretamente o fallback local para evitar problemas com a API
       queryEmbedding = generateSimpleEmbedding(query)
+      console.log("API Search: Embeddings gerados com sucesso usando método local")
+    } catch (embeddingError) {
+      console.error("API Search: Erro ao gerar embeddings:", embeddingError)
+      return NextResponse.json(
+        {
+          error: "Erro ao gerar embeddings para a consulta",
+          message: embeddingError instanceof Error ? embeddingError.message : String(embeddingError),
+          aiResponse: "Ocorreu um erro ao processar sua consulta. Por favor, tente novamente mais tarde.",
+        },
+        { status: 500 },
+      )
     }
 
     // 5. Obter resposta da IA
@@ -121,11 +172,14 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error("API Search: Erro ao processar busca:", error)
+
+    // Garantir que a resposta seja sempre um JSON válido
     return NextResponse.json(
       {
         error: "Erro ao processar busca",
         message: error instanceof Error ? error.message : String(error),
         aiResponse: "Ocorreu um erro ao processar sua consulta. Por favor, tente novamente mais tarde.",
+        results: [],
       },
       { status: 500 },
     )

@@ -44,7 +44,20 @@ export function SearchInterface() {
         body: JSON.stringify({ query: query.trim() }),
       })
 
-      const data = await response.json()
+      // Verificar se a resposta é um JSON válido
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        console.error("SearchInterface: Erro ao analisar resposta JSON:", jsonError)
+
+        // Tentar obter o texto da resposta para diagnóstico
+        const responseText = await response.text().catch(() => "Não foi possível ler o corpo da resposta")
+
+        throw new Error(
+          `Resposta inválida do servidor. Status: ${response.status}. Corpo: ${responseText.substring(0, 100)}...`,
+        )
+      }
 
       if (!response.ok) {
         console.error("SearchInterface: Erro na resposta da API:", data)
@@ -94,7 +107,15 @@ export function SearchInterface() {
 
     try {
       const response = await fetch("/api/diagnose")
-      const data = await response.json()
+
+      // Verificar se a resposta é um JSON válido
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        console.error("SearchInterface: Erro ao analisar resposta JSON do diagnóstico:", jsonError)
+        throw new Error("Resposta inválida do servidor durante o diagnóstico")
+      }
 
       if (!response.ok) {
         throw new Error(data.message || data.error || "Erro no diagnóstico")

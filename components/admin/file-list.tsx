@@ -15,6 +15,7 @@ import {
   AlertCircle,
   FolderPlus,
   Search,
+  Info,
 } from "lucide-react"
 import { getBunnyPublicUrl } from "@/lib/bunny"
 
@@ -43,10 +44,12 @@ export function FileList() {
   const [directoryCreated, setDirectoryCreated] = useState(false)
   const [directoryInfo, setDirectoryInfo] = useState<any | null>(null)
   const [isCheckingDirectory, setIsCheckingDirectory] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<string | null>(null)
 
   const fetchFiles = async () => {
     setIsLoading(true)
     setError(null)
+    setDebugInfo(null)
 
     try {
       console.log("Iniciando busca de arquivos...")
@@ -60,7 +63,17 @@ export function FileList() {
       const data = await response.json()
       console.log(`Arquivos recebidos: ${data.files?.length || 0}`)
 
-      // Adicionar URLs públicas aos arquivos se não existirem
+      // Verificar e exibir informações de depuração
+      if (data.files && data.files.length > 0) {
+        const debugSample = data.files.slice(0, 3).map((file: BunnyFile) => ({
+          Nome: file.ObjectName,
+          Caminho: file.Path,
+          URL: file.PublicUrl || getBunnyPublicUrl(file.Path),
+        }))
+        setDebugInfo(JSON.stringify(debugSample, null, 2))
+      }
+
+      // Garantir que todos os arquivos tenham URLs públicas corretas
       const filesWithPublicUrls = (data.files || []).map((file: BunnyFile) => {
         if (!file.PublicUrl) {
           return {
@@ -92,22 +105,43 @@ export function FileList() {
     setDeletingFile(path)
 
     try {
-      const response = await fetch(`/api/files/${encodeURIComponent(path)}`, {
+      console.log(`FileList: Iniciando exclusão do arquivo: ${path}`)
+
+      // Extrair apenas o nome do arquivo e pasta para a API
+      // Remover qualquer prefixo de URL completa se existir
+      let cleanPath = path
+
+      // Se o caminho começa com http, extrair apenas a parte após o domínio
+      if (path.startsWith("http")) {
+        const url = new URL(path)
+        cleanPath = url.pathname.replace(/^\//, "") // Remover a barra inicial
+      }
+
+      // Se o caminho já começa com 'documents/', usar como está
+      // Caso contrário, extrair apenas o nome do arquivo
+      if (!cleanPath.startsWith("documents/")) {
+        const parts = cleanPath.split("/")
+        cleanPath = parts[parts.length - 1]
+      }
+
+      console.log(`FileList: Caminho limpo para API: ${cleanPath}`)
+
+      const response = await fetch(`/api/files/${encodeURIComponent(cleanPath)}`, {
         method: "DELETE",
       })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || errorData.error || `Erro ao excluir arquivo: ${response.status}`)
-      }
-
       const data = await response.json()
 
-      // Atualizar a lista de arquivos
-      setFiles((prevFiles) => prevFiles.filter((file) => file.Path !== path))
+      if (!response.ok) {
+        throw new Error(data.message || data.error || `Erro ao excluir arquivo: ${response.status}`)
+      }
+
+      // Atualizar a lista após exclusão bem-sucedida
+      setFiles((prev) => prev.filter((file) => file.Path !== path))
+      console.log(`FileList: Arquivo excluído com sucesso: ${path}`)
     } catch (err) {
       console.error("Erro ao excluir arquivo:", err)
-      setError(err instanceof Error ? err.message : "Erro ao excluir arquivo")
+      alert(err instanceof Error ? err.message : "Erro ao excluir arquivo")
     } finally {
       setDeletingFile(null)
     }
@@ -163,7 +197,7 @@ export function FileList() {
         setFiles(
           data.files.map((file: BunnyFile) => ({
             ...file,
-            PublicUrl: getBunnyPublicUrl(file.Path),
+            PublicUrl: file.PublicUrl || getBunnyPublicUrl(file.Path),
           })),
         )
       }
@@ -293,6 +327,18 @@ export function FileList() {
           </button>
         </div>
       </div>
+
+      {debugInfo && (
+        <div className="bg-gray-50 p-3 rounded-md mb-4 text-xs">
+          <div className="flex items-start">
+            <Info className="h-4 w-4 mr-2 text-[#4b7bb5] flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-gray-700">Informações de depuração (primeiros 3 arquivos):</p>
+              <pre className="mt-1 bg-gray-100 p-2 rounded overflow-auto max-h-40">{debugInfo}</pre>
+            </div>
+          </div>
+        </div>
+      )}
 
       {directoryCreated && (
         <div className="bg-green-50 text-green-700 p-4 rounded-md mb-4 flex items-start">

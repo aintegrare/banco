@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Search, FileText, Settings, Menu, X } from "lucide-react"
+import { Home, Search, FileText, Settings, Menu, X, PenToolIcon as Tool } from "lucide-react"
 
 export function AdminNav() {
   const pathname = usePathname()
@@ -13,9 +13,11 @@ export function AdminNav() {
     return pathname === path
   }
 
+  // Adicionar um novo item ao array navItems para a página de ferramentas
   const navItems = [
     { href: "/admin", label: "Dashboard", icon: Home },
     { href: "/admin/arquivos", label: "Arquivos", icon: FileText },
+    { href: "/admin/ferramentas", label: "Ferramentas", icon: Tool },
     { href: "/admin/configuracoes", label: "Configurações", icon: Settings },
     { href: "/", label: "Voltar ao Site", icon: Search },
   ]

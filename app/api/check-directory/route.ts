@@ -37,6 +37,14 @@ export async function GET() {
     // Verificar o conteúdo do diretório 'documents'
     const documentsFiles = await listBunnyFiles("documents")
 
+    // Verificar e exibir os caminhos completos para depuração
+    if (documentsFiles.length > 0) {
+      console.log("API Check Directory: Exemplos de caminhos de arquivos:")
+      documentsFiles.slice(0, 3).forEach((file) => {
+        console.log(`- Nome: ${file.ObjectName}, Path: ${file.Path}, URL: ${file.PublicUrl}`)
+      })
+    }
+
     return NextResponse.json({
       exists: true,
       message: "Diretório 'documents' existe",

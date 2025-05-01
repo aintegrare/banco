@@ -122,10 +122,41 @@ export async function getDocumentContent(documentId: number): Promise<string[]> 
 
     if (!chunks || chunks.length === 0) {
       console.log(`DocumentSelection: Nenhum chunk encontrado para o documento ${documentId}`)
+
+      // Buscar informações do documento para diagnóstico
+      const { data: docInfo, error: docError } = await supabase
+        .from("documents")
+        .select("*")
+        .eq("id", documentId)
+        .single()
+
+      if (docError) {
+        console.error(`DocumentSelection: Erro ao buscar informações do documento ${documentId}:`, docError)
+      } else if (docInfo) {
+        console.log(`DocumentSelection: Informações do documento ${documentId}:`, {
+          title: docInfo.title,
+          url: docInfo.url,
+          source_type: docInfo.source_type,
+          created_at: docInfo.created_at,
+        })
+      }
+
       return []
     }
 
     console.log(`DocumentSelection: ${chunks.length} chunks encontrados para o documento ${documentId}`)
+
+    // Verificar o conteúdo do primeiro chunk para diagnóstico
+    if (chunks.length > 0) {
+      const firstChunk = chunks[0]
+      console.log(
+        `DocumentSelection: Amostra do primeiro chunk (primeiros 100 caracteres): ${firstChunk.content.substring(
+          0,
+          100,
+        )}...`,
+      )
+    }
+
     return chunks.map((chunk) => chunk.content)
   } catch (error) {
     console.error(`DocumentSelection: Erro ao buscar conteúdo do documento ${documentId}:`, error)
