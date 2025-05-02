@@ -160,8 +160,18 @@ export function TaskBoard() {
     // Verificar se há um projeto na URL
     const urlParams = new URLSearchParams(window.location.search)
     const projectParam = urlParams.get("projeto")
+    const newTaskParam = urlParams.get("new")
+
     if (projectParam) {
       setSelectedProject(projectParam)
+    }
+
+    // Abrir o diálogo de criação se o parâmetro 'new' estiver presente
+    if (newTaskParam === "true") {
+      setIsCreateDialogOpen(true)
+      // Limpar o parâmetro da URL para evitar que o diálogo abra novamente ao atualizar
+      const newUrl = window.location.pathname + (projectParam ? `?projeto=${projectParam}` : "")
+      window.history.replaceState({}, "", newUrl)
     }
 
     // Simular carregamento de dados

@@ -28,12 +28,20 @@ const STATUSES = [
 ]
 
 interface CreateTaskDialogProps {
+  isOpen?: boolean
   onClose: () => void
-  initialProject: string | null
+  initialProject?: string | null
   onTaskCreated?: (task: any) => void
+  onCreateTask?: (task: any) => void
 }
 
-export function CreateTaskDialog({ onClose, initialProject, onTaskCreated }: CreateTaskDialogProps) {
+export function CreateTaskDialog({
+  isOpen = false,
+  onClose,
+  initialProject = null,
+  onTaskCreated,
+  onCreateTask,
+}: CreateTaskDialogProps) {
   const [taskTitle, setTaskTitle] = useState("")
   const [taskDescription, setTaskDescription] = useState("")
   const [projectId, setProjectId] = useState(initialProject || "integrare")
@@ -41,6 +49,11 @@ export function CreateTaskDialog({ onClose, initialProject, onTaskCreated }: Cre
   const [dueDate, setDueDate] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Se o diálogo não estiver aberto, não renderize nada
+  if (!isOpen) {
+    return null
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -77,6 +90,10 @@ export function CreateTaskDialog({ onClose, initialProject, onTaskCreated }: Cre
         onTaskCreated(newTask)
       }
 
+      if (onCreateTask) {
+        onCreateTask(newTask)
+      }
+
       // Fechar o diálogo após sucesso
       onClose()
     } catch (err) {
@@ -91,7 +108,7 @@ export function CreateTaskDialog({ onClose, initialProject, onTaskCreated }: Cre
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center border-b border-gray-200 px-6 py-4">
           <h2 className="text-xl font-semibold text-gray-800">Nova Tarefa</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600" type="button">
             <X size={24} />
           </button>
         </div>

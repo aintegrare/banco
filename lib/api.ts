@@ -13,6 +13,177 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 // Cliente para operações administrativas (com chave de serviço)
 export const adminSupabase = createClient(supabaseUrl, supabaseServiceKey)
 
+// Interface para metadados de documentos
+export interface DocumentMetadata {
+  id?: number
+  title: string
+  originalFileName: string
+  storedFileName: string
+  fileUrl: string
+  filePath: string
+  fileType: string
+  documentType: "pdf" | "website"
+  timestamp: number
+  processed?: boolean
+  processingError?: string
+}
+
+// Função para adicionar metadados de documento
+export async function addDocumentMetadata(metadata: Omit<DocumentMetadata, "id">): Promise<DocumentMetadata> {
+  try {
+    console.log("API: Adicionando metadados do documento:", metadata.title)
+
+    const { data, error } = await adminSupabase
+      .from("document_metadata")
+      .insert({
+        title: metadata.title,
+        original_file_name: metadata.originalFileName,
+        stored_file_name: metadata.storedFileName,
+        file_url: metadata.fileUrl,
+        file_path: metadata.filePath,
+        file_type: metadata.fileType,
+        document_type: metadata.documentType,
+        timestamp: metadata.timestamp,
+        processed: false,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error("API: Erro ao adicionar metadados do documento:", error)
+      throw error
+    }
+
+    console.log("API: Metadados do documento adicionados com sucesso:", data)
+
+    return {
+      id: data.id,
+      title: data.title,
+      originalFileName: data.original_file_name,
+      storedFileName: data.stored_file_name,
+      fileUrl: data.file_url,
+      filePath: data.file_path,
+      fileType: data.file_type,
+      documentType: data.document_type as "pdf" | "website",
+      timestamp: data.timestamp,
+      processed: data.processed,
+      processingError: data.processing_error,
+    }
+  } catch (error) {
+    console.error("API: Erro ao adicionar metadados do documento:", error)
+    throw error
+  }
+}
+
+// Função para atualizar o status de processamento de um documento
+export async function updateDocumentProcessingStatus(
+  documentId: number,
+  processed: boolean,
+  error?: string,
+): Promise<void> {
+  try {
+    console.log(
+      `API: Atualizando status de processamento do documento ${documentId} para ${processed ? "processado" : "não processado"}`,
+    )
+
+    const { error: updateError } = await adminSupabase
+      .from("document_metadata")
+      .update({
+        processed,
+        processing_error: error,
+        processed_at: processed ? new Date().toISOString() : null,
+      })
+      .eq("id", documentId)
+
+    if (updateError) {
+      console.error("API: Erro ao atualizar status de processamento do documento:", updateError)
+      throw updateError
+    }
+
+    console.log(`API: Status de processamento do documento ${documentId} atualizado com sucesso`)
+  } catch (error) {
+    console.error("API: Erro ao atualizar status de processamento do documento:", error)
+    throw error
+  }
+}
+
+// Função para obter metadados de um documento
+export async function getDocumentMetadata(documentId: number): Promise<DocumentMetadata | null> {
+  try {
+    console.log(`API: Obtendo metadados do documento ${documentId}`)
+
+    const { data, error } = await supabase.from("document_metadata").select("*").eq("id", documentId).single()
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        console.log(`API: Documento ${documentId} não encontrado`)
+        return null
+      }
+      console.error("API: Erro ao obter metadados do documento:", error)
+      throw error
+    }
+
+    if (!data) {
+      return null
+    }
+
+    console.log(`API: Metadados do documento ${documentId} obtidos com sucesso:`, data)
+
+    return {
+      id: data.id,
+      title: data.title,
+      originalFileName: data.original_file_name,
+      storedFileName: data.stored_file_name,
+      fileUrl: data.file_url,
+      filePath: data.file_path,
+      fileType: data.file_type,
+      documentType: data.document_type as "pdf" | "website",
+      timestamp: data.timestamp,
+      processed: data.processed,
+      processingError: data.processing_error,
+    }
+  } catch (error) {
+    console.error("API: Erro ao obter metadados do documento:", error)
+    throw error
+  }
+}
+
+// Função para listar todos os documentos
+export async function listDocumentMetadata(): Promise<DocumentMetadata[]> {
+  try {
+    console.log("API: Listando metadados de todos os documentos")
+
+    const { data, error } = await supabase
+      .from("document_metadata")
+      .select("*")
+      .order("timestamp", { ascending: false })
+
+    if (error) {
+      console.error("API: Erro ao listar metadados dos documentos:", error)
+      throw error
+    }
+
+    console.log(`API: ${data.length} metadados de documentos obtidos com sucesso`)
+
+    return data.map((item) => ({
+      id: item.id,
+      title: item.title,
+      originalFileName: item.original_file_name,
+      storedFileName: item.stored_file_name,
+      fileUrl: item.file_url,
+      filePath: item.file_path,
+      fileType: item.file_type,
+      documentType: item.document_type as "pdf" | "website",
+      timestamp: item.timestamp,
+      processed: item.processed,
+      processingError: item.processing_error,
+    }))
+  } catch (error) {
+    console.error("API: Erro ao listar metadados dos documentos:", error)
+    throw error
+  }
+}
+
 // Função para gerar embeddings de texto usando a API do Claude
 export async function generateEmbeddings(text: string) {
   try {
@@ -175,31 +346,40 @@ export function splitTextIntoChunks(text: string, chunkSize: number) {
   return chunks
 }
 
-// Atualizar a função processDocument para usar o novo extrator de PDF
-export async function processDocument(documentUrl: string, documentType: "pdf" | "website", chunkSize = 1000) {
-  let documentId = null
-  let useSimpleEmbeddings = false
-
+// Atualizar a função processDocument para usar o novo extrator de PDF e metadados
+export async function processDocument(documentId: number, chunkSize = 1000) {
   try {
-    console.log(`Processando documento ${documentType}: ${documentUrl}`)
+    console.log(`Processando documento com ID: ${documentId}`)
 
-    // Extrair título do URL
-    const urlObj = new URL(documentUrl)
-    const pathSegments = urlObj.pathname.split("/")
-    const fileName = pathSegments[pathSegments.length - 1] || urlObj.hostname
-    const title = fileName.replace(/\.[^/.]+$/, "").replace(/-/g, " ") || urlObj.hostname
+    // Obter metadados do documento
+    const metadata = await getDocumentMetadata(documentId)
+
+    if (!metadata) {
+      throw new Error(`Documento com ID ${documentId} não encontrado`)
+    }
+
+    console.log(`Metadados do documento obtidos:`, {
+      title: metadata.title,
+      url: metadata.fileUrl,
+      type: metadata.documentType,
+    })
 
     // Extrair texto do documento
     let documentText = ""
-    if (documentType === "website") {
-      documentText = await extractTextFromWebsite(documentUrl)
+    if (metadata.documentType === "website") {
+      documentText = await extractTextFromWebsite(metadata.fileUrl)
     } else {
-      // Usar nosso novo extrator de PDF compatível com serverless
-      documentText = await extractPDFText(documentUrl)
+      // Usar nosso extrator de PDF compatível com serverless
+      console.log(`Extraindo texto do PDF: ${metadata.fileUrl}`)
+      documentText = await extractPDFText(metadata.fileUrl)
+      console.log(`Extração de texto do PDF concluída, tamanho: ${documentText.length} caracteres`)
     }
 
     if (!documentText || documentText.length < 50) {
-      throw new Error("Texto extraído muito curto ou vazio")
+      const error = "Texto extraído muito curto ou vazio"
+      console.error(error)
+      await updateDocumentProcessingStatus(documentId, false, error)
+      throw new Error(error)
     }
 
     console.log(`Texto extraído com sucesso: ${documentText.length} caracteres`)
@@ -210,7 +390,10 @@ export async function processDocument(documentUrl: string, documentType: "pdf" |
       documentText.includes("Este é um texto extraído do arquivo") ||
       documentText.includes("Este é apenas um texto de exemplo para teste do sistema")
     ) {
-      throw new Error("O texto extraído parece ser simulado, não real")
+      const error = "O texto extraído parece ser simulado, não real"
+      console.error(error)
+      await updateDocumentProcessingStatus(documentId, false, error)
+      throw new Error(error)
     }
 
     // Dividir o texto em chunks
@@ -218,14 +401,19 @@ export async function processDocument(documentUrl: string, documentType: "pdf" |
     console.log(`Texto dividido em ${chunks.length} chunks`)
 
     if (chunks.length === 0) {
-      throw new Error("Nenhum chunk gerado do texto")
+      const error = "Nenhum chunk gerado do texto"
+      console.error(error)
+      await updateDocumentProcessingStatus(documentId, false, error)
+      throw new Error(error)
     }
 
     // Adicionar documento ao banco de dados
-    const document = await addDocument(title, documentUrl, documentType)
-    documentId = document.id
+    const document = await addDocument(metadata.title, metadata.fileUrl, metadata.documentType)
+    const dbDocumentId = document.id
 
-    console.log(`Documento adicionado com ID: ${documentId}`)
+    console.log(`Documento adicionado ao banco de dados com ID: ${dbDocumentId}`)
+
+    let useSimpleEmbeddings = false
 
     // Para cada chunk, gerar embedding e armazenar
     for (let i = 0; i < chunks.length; i++) {
@@ -243,26 +431,29 @@ export async function processDocument(documentUrl: string, documentType: "pdf" |
         useSimpleEmbeddings = true
       }
 
-      await addDocumentChunk(documentId, chunk, embedding, i)
+      await addDocumentChunk(dbDocumentId, chunk, embedding, i)
       console.log(`Chunk ${i + 1} processado com sucesso`)
     }
+
+    // Atualizar status de processamento
+    await updateDocumentProcessingStatus(documentId, true)
 
     return {
       success: true,
       chunksProcessed: chunks.length,
-      documentId,
+      documentId: dbDocumentId,
+      metadataId: documentId,
       usedFallbackEmbeddings: useSimpleEmbeddings,
     }
   } catch (error) {
-    console.error(`Erro ao processar documento ${documentUrl}:`, error)
+    console.error(`Erro ao processar documento:`, error)
 
-    // Se o documento foi criado mas houve erro nos chunks, remover o documento
+    // Atualizar status de processamento com erro
     if (documentId) {
       try {
-        console.log(`Removendo documento ${documentId} devido a erro no processamento`)
-        await adminSupabase.from("documents").delete().eq("id", documentId)
-      } catch (deleteError) {
-        console.error("Erro ao remover documento após falha:", deleteError)
+        await updateDocumentProcessingStatus(documentId, false, error instanceof Error ? error.message : String(error))
+      } catch (updateError) {
+        console.error("Erro ao atualizar status de processamento:", updateError)
       }
     }
 

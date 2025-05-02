@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { uploadFileToBunny } from "@/lib/bunny"
+import { addDocumentMetadata } from "@/lib/api"
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,10 +46,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Gerar um nome de arquivo único
-    const fileName = `${Date.now()}-${file.name.replace(/\s+/g, "-")}`
+    const originalFileName = file.name
+    const timestamp = Date.now()
+    const fileName = `${timestamp}-${originalFileName.replace(/\s+/g, "-")}`
     const filePath = `documents/${fileName}`
 
-    console.log(`API Upload: Preparando upload para ${filePath}`)
+    console.log(`API Upload: Nome original: ${originalFileName}`)
+    console.log(`API Upload: Nome com timestamp: ${fileName}`)
+    console.log(`API Upload: Caminho completo: ${filePath}`)
 
     // Converter o arquivo para buffer
     const arrayBuffer = await file.arrayBuffer()
@@ -62,13 +67,30 @@ export async function POST(request: NextRequest) {
       const fileUrl = await uploadFileToBunny(filePath, buffer, file.type)
       console.log(`API Upload: Upload concluído com sucesso. URL: ${fileUrl}`)
 
+      // Armazenar metadados do documento
+      const documentType = fileType.includes("pdf") ? "pdf" : "website"
+      const metadata = await addDocumentMetadata({
+        title: originalFileName.replace(/\.[^/.]+$/, ""),
+        originalFileName,
+        storedFileName: fileName,
+        fileUrl,
+        filePath,
+        fileType,
+        documentType,
+        timestamp,
+      })
+
+      console.log(`API Upload: Metadados armazenados com ID: ${metadata.id}`)
+
       // Para simplificar o teste, vamos retornar sucesso sem processar o documento
       return NextResponse.json({
         success: true,
         fileUrl,
         fileName,
+        originalFileName,
         fileType,
-        filePath, // Adicionando o caminho do arquivo para depuração
+        filePath,
+        documentId: metadata.id,
         chunksProcessed: 0,
       })
     } catch (uploadError) {

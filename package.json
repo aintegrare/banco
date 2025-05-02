@@ -59,11 +59,11 @@
     "vaul": "^0.9.6",
     "zod": "^3.24.1",
     "@emotion/is-prop-valid": "latest",
-    "@supabase/supabase-js": "latest",
     "tesseract.js": "latest",
     "pdfjs-dist": "latest",
     "react-beautiful-dnd": "latest",
-    "framer-motion": "latest"
+    "framer-motion": "latest",
+    "@supabase/supabase-js": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
