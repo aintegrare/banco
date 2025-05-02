@@ -61,8 +61,8 @@
     "@emotion/is-prop-valid": "latest",
     "tesseract.js": "latest",
     "pdfjs-dist": "latest",
-    "react-beautiful-dnd": "latest",
     "framer-motion": "latest",
+    "react-beautiful-dnd": "latest",
     "@supabase/supabase-js": "latest"
   },
   "devDependencies": {

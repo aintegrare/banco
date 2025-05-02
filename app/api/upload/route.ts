@@ -33,13 +33,14 @@ export async function POST(request: NextRequest) {
       fileType === "application/pdf" ||
       fileType.startsWith("text/") ||
       fileType === "application/msword" ||
-      fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      fileType.startsWith("image/") // Permitir imagens
 
     if (!isAllowedType) {
       console.error(`API Upload: Tipo de arquivo não permitido - ${fileType}`)
       return NextResponse.json(
         {
-          error: "Tipo de arquivo não permitido. Apenas PDF, DOC, DOCX e arquivos de texto são aceitos.",
+          error: "Tipo de arquivo não permitido. Apenas PDF, DOC, DOCX, arquivos de texto e imagens são aceitos.",
         },
         { status: 400 },
       )
@@ -49,7 +50,11 @@ export async function POST(request: NextRequest) {
     const originalFileName = file.name
     const timestamp = Date.now()
     const fileName = `${timestamp}-${originalFileName.replace(/\s+/g, "-")}`
-    const filePath = `documents/${fileName}`
+
+    // Determinar a pasta com base no tipo de arquivo
+    const isImage = fileType.startsWith("image/")
+    const folder = isImage ? "images" : "documents"
+    const filePath = `${folder}/${fileName}`
 
     console.log(`API Upload: Nome original: ${originalFileName}`)
     console.log(`API Upload: Nome com timestamp: ${fileName}`)
@@ -68,7 +73,7 @@ export async function POST(request: NextRequest) {
       console.log(`API Upload: Upload concluído com sucesso. URL: ${fileUrl}`)
 
       // Armazenar metadados do documento
-      const documentType = fileType.includes("pdf") ? "pdf" : "website"
+      const documentType = isImage ? "image" : fileType.includes("pdf") ? "pdf" : "document"
       const metadata = await addDocumentMetadata({
         title: originalFileName.replace(/\.[^/.]+$/, ""),
         originalFileName,
@@ -92,6 +97,7 @@ export async function POST(request: NextRequest) {
         filePath,
         documentId: metadata.id,
         chunksProcessed: 0,
+        isImage,
       })
     } catch (uploadError) {
       console.error("API Upload: Erro específico no upload para Bunny.net:", uploadError)

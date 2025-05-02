@@ -2,99 +2,100 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { ChevronLeft, Calendar, MoreVertical, Edit, Trash2, Share2 } from "lucide-react"
+import { ArrowLeft, Calendar, Edit, Users } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { EditProjectDialog } from "@/components/projects/edit-project-dialog"
 
 interface ProjectHeaderProps {
-  project: {
-    id: string
-    name: string
-    description: string
-    status: string
-    client: string
-    startDate: string
-    endDate: string
-    budget: string
-  }
+  project: any
+  onProjectUpdate?: () => void
 }
 
-export function ProjectHeader({ project }: ProjectHeaderProps) {
-  const [showMenu, setShowMenu] = useState(false)
+export function ProjectHeader({ project, onProjectUpdate }: ProjectHeaderProps) {
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    })
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "Não definida"
+    try {
+      return format(new Date(dateString), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+    } catch (error) {
+      console.error("Erro ao formatar data:", error)
+      return "Data inválida"
+    }
+  }
+
+  const getStatusLabel = (status: string) => {
+    const statusMap: Record<string, string> = {
+      planejamento: "Planejamento",
+      em_andamento: "Em andamento",
+      pausado: "Pausado",
+      concluido: "Concluído",
+      cancelado: "Cancelado",
+    }
+    return statusMap[status] || status
+  }
+
+  const getStatusColor = (status: string) => {
+    const colorMap: Record<string, string> = {
+      planejamento: "bg-blue-100 text-blue-800",
+      em_andamento: "bg-green-100 text-green-800",
+      pausado: "bg-yellow-100 text-yellow-800",
+      concluido: "bg-purple-100 text-purple-800",
+      cancelado: "bg-red-100 text-red-800",
+    }
+    return colorMap[status] || "bg-gray-100 text-gray-800"
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center">
-          <Link href="/projetos" className="mr-4 text-gray-500 hover:text-[#4b7bb5]">
-            <ChevronLeft size={20} />
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-800">{project.name}</h1>
-          <span className="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-[#4b7bb5] bg-opacity-10 text-[#4b7bb5]">
-            {project.status}
-          </span>
-        </div>
+    <>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div>
+          <div className="flex items-center mb-2">
+            <Link href="/projetos" className="text-gray-500 hover:text-gray-700 mr-2">
+              <ArrowLeft size={20} />
+            </Link>
+            <h1 className="text-2xl font-bold text-gray-800">{project.name}</h1>
+          </div>
 
-        <div className="relative">
-          <button onClick={() => setShowMenu(!showMenu)} className="p-2 rounded-full hover:bg-gray-100 text-gray-500">
-            <MoreVertical size={20} />
-          </button>
+          <p className="text-gray-600 mb-4">{project.description}</p>
 
-          {showMenu && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200 py-1">
-              <button className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                <Edit size={16} className="mr-2" />
-                Editar projeto
-              </button>
-              <button className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                <Share2 size={16} className="mr-2" />
-                Compartilhar
-              </button>
-              <button className="flex items-center w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
-                <Trash2 size={16} className="mr-2" />
-                Arquivar projeto
-              </button>
+          <div className="flex flex-wrap gap-3">
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(project.status)}`}>
+              {getStatusLabel(project.status)}
+            </span>
+
+            <div className="flex items-center text-sm text-gray-500">
+              <Calendar size={16} className="mr-1" />
+              <span>
+                {formatDate(project.start_date)} - {formatDate(project.end_date)}
+              </span>
             </div>
-          )}
-        </div>
-      </div>
 
-      <p className="text-gray-600 mb-6">{project.description}</p>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-sm text-gray-500 mb-1">Cliente</p>
-          <p className="font-medium">{project.client}</p>
-        </div>
-
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-sm text-gray-500 mb-1">Data de início</p>
-          <div className="flex items-center">
-            <Calendar size={16} className="mr-2 text-gray-400" />
-            <p className="font-medium">{formatDate(project.startDate)}</p>
+            <div className="flex items-center text-sm text-gray-500">
+              <Users size={16} className="mr-1" />
+              <span>{project.members?.length || 0} membros</span>
+            </div>
           </div>
         </div>
 
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-sm text-gray-500 mb-1">Data de término</p>
-          <div className="flex items-center">
-            <Calendar size={16} className="mr-2 text-gray-400" />
-            <p className="font-medium">{formatDate(project.endDate)}</p>
-          </div>
-        </div>
-
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-sm text-gray-500 mb-1">Orçamento</p>
-          <p className="font-medium">{project.budget}</p>
+        <div className="flex items-center gap-3 mt-4 md:mt-0">
+          <Button variant="outline" onClick={() => setIsEditDialogOpen(true)} data-testid="edit-project-button">
+            <Edit size={16} className="mr-2" />
+            Editar Projeto
+          </Button>
         </div>
       </div>
-    </div>
+
+      <EditProjectDialog
+        project={project}
+        isOpen={isEditDialogOpen}
+        onClose={() => setIsEditDialogOpen(false)}
+        onSuccess={() => {
+          if (onProjectUpdate) onProjectUpdate()
+        }}
+      />
+    </>
   )
 }

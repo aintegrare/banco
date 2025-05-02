@@ -16,6 +16,8 @@ import {
   FolderPlus,
   Search,
   Info,
+  X,
+  Download,
 } from "lucide-react"
 import { getBunnyPublicUrl } from "@/lib/bunny"
 
@@ -45,15 +47,17 @@ export function FileList() {
   const [directoryInfo, setDirectoryInfo] = useState<any | null>(null)
   const [isCheckingDirectory, setIsCheckingDirectory] = useState(false)
   const [debugInfo, setDebugInfo] = useState<string | null>(null)
+  const [selectedDirectory, setSelectedDirectory] = useState<string>("documents")
+  const [previewFile, setPreviewFile] = useState<BunnyFile | null>(null)
 
-  const fetchFiles = async () => {
+  const fetchFiles = async (directory = selectedDirectory) => {
     setIsLoading(true)
     setError(null)
     setDebugInfo(null)
 
     try {
-      console.log("Iniciando busca de arquivos...")
-      const response = await fetch("/api/files?directory=documents")
+      console.log(`Iniciando busca de arquivos no diretório: ${directory}...`)
+      const response = await fetch(`/api/files?directory=${directory}`)
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
@@ -117,13 +121,6 @@ export function FileList() {
         cleanPath = url.pathname.replace(/^\//, "") // Remover a barra inicial
       }
 
-      // Se o caminho já começa com 'documents/', usar como está
-      // Caso contrário, extrair apenas o nome do arquivo
-      if (!cleanPath.startsWith("documents/")) {
-        const parts = cleanPath.split("/")
-        cleanPath = parts[parts.length - 1]
-      }
-
       console.log(`FileList: Caminho limpo para API: ${cleanPath}`)
 
       const response = await fetch(`/api/files/${encodeURIComponent(cleanPath)}`, {
@@ -147,7 +144,7 @@ export function FileList() {
     }
   }
 
-  const handleCreateDirectory = async () => {
+  const handleCreateDirectory = async (directory: string) => {
     setIsCreatingDirectory(true)
     setError(null)
     setDirectoryCreated(false)
@@ -158,7 +155,7 @@ export function FileList() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ directory: "documents" }),
+        body: JSON.stringify({ directory }),
       })
 
       if (!response.ok) {
@@ -167,7 +164,8 @@ export function FileList() {
       }
 
       setDirectoryCreated(true)
-      await fetchFiles()
+      await fetchFiles(directory)
+      setSelectedDirectory(directory)
     } catch (err) {
       console.error("Erro ao criar diretório:", err)
       setError(err instanceof Error ? err.message : "Erro ao criar diretório")
@@ -281,11 +279,51 @@ export function FileList() {
     }
   }
 
+  const isImage = (fileName: string) => {
+    const extension = fileName.split(".").pop()?.toLowerCase()
+    return ["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")
+  }
+
+  const handlePreviewFile = (file: BunnyFile) => {
+    if (isImage(file.ObjectName)) {
+      setPreviewFile(file)
+    } else {
+      window.open(file.PublicUrl || getBunnyPublicUrl(file.Path), "_blank")
+    }
+  }
+
+  const closePreview = () => {
+    setPreviewFile(null)
+  }
+
+  const switchDirectory = (directory: string) => {
+    setSelectedDirectory(directory)
+    fetchFiles(directory)
+  }
+
   return (
     <div className="bg-white rounded-xl shadow-md p-6">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-[#4072b0]">Arquivos Armazenados</h2>
         <div className="flex space-x-2">
+          <div className="flex space-x-2 mr-4">
+            <button
+              onClick={() => switchDirectory("documents")}
+              className={`px-3 py-1 text-sm rounded-md ${
+                selectedDirectory === "documents" ? "bg-[#4b7bb5] text-white" : "border border-[#4b7bb5] text-[#4b7bb5]"
+              }`}
+            >
+              Documentos
+            </button>
+            <button
+              onClick={() => switchDirectory("images")}
+              className={`px-3 py-1 text-sm rounded-md ${
+                selectedDirectory === "images" ? "bg-[#4b7bb5] text-white" : "border border-[#4b7bb5] text-[#4b7bb5]"
+              }`}
+            >
+              Imagens
+            </button>
+          </div>
           <button
             onClick={handleCheckDirectory}
             className="flex items-center text-sm text-[#4b7bb5] hover:text-[#3d649e] px-2 py-1 border border-[#4b7bb5] rounded-md"
@@ -299,7 +337,7 @@ export function FileList() {
             Verificar Diretório
           </button>
           <button
-            onClick={handleCreateDirectory}
+            onClick={() => handleCreateDirectory(selectedDirectory)}
             className="flex items-center text-sm text-[#4b7bb5] hover:text-[#3d649e] px-2 py-1 border border-[#4b7bb5] rounded-md"
             disabled={isCreatingDirectory}
           >
@@ -309,13 +347,6 @@ export function FileList() {
               <FolderPlus className="h-4 w-4 mr-1" />
             )}
             Criar Diretório
-          </button>
-          <button
-            onClick={handleCreateTestDirectory}
-            className="flex items-center text-sm text-[#4b7bb5] hover:text-[#3d649e] px-2 py-1 border border-[#4b7bb5] rounded-md"
-            disabled={isLoading}
-          >
-            Criar Teste
           </button>
           <button
             onClick={fetchFiles}
@@ -344,7 +375,7 @@ export function FileList() {
         <div className="bg-green-50 text-green-700 p-4 rounded-md mb-4 flex items-start">
           <div>
             <p className="font-medium">Diretório criado com sucesso!</p>
-            <p className="mt-1">O diretório "documents" foi criado e está pronto para receber arquivos.</p>
+            <p className="mt-1">O diretório "{selectedDirectory}" foi criado e está pronto para receber arquivos.</p>
           </div>
         </div>
       )}
@@ -378,11 +409,11 @@ export function FileList() {
             </p>
             <div className="mt-2">
               <button
-                onClick={handleCreateDirectory}
+                onClick={() => handleCreateDirectory(selectedDirectory)}
                 className="text-sm text-red-700 underline"
                 disabled={isCreatingDirectory}
               >
-                Tentar criar o diretório "documents"
+                Tentar criar o diretório "{selectedDirectory}"
               </button>
             </div>
           </div>
@@ -396,14 +427,14 @@ export function FileList() {
         </div>
       ) : files.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          <p>Nenhum arquivo encontrado.</p>
+          <p>Nenhum arquivo encontrado no diretório "{selectedDirectory}".</p>
           <p className="text-sm mt-2">Faça upload de arquivos usando o formulário acima.</p>
           <button
-            onClick={handleCreateDirectory}
+            onClick={() => handleCreateDirectory(selectedDirectory)}
             className="mt-4 px-4 py-2 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e]"
             disabled={isCreatingDirectory}
           >
-            {isCreatingDirectory ? "Criando diretório..." : "Criar diretório 'documents'"}
+            {isCreatingDirectory ? `Criando diretório...` : `Criar diretório '${selectedDirectory}'`}
           </button>
         </div>
       ) : (
@@ -423,7 +454,12 @@ export function FileList() {
                   <td className="py-2 px-2">
                     <div className="flex items-center">
                       {getFileIcon(file.ObjectName)}
-                      <span className="ml-2">{file.ObjectName}</span>
+                      <span
+                        className="ml-2 cursor-pointer hover:text-[#4b7bb5]"
+                        onClick={() => handlePreviewFile(file)}
+                      >
+                        {file.ObjectName}
+                      </span>
                     </div>
                   </td>
                   <td className="py-2 px-2 text-gray-500">{formatFileSize(file.Length)}</td>
@@ -457,6 +493,40 @@ export function FileList() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Modal de preview de imagem */}
+      {previewFile && isImage(previewFile.ObjectName) && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="font-medium">{previewFile.ObjectName}</h3>
+              <button onClick={closePreview} className="text-gray-500 hover:text-gray-700">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+              <img
+                src={previewFile.PublicUrl || getBunnyPublicUrl(previewFile.Path)}
+                alt={previewFile.ObjectName}
+                className="max-w-full max-h-[70vh] object-contain"
+              />
+            </div>
+            <div className="p-4 border-t flex justify-between">
+              <div className="text-sm text-gray-500">
+                {formatFileSize(previewFile.Length)} • {formatDate(previewFile.LastChanged)}
+              </div>
+              <a
+                href={previewFile.PublicUrl || getBunnyPublicUrl(previewFile.Path)}
+                download
+                className="text-[#4b7bb5] hover:text-[#3d649e] flex items-center"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                <span>Download</span>
+              </a>
+            </div>
+          </div>
         </div>
       )}
     </div>

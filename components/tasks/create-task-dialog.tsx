@@ -2,21 +2,14 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { X, Calendar, Paperclip, Loader2 } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
 
-// Lista de projetos disponíveis
-const PROJECTS = [
-  { id: "dr-joel", name: "Dr. Joel" },
-  { id: "vanessa-dentista", name: "Vanessa Dentista" },
-  { id: "vanessa-cardiologista", name: "Vanessa Cardiologista" },
-  { id: "eora", name: "Eora" },
-  { id: "medeiros-advogados", name: "Medeiros Advogados" },
-  { id: "mateus-arquiteto", name: "Mateus Arquiteto" },
-  { id: "billions", name: "Billions" },
-  { id: "plucio", name: "Plúcio" },
-  { id: "integrare", name: "Integrare" },
-]
+interface Project {
+  id: string | number
+  name: string
+}
 
 // Lista de status disponíveis
 const STATUSES = [
@@ -30,9 +23,8 @@ const STATUSES = [
 interface CreateTaskDialogProps {
   isOpen?: boolean
   onClose: () => void
-  initialProject?: string | null
+  initialProject?: string | number | null
   onTaskCreated?: (task: any) => void
-  onCreateTask?: (task: any) => void
 }
 
 export function CreateTaskDialog({
@@ -40,15 +32,45 @@ export function CreateTaskDialog({
   onClose,
   initialProject = null,
   onTaskCreated,
-  onCreateTask,
 }: CreateTaskDialogProps) {
   const [taskTitle, setTaskTitle] = useState("")
   const [taskDescription, setTaskDescription] = useState("")
-  const [projectId, setProjectId] = useState(initialProject || "integrare")
+  const [projectId, setProjectId] = useState<string | number | null>(initialProject)
   const [status, setStatus] = useState("todo")
   const [dueDate, setDueDate] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false)
+  const { toast } = useToast()
+
+  // Buscar projetos disponíveis
+  useEffect(() => {
+    const fetchProjects = async () => {
+      setIsLoadingProjects(true)
+      try {
+        const response = await fetch("/api/projects")
+        if (!response.ok) {
+          throw new Error("Falha ao buscar projetos")
+        }
+        const data = await response.json()
+        setProjects(data)
+      } catch (error) {
+        console.error("Erro ao buscar projetos:", error)
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar a lista de projetos",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoadingProjects(false)
+      }
+    }
+
+    if (isOpen) {
+      fetchProjects()
+    }
+  }, [isOpen, toast])
 
   // Se o diálogo não estiver aberto, não renderize nada
   if (!isOpen) {
@@ -63,41 +85,57 @@ export function CreateTaskDialog({
       return
     }
 
+    if (!projectId) {
+      setError("Selecione um projeto")
+      return
+    }
+
     setIsSubmitting(true)
     setError(null)
 
     try {
-      // Simular chamada à API
-      await new Promise((resolve) => setTimeout(resolve, 800))
+      // Criar nova tarefa via API
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: taskTitle,
+          description: taskDescription,
+          status: status,
+          project_id: projectId,
+          due_date: dueDate || null,
+        }),
+      })
 
-      // Criar nova tarefa
-      const newTask = {
-        id: `task-${Math.floor(Math.random() * 10000)}`,
-        title: taskTitle,
-        description: taskDescription,
-        status: status,
-        projectId: projectId,
-        projectName: PROJECTS.find((p) => p.id === projectId)?.name || "Projeto",
-        dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        assignee: "Usuário Atual",
-        comments: 0,
-        attachments: 0,
-        createdAt: new Date().toISOString(),
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erro ao criar tarefa")
       }
+
+      const newTask = await response.json()
+
+      toast({
+        title: "Sucesso",
+        description: "Tarefa criada com sucesso!",
+      })
 
       // Notificar o componente pai sobre a nova tarefa
       if (onTaskCreated) {
         onTaskCreated(newTask)
       }
 
-      if (onCreateTask) {
-        onCreateTask(newTask)
-      }
-
       // Fechar o diálogo após sucesso
       onClose()
-    } catch (err) {
-      setError("Ocorreu um erro ao criar a tarefa. Por favor, tente novamente.")
+    } catch (err: any) {
+      console.error("Erro ao criar tarefa:", err)
+      setError(err.message || "Ocorreu um erro ao criar a tarefa. Por favor, tente novamente.")
+      toast({
+        title: "Erro",
+        description: err.message || "Não foi possível criar a tarefa",
+        variant: "destructive",
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -153,12 +191,14 @@ export function CreateTaskDialog({
               </label>
               <select
                 id="project-select"
-                value={projectId}
+                value={projectId?.toString() || ""}
                 onChange={(e) => setProjectId(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
+                disabled={isLoadingProjects}
               >
-                {PROJECTS.map((project) => (
-                  <option key={project.id} value={project.id}>
+                <option value="">Selecione um projeto</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id.toString()}>
                     {project.name}
                   </option>
                 ))}

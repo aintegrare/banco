@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useRef } from "react"
-import { Upload, File, Loader2, X, CheckCircle, AlertTriangle } from "lucide-react"
+import { Upload, File, Loader2, X, CheckCircle, AlertTriangle, ImageIcon } from "lucide-react"
 
 export function FileUploader() {
   const [file, setFile] = useState<File | null>(null)
@@ -13,14 +13,27 @@ export function FileUploader() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<any | null>(null)
   const [detailedError, setDetailedError] = useState<string | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0])
+      const selectedFile = e.target.files[0]
+      setFile(selectedFile)
       setError(null)
       setDetailedError(null)
       setSuccess(null)
+
+      // Criar preview para imagens
+      if (selectedFile.type.startsWith("image/")) {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          setPreviewUrl(e.target?.result as string)
+        }
+        reader.readAsDataURL(selectedFile)
+      } else {
+        setPreviewUrl(null)
+      }
     }
   }
 
@@ -34,15 +47,28 @@ export function FileUploader() {
     e.stopPropagation()
 
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0])
+      const selectedFile = e.dataTransfer.files[0]
+      setFile(selectedFile)
       setError(null)
       setDetailedError(null)
       setSuccess(null)
+
+      // Criar preview para imagens
+      if (selectedFile.type.startsWith("image/")) {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          setPreviewUrl(e.target?.result as string)
+        }
+        reader.readAsDataURL(selectedFile)
+      } else {
+        setPreviewUrl(null)
+      }
     }
   }
 
   const clearFile = () => {
     setFile(null)
+    setPreviewUrl(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -164,9 +190,17 @@ export function FileUploader() {
     }
   }
 
+  // Determinar o tipo de arquivo aceito
+  const getAcceptedFileTypes = () => {
+    return ".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.webp"
+  }
+
+  // Verificar se o arquivo é uma imagem
+  const isImage = file && file.type.startsWith("image/")
+
   return (
     <div className="bg-white rounded-xl shadow-md p-6">
-      <h2 className="text-xl font-bold text-[#4072b0] mb-4">Upload de Documentos</h2>
+      <h2 className="text-xl font-bold text-[#4072b0] mb-4">Upload de Arquivos</h2>
 
       <div
         className={`border-2 border-dashed rounded-lg p-8 text-center ${
@@ -180,7 +214,7 @@ export function FileUploader() {
           id="file-upload"
           className="hidden"
           onChange={handleFileChange}
-          accept=".pdf,.doc,.docx,.txt"
+          accept={getAcceptedFileTypes()}
           ref={fileInputRef}
         />
 
@@ -189,21 +223,38 @@ export function FileUploader() {
             <div className="flex flex-col items-center">
               <Upload className="h-12 w-12 text-gray-400 mb-2" />
               <p className="text-gray-600 mb-1">Arraste e solte um arquivo aqui ou clique para selecionar</p>
-              <p className="text-xs text-gray-500">PDF, DOC, DOCX, TXT (máx. 10MB)</p>
+              <p className="text-xs text-gray-500">PDF, DOC, DOCX, TXT, JPG, PNG, GIF, WEBP (máx. 10MB)</p>
             </div>
           </label>
         ) : (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <File className="h-8 w-8 text-[#4b7bb5] mr-3" />
-              <div className="text-left">
-                <p className="font-medium text-gray-800">{file.name}</p>
-                <p className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+          <div className="flex flex-col items-center">
+            <div className="flex items-center justify-between w-full mb-4">
+              <div className="flex items-center">
+                {isImage ? (
+                  <ImageIcon className="h-8 w-8 text-[#4b7bb5] mr-3" />
+                ) : (
+                  <File className="h-8 w-8 text-[#4b7bb5] mr-3" />
+                )}
+                <div className="text-left">
+                  <p className="font-medium text-gray-800">{file.name}</p>
+                  <p className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                </div>
               </div>
+              <button onClick={clearFile} className="text-gray-500 hover:text-red-500" disabled={isUploading}>
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <button onClick={clearFile} className="text-gray-500 hover:text-red-500" disabled={isUploading}>
-              <X className="h-5 w-5" />
-            </button>
+
+            {/* Preview de imagem */}
+            {previewUrl && (
+              <div className="mt-2 mb-4">
+                <img
+                  src={previewUrl || "/placeholder.svg"}
+                  alt="Preview"
+                  className="max-h-48 max-w-full rounded-lg object-contain"
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

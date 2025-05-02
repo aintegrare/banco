@@ -1,25 +1,67 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Calendar, Clock, CheckCircle, AlertTriangle, ArrowRight } from "lucide-react"
+import { Calendar, Clock, CheckCircle, AlertTriangle, ArrowRight, Plus, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { CreateTaskDialog } from "@/components/tasks/create-task-dialog"
+import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
+import { useToast } from "@/components/ui/use-toast"
 
-interface ProjectTasksProps {
-  tasks: Array<{
-    id: string
-    title: string
-    description: string
-    status: string
-    dueDate: string
-    assignee: string
-    priority: string
-  }>
+interface Task {
+  id: string | number
+  title: string
+  description: string
+  status: string
+  due_date?: string
+  assignee?: string
+  priority: string
+  project_id: string | number
 }
 
-export function ProjectTasks({ tasks }: ProjectTasksProps) {
-  const [filter, setFilter] = useState("all")
+interface ProjectTasksProps {
+  tasks: Task[]
+  projectId: string | number
+}
 
-  const formatDate = (dateString: string) => {
+export function ProjectTasks({ tasks: initialTasks, projectId }: ProjectTasksProps) {
+  const [filter, setFilter] = useState("all")
+  const [tasks, setTasks] = useState<Task[]>(initialTasks || [])
+  const [isLoading, setIsLoading] = useState(false)
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [editTaskId, setEditTaskId] = useState<string | number | null>(null)
+  const { toast } = useToast()
+
+  // Buscar tarefas do projeto
+  useEffect(() => {
+    const fetchTasks = async () => {
+      if (!projectId) return
+
+      setIsLoading(true)
+      try {
+        const response = await fetch(`/api/tasks?projectId=${projectId}`)
+        if (!response.ok) {
+          throw new Error("Falha ao buscar tarefas")
+        }
+        const data = await response.json()
+        setTasks(data)
+      } catch (error: any) {
+        console.error("Erro ao buscar tarefas:", error)
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar as tarefas do projeto",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchTasks()
+  }, [projectId, toast])
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "Sem data"
     const date = new Date(dateString)
     return date.toLocaleDateString("pt-BR", {
       day: "2-digit",
@@ -27,7 +69,8 @@ export function ProjectTasks({ tasks }: ProjectTasksProps) {
     })
   }
 
-  const isOverdue = (dateString: string) => {
+  const isOverdue = (dateString?: string) => {
+    if (!dateString) return false
     const today = new Date()
     const dueDate = new Date(dateString)
     return dueDate < today
@@ -35,14 +78,27 @@ export function ProjectTasks({ tasks }: ProjectTasksProps) {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case "alta":
+      case "high":
         return "text-red-500 bg-red-50"
-      case "média":
+      case "medium":
         return "text-orange-500 bg-orange-50"
-      case "baixa":
+      case "low":
         return "text-green-500 bg-green-50"
       default:
         return "text-gray-500 bg-gray-50"
+    }
+  }
+
+  const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+      case "high":
+        return "Alta"
+      case "medium":
+        return "Média"
+      case "low":
+        return "Baixa"
+      default:
+        return "Normal"
     }
   }
 
@@ -64,66 +120,99 @@ export function ProjectTasks({ tasks }: ProjectTasksProps) {
     if (filter === "all") return true
     if (filter === "pending") return task.status !== "done"
     if (filter === "completed") return task.status === "done"
-    if (filter === "overdue") return isOverdue(task.dueDate) && task.status !== "done"
+    if (filter === "overdue") return isOverdue(task.due_date) && task.status !== "done"
     return true
   })
 
   // Ordenar tarefas por data de vencimento
   const sortedTasks = [...filteredTasks].sort((a, b) => {
-    const dateA = new Date(a.dueDate)
-    const dateB = new Date(b.dueDate)
+    if (!a.due_date) return 1
+    if (!b.due_date) return -1
+    const dateA = new Date(a.due_date)
+    const dateB = new Date(b.due_date)
     return dateA.getTime() - dateB.getTime()
   })
 
   // Limitar a 5 tarefas
   const displayTasks = sortedTasks.slice(0, 5)
 
+  const handleTaskCreated = (newTask: Task) => {
+    setTasks((prevTasks) => [newTask, ...prevTasks])
+    toast({
+      title: "Tarefa criada",
+      description: "A tarefa foi criada com sucesso!",
+    })
+  }
+
+  const handleTaskUpdated = (updatedTask: Task) => {
+    setTasks((prevTasks) => prevTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task)))
+    toast({
+      title: "Tarefa atualizada",
+      description: "A tarefa foi atualizada com sucesso!",
+    })
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-medium text-gray-800">Tarefas</h2>
 
-        <div className="flex space-x-2">
-          <button
-            onClick={() => setFilter("all")}
-            className={`px-3 py-1 text-xs rounded-full ${
-              filter === "all" ? "bg-[#4b7bb5] text-white" : "bg-gray-100 text-gray-600"
-            }`}
-          >
-            Todas
-          </button>
-          <button
-            onClick={() => setFilter("pending")}
-            className={`px-3 py-1 text-xs rounded-full ${
-              filter === "pending" ? "bg-[#4b7bb5] text-white" : "bg-gray-100 text-gray-600"
-            }`}
-          >
-            Pendentes
-          </button>
-          <button
-            onClick={() => setFilter("completed")}
-            className={`px-3 py-1 text-xs rounded-full ${
-              filter === "completed" ? "bg-[#4b7bb5] text-white" : "bg-gray-100 text-gray-600"
-            }`}
-          >
-            Concluídas
-          </button>
-          <button
-            onClick={() => setFilter("overdue")}
-            className={`px-3 py-1 text-xs rounded-full ${
-              filter === "overdue" ? "bg-[#4b7bb5] text-white" : "bg-gray-100 text-gray-600"
-            }`}
-          >
-            Atrasadas
-          </button>
+        <div className="flex items-center space-x-4">
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setFilter("all")}
+              className={`px-3 py-1 text-xs rounded-full ${
+                filter === "all" ? "bg-[#4b7bb5] text-white" : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              Todas
+            </button>
+            <button
+              onClick={() => setFilter("pending")}
+              className={`px-3 py-1 text-xs rounded-full ${
+                filter === "pending" ? "bg-[#4b7bb5] text-white" : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              Pendentes
+            </button>
+            <button
+              onClick={() => setFilter("completed")}
+              className={`px-3 py-1 text-xs rounded-full ${
+                filter === "completed" ? "bg-[#4b7bb5] text-white" : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              Concluídas
+            </button>
+            <button
+              onClick={() => setFilter("overdue")}
+              className={`px-3 py-1 text-xs rounded-full ${
+                filter === "overdue" ? "bg-[#4b7bb5] text-white" : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              Atrasadas
+            </button>
+          </div>
+
+          <Button size="sm" onClick={() => setIsCreateDialogOpen(true)} className="bg-[#4b7bb5] hover:bg-[#3d649e]">
+            <Plus size={16} className="mr-1" />
+            Nova
+          </Button>
         </div>
       </div>
 
-      <div className="space-y-3">
-        {displayTasks.length > 0 ? (
-          displayTasks.map((task) => (
-            <Link href={`/tarefas/${task.id}`} key={task.id} className="block">
-              <div className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 size={30} className="text-[#4b7bb5] animate-spin" />
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {displayTasks.length > 0 ? (
+            displayTasks.map((task) => (
+              <div
+                key={task.id}
+                className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow cursor-pointer"
+                onClick={() => setEditTaskId(task.id)}
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex items-start space-x-3">
                     <div className="mt-1">{getStatusIcon(task.status)}</div>
@@ -134,39 +223,61 @@ export function ProjectTasks({ tasks }: ProjectTasksProps) {
                   </div>
                   <div className="flex flex-col items-end">
                     <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
-                      {task.priority}
+                      {getPriorityLabel(task.priority)}
                     </span>
                     <div
                       className={`flex items-center mt-2 text-xs ${
-                        isOverdue(task.dueDate) && task.status !== "done" ? "text-red-500" : "text-gray-500"
+                        isOverdue(task.due_date) && task.status !== "done" ? "text-red-500" : "text-gray-500"
                       }`}
                     >
                       <Calendar size={14} className="mr-1" />
-                      <span>{formatDate(task.dueDate)}</span>
+                      <span>{formatDate(task.due_date)}</span>
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
-                  <span className="text-xs text-gray-500">Responsável: {task.assignee}</span>
+                  <span className="text-xs text-gray-500">Responsável: {task.assignee || "Não atribuído"}</span>
                 </div>
               </div>
-            </Link>
-          ))
-        ) : (
-          <div className="text-center py-6 text-gray-500">Nenhuma tarefa encontrada para os filtros selecionados</div>
-        )}
-      </div>
+            ))
+          ) : (
+            <div className="text-center py-6 text-gray-500">
+              {tasks.length === 0
+                ? "Nenhuma tarefa encontrada para este projeto"
+                : "Nenhuma tarefa encontrada para os filtros selecionados"}
+            </div>
+          )}
+        </div>
+      )}
 
       {tasks.length > 5 && (
         <div className="mt-4 text-center">
           <Link
-            href={`/tarefas?projeto=${tasks[0]?.projectId}`}
+            href={`/tarefas?projeto=${projectId}`}
             className="inline-flex items-center text-sm text-[#4b7bb5] hover:underline"
           >
             Ver todas as tarefas
             <ArrowRight size={16} className="ml-1" />
           </Link>
         </div>
+      )}
+
+      {/* Diálogo de criação de tarefa */}
+      <CreateTaskDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        initialProject={projectId}
+        onTaskCreated={handleTaskCreated}
+      />
+
+      {/* Diálogo de edição de tarefa */}
+      {editTaskId && (
+        <EditTaskDialog
+          isOpen={!!editTaskId}
+          onClose={() => setEditTaskId(null)}
+          taskId={editTaskId}
+          onSave={handleTaskUpdated}
+        />
       )}
     </div>
   )

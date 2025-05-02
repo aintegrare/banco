@@ -12,62 +12,155 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useToast } from "@/components/ui/use-toast"
+
+interface Project {
+  id: string | number
+  name: string
+}
 
 interface EditTaskDialogProps {
   isOpen: boolean
   onClose: () => void
-  task: any
-  onSave: (task: any) => void
-  projects: any[]
+  taskId: string | number
+  onSave?: (task: any) => void
 }
 
-export function EditTaskDialog({ isOpen, onClose, task, onSave, projects }: EditTaskDialogProps) {
-  const [editedTask, setEditedTask] = useState<any>(task)
-  const [date, setDate] = useState<Date | undefined>(task.dueDate ? new Date(task.dueDate) : undefined)
+export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDialogProps) {
+  const [task, setTask] = useState<any>(null)
+  const [date, setDate] = useState<Date | undefined>(undefined)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
 
+  // Buscar dados da tarefa
   useEffect(() => {
-    if (isOpen) {
-      setEditedTask(task)
-      setDate(task.dueDate ? new Date(task.dueDate) : undefined)
+    const fetchTaskData = async () => {
+      if (!isOpen || !taskId) return
+
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        // Buscar tarefa
+        const taskResponse = await fetch(`/api/tasks/${taskId}`)
+        if (!taskResponse.ok) {
+          throw new Error("Falha ao buscar dados da tarefa")
+        }
+        const taskData = await taskResponse.json()
+        setTask(taskData)
+
+        // Definir data se houver
+        if (taskData.due_date) {
+          setDate(new Date(taskData.due_date))
+        } else {
+          setDate(undefined)
+        }
+
+        // Buscar projetos
+        const projectsResponse = await fetch("/api/projects")
+        if (!projectsResponse.ok) {
+          throw new Error("Falha ao buscar projetos")
+        }
+        const projectsData = await projectsResponse.json()
+        setProjects(projectsData)
+      } catch (error: any) {
+        console.error("Erro ao buscar dados:", error)
+        setError(error.message || "Erro ao carregar dados")
+        toast({
+          title: "Erro",
+          description: error.message || "Não foi possível carregar os dados da tarefa",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }, [task, isOpen])
+
+    fetchTaskData()
+  }, [isOpen, taskId, toast])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
-    setEditedTask((prev: any) => ({ ...prev, [name]: value }))
+    setTask((prev: any) => ({ ...prev, [name]: value }))
   }
 
   const handleSelectChange = (name: string, value: string) => {
-    setEditedTask((prev: any) => ({ ...prev, [name]: value }))
+    setTask((prev: any) => ({ ...prev, [name]: value }))
   }
 
   const handleDateChange = (date: Date | undefined) => {
     setDate(date)
     if (date) {
       const formattedDate = format(date, "yyyy-MM-dd")
-      setEditedTask((prev: any) => ({ ...prev, dueDate: formattedDate }))
+      setTask((prev: any) => ({ ...prev, due_date: formattedDate }))
     } else {
-      setEditedTask((prev: any) => ({ ...prev, dueDate: null }))
+      setTask((prev: any) => ({ ...prev, due_date: null }))
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Atualizar o nome do projeto com base no ID selecionado
-    const selectedProject = projects.find((p) => p.id === editedTask.projectId)
-    const updatedTask = {
-      ...editedTask,
-      projectName: selectedProject ? selectedProject.name : editedTask.projectName,
+    if (!task) return
+
+    if (!task.title) {
+      setError("O título da tarefa é obrigatório")
+      return
     }
 
-    if (typeof onSave === "function") {
-      onSave(updatedTask)
+    setIsSaving(true)
+    setError(null)
+
+    try {
+      // Preparar dados para envio
+      const updateData = {
+        ...task,
+        project_id: task.project_id || task.projectId, // Garantir compatibilidade
+      }
+
+      // Atualizar tarefa via API
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erro ao atualizar tarefa")
+      }
+
+      const updatedTask = await response.json()
+
+      toast({
+        title: "Sucesso",
+        description: "Tarefa atualizada com sucesso!",
+      })
+
+      // Notificar o componente pai sobre a atualização
+      if (onSave) {
+        onSave(updatedTask)
+      }
+
+      // Fechar o diálogo após sucesso
       onClose()
-    } else {
-      console.error("onSave is not a function")
+    } catch (err: any) {
+      console.error("Erro ao atualizar tarefa:", err)
+      setError(err.message || "Ocorreu um erro ao atualizar a tarefa. Por favor, tente novamente.")
+      toast({
+        title: "Erro",
+        description: err.message || "Não foi possível atualizar a tarefa",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -77,132 +170,156 @@ export function EditTaskDialog({ isOpen, onClose, task, onSave, projects }: Edit
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-[#4b7bb5]">Editar Tarefa</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          <div className="space-y-2">
-            <label htmlFor="title" className="text-sm font-medium">
-              Título
-            </label>
-            <Input
-              id="title"
-              name="title"
-              value={editedTask.title || ""}
-              onChange={handleChange}
-              required
-              className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
-            />
+
+        {isLoading ? (
+          <div className="flex justify-center items-center py-8">
+            <Loader2 size={30} className="text-[#4b7bb5] animate-spin" />
           </div>
-          <div className="space-y-2">
-            <label htmlFor="description" className="text-sm font-medium">
-              Descrição
-            </label>
-            <Textarea
-              id="description"
-              name="description"
-              value={editedTask.description || ""}
-              onChange={handleChange}
-              rows={3}
-              className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+        ) : task ? (
+          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
             <div className="space-y-2">
-              <label htmlFor="status" className="text-sm font-medium">
-                Status
+              <label htmlFor="title" className="text-sm font-medium">
+                Título
               </label>
-              <Select value={editedTask.status} onValueChange={(value) => handleSelectChange("status", value)}>
-                <SelectTrigger className="border-[#4b7bb5]">
-                  <SelectValue placeholder="Selecione o status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="backlog">Backlog</SelectItem>
-                  <SelectItem value="todo">A Fazer</SelectItem>
-                  <SelectItem value="in-progress">Em Progresso</SelectItem>
-                  <SelectItem value="review">Em Revisão</SelectItem>
-                  <SelectItem value="done">Concluído</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                id="title"
+                name="title"
+                value={task.title || ""}
+                onChange={handleChange}
+                required
+                className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
+              />
             </div>
             <div className="space-y-2">
-              <label htmlFor="priority" className="text-sm font-medium">
-                Prioridade
+              <label htmlFor="description" className="text-sm font-medium">
+                Descrição
               </label>
-              <Select
-                value={editedTask.priority || "medium"}
-                onValueChange={(value) => handleSelectChange("priority", value)}
-              >
-                <SelectTrigger className="border-[#4b7bb5]">
-                  <SelectValue placeholder="Selecione a prioridade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Baixa</SelectItem>
-                  <SelectItem value="medium">Média</SelectItem>
-                  <SelectItem value="high">Alta</SelectItem>
-                </SelectContent>
-              </Select>
+              <Textarea
+                id="description"
+                name="description"
+                value={task.description || ""}
+                onChange={handleChange}
+                rows={3}
+                className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
+              />
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label htmlFor="status" className="text-sm font-medium">
+                  Status
+                </label>
+                <Select value={task.status} onValueChange={(value) => handleSelectChange("status", value)}>
+                  <SelectTrigger className="border-[#4b7bb5]">
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="backlog">Backlog</SelectItem>
+                    <SelectItem value="todo">A Fazer</SelectItem>
+                    <SelectItem value="in-progress">Em Progresso</SelectItem>
+                    <SelectItem value="review">Em Revisão</SelectItem>
+                    <SelectItem value="done">Concluído</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="priority" className="text-sm font-medium">
+                  Prioridade
+                </label>
+                <Select
+                  value={task.priority || "medium"}
+                  onValueChange={(value) => handleSelectChange("priority", value)}
+                >
+                  <SelectTrigger className="border-[#4b7bb5]">
+                    <SelectValue placeholder="Selecione a prioridade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Baixa</SelectItem>
+                    <SelectItem value="medium">Média</SelectItem>
+                    <SelectItem value="high">Alta</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label htmlFor="project" className="text-sm font-medium">
+                  Projeto
+                </label>
+                <Select
+                  value={task.project_id?.toString() || task.projectId?.toString() || ""}
+                  onValueChange={(value) => handleSelectChange("project_id", value)}
+                >
+                  <SelectTrigger className="border-[#4b7bb5]">
+                    <SelectValue placeholder="Selecione o projeto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id.toString()}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="dueDate" className="text-sm font-medium">
+                  Data de Entrega
+                </label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal border-[#4b7bb5]",
+                        !date && "text-muted-foreground",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {date ? format(date, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar mode="single" selected={date} onSelect={handleDateChange} initialFocus locale={ptBR} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
             <div className="space-y-2">
-              <label htmlFor="project" className="text-sm font-medium">
-                Projeto
+              <label htmlFor="assignee" className="text-sm font-medium">
+                Responsável
               </label>
-              <Select value={editedTask.projectId} onValueChange={(value) => handleSelectChange("projectId", value)}>
-                <SelectTrigger className="border-[#4b7bb5]">
-                  <SelectValue placeholder="Selecione o projeto" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                id="assignee"
+                name="assignee"
+                value={task.assignee || ""}
+                onChange={handleChange}
+                className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
+              />
             </div>
-            <div className="space-y-2">
-              <label htmlFor="dueDate" className="text-sm font-medium">
-                Data de Entrega
-              </label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal border-[#4b7bb5]",
-                      !date && "text-muted-foreground",
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={date} onSelect={handleDateChange} initialFocus locale={ptBR} />
-                </PopoverContent>
-              </Popover>
-            </div>
+
+            {error && <p className="text-red-600 text-sm">{error}</p>}
+
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="bg-[#4b7bb5] hover:bg-[#3d649e]" disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Salvar Alterações"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        ) : (
+          <div className="py-4 text-center text-gray-500">
+            {error || "Não foi possível carregar os dados da tarefa"}
           </div>
-          <div className="space-y-2">
-            <label htmlFor="assignee" className="text-sm font-medium">
-              Responsável
-            </label>
-            <Input
-              id="assignee"
-              name="assignee"
-              value={editedTask.assignee || ""}
-              onChange={handleChange}
-              className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
-            />
-          </div>
-          <DialogFooter className="mt-6">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button type="submit" className="bg-[#4b7bb5] hover:bg-[#3d649e]">
-              Salvar Alterações
-            </Button>
-          </DialogFooter>
-        </form>
+        )}
       </DialogContent>
     </Dialog>
   )

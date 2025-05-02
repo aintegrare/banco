@@ -3,13 +3,15 @@
 import type React from "react"
 
 import { useState } from "react"
-import { X } from "lucide-react"
+import { X, Loader2 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 interface CreateProjectDialogProps {
   onClose: () => void
 }
 
 export function CreateProjectDialog({ onClose }: CreateProjectDialogProps) {
+  const router = useRouter()
   const [projectName, setProjectName] = useState("")
   const [projectDescription, setProjectDescription] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -27,17 +29,37 @@ export function CreateProjectDialog({ onClose }: CreateProjectDialogProps) {
     setError(null)
 
     try {
-      // Aqui faríamos a chamada à API para criar o projeto
-      // Por enquanto, vamos simular
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // Fazer a chamada à API para criar o projeto
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: projectName.trim(),
+          description: projectDescription.trim(),
+          status: "em_andamento",
+          start_date: new Date().toISOString(),
+          color: "#4b7bb5",
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erro ao criar projeto")
+      }
+
+      const newProject = await response.json()
+      console.log("Projeto criado com sucesso:", newProject)
 
       // Fechar o diálogo após sucesso
       onClose()
 
-      // Recarregar a página para mostrar o novo projeto
-      window.location.reload()
-    } catch (err) {
-      setError("Ocorreu um erro ao criar o projeto. Por favor, tente novamente.")
+      // Redirecionar para a página do novo projeto
+      router.push(`/projetos/${newProject.id}`)
+    } catch (err: any) {
+      console.error("Erro ao criar projeto:", err)
+      setError(err.message || "Ocorreu um erro ao criar o projeto. Por favor, tente novamente.")
     } finally {
       setIsSubmitting(false)
     }
@@ -48,7 +70,7 @@ export function CreateProjectDialog({ onClose }: CreateProjectDialogProps) {
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center border-b border-gray-200 px-6 py-4">
           <h2 className="text-xl font-semibold text-gray-800">Novo Projeto</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600" type="button" aria-label="Fechar">
             <X size={24} />
           </button>
         </div>
@@ -56,7 +78,7 @@ export function CreateProjectDialog({ onClose }: CreateProjectDialogProps) {
         <form onSubmit={handleSubmit} className="p-6">
           <div className="mb-4">
             <label htmlFor="project-name" className="block text-sm font-medium text-gray-700 mb-1">
-              Nome do Projeto
+              Nome do Projeto *
             </label>
             <input
               type="text"
@@ -69,6 +91,7 @@ export function CreateProjectDialog({ onClose }: CreateProjectDialogProps) {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
               placeholder="Digite o nome do projeto"
               autoFocus
+              required
             />
           </div>
 
@@ -99,10 +122,17 @@ export function CreateProjectDialog({ onClose }: CreateProjectDialogProps) {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-[#4b7bb5] text-white rounded-lg hover:bg-[#3d649e] transition-colors"
+              className="px-4 py-2 bg-[#4b7bb5] text-white rounded-lg hover:bg-[#3d649e] transition-colors flex items-center justify-center min-w-[120px]"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Criando..." : "Criar Projeto"}
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={16} className="mr-2 animate-spin" />
+                  Criando...
+                </>
+              ) : (
+                "Criar Projeto"
+              )}
             </button>
           </div>
         </form>
