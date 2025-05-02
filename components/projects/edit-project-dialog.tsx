@@ -116,7 +116,15 @@ export function EditProjectDialog({ project, isOpen, onClose, onSuccess }: EditP
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+
+    // Tratamento especial para campos numéricos
+    if (name === "progress") {
+      setFormData((prev) => ({ ...prev, [name]: value === "" ? 0 : Number(value) }))
+    } else if (name === "budget") {
+      setFormData((prev) => ({ ...prev, [name]: value })) // Mantém como string para formatação
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }))
+    }
   }
 
   const handleSelectChange = (name: string, value: string) => {

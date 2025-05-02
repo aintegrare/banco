@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { listBunnyFiles } from "@/lib/bunny"
+import { getBunnyClient, getBunnyPublicUrl } from "@/lib/bunny"
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const directory = searchParams.get("directory") || "documents"
 
-    console.log(`API Files: Listando arquivos do diretório: ${directory}`)
+    console.log(`API Files: Buscando arquivos no diretório: ${directory}`)
 
     // Verificar se as variáveis de ambiente estão configuradas
     if (!process.env.BUNNY_API_KEY || !process.env.BUNNY_STORAGE_ZONE) {
@@ -14,68 +14,59 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           error: "Configurações do Bunny.net incompletas. Verifique as variáveis de ambiente.",
-          files: [],
         },
         { status: 500 },
       )
     }
 
-    // Tentar listar os arquivos
+    const bunnyClient = getBunnyClient()
+
+    // Verificar se o diretório existe e criar se não existir
     try {
-      console.log(`API Files: Chamando listBunnyFiles para o diretório: ${directory}`)
-      const files = await listBunnyFiles(directory)
-      console.log(`API Files: Arquivos listados com sucesso: ${files.length} arquivos encontrados`)
-
-      // Adicionar mais informações para depuração
-      if (files.length > 0) {
-        console.log(
-          "API Files: Primeiros 3 arquivos:",
-          files.slice(0, 3).map((f) => ({
-            Nome: f.ObjectName,
-            Caminho: f.Path,
-            URL: f.PublicUrl,
-          })),
-        )
-      } else {
-        console.log("API Files: Nenhum arquivo encontrado no diretório")
-      }
-
-      return NextResponse.json({ files })
-    } catch (listError) {
-      console.error("API Files: Erro específico ao listar arquivos:", listError)
-
-      // Tentar listar o diretório raiz como fallback
+      console.log(`API Files: Verificando se o diretório ${directory} existe`)
+      await bunnyClient.get(`/${directory}/`)
+      console.log(`API Files: Diretório ${directory} existe`)
+    } catch (error) {
+      console.log(`API Files: Diretório ${directory} não existe, criando...`)
       try {
-        console.log("API Files: Tentando listar o diretório raiz como fallback")
-        const rootFiles = await listBunnyFiles("")
-        console.log(`API Files: Diretório raiz listado com sucesso: ${rootFiles.length} arquivos/pastas encontrados`)
-
-        // Verificar se o diretório 'documents' existe
-        const documentsDir = rootFiles.find((f) => f.ObjectName === "documents" && f.IsDirectory)
-
-        if (!documentsDir) {
-          console.log("API Files: Diretório 'documents' não encontrado no diretório raiz")
-        } else {
-          console.log("API Files: Diretório 'documents' encontrado no diretório raiz")
-        }
-
-        return NextResponse.json({
-          warning: "Não foi possível listar o diretório solicitado. Mostrando diretório raiz.",
-          files: rootFiles,
-        })
-      } catch (rootError) {
-        console.error("API Files: Erro ao listar diretório raiz:", rootError)
-        throw listError // Lançar o erro original
+        await bunnyClient.put(`/${directory}/`, "")
+        console.log(`API Files: Diretório ${directory} criado com sucesso`)
+      } catch (createError) {
+        console.error(`API Files: Erro ao criar diretório ${directory}:`, createError)
+        // Continuar mesmo se não conseguir criar o diretório
       }
     }
+
+    // Listar arquivos no diretório
+    console.log(`API Files: Listando arquivos no diretório ${directory}`)
+    const response = await bunnyClient.get(`/${directory}/`)
+
+    if (!response.ok) {
+      console.error(
+        `API Files: Erro ao listar arquivos no diretório ${directory}: ${response.status} ${response.statusText}`,
+      )
+      return NextResponse.json(
+        { error: `Erro ao listar arquivos: ${response.status} ${response.statusText}` },
+        { status: response.status },
+      )
+    }
+
+    const files = await response.json()
+    console.log(`API Files: ${files.length} arquivos encontrados no diretório ${directory}`)
+
+    // Adicionar URLs públicas aos arquivos
+    const filesWithUrls = files.map((file: any) => ({
+      ...file,
+      PublicUrl: getBunnyPublicUrl(file.Path),
+    }))
+
+    return NextResponse.json({ files: filesWithUrls })
   } catch (error) {
     console.error("API Files: Erro ao listar arquivos:", error)
-
     return NextResponse.json(
       {
         error: "Erro ao listar arquivos",
         message: error instanceof Error ? error.message : String(error),
-        files: [],
       },
       { status: 500 },
     )

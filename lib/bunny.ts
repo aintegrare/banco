@@ -1,6 +1,7 @@
 // Configuração do cliente Bunny.net Storage
 const BUNNY_API_KEY = process.env.BUNNY_API_KEY || ""
 const BUNNY_STORAGE_ZONE = process.env.BUNNY_STORAGE_ZONE || ""
+const BUNNY_STORAGE_REGION = process.env.BUNNY_STORAGE_REGION || ""
 
 // URLs corretas conforme configuração do Bunny.net
 const BUNNY_STORAGE_URL = `https://storage.bunnycdn.com/${BUNNY_STORAGE_ZONE}`
@@ -306,4 +307,67 @@ export function getBunnyPublicUrl(filePath: string): string {
   // Normalizar o caminho do arquivo
   const normalizedPath = filePath ? filePath.replace(/\/+/g, "/").replace(/^\//, "") : ""
   return `${BUNNY_PULLZONE_URL}/${normalizedPath}`
+}
+
+// Função para criar um cliente Bunny.net
+export function getBunnyClient() {
+  if (!BUNNY_API_KEY || !BUNNY_STORAGE_ZONE) {
+    throw new Error("Configurações do Bunny.net incompletas. Verifique as variáveis de ambiente.")
+  }
+
+  const bunnyClient = {
+    get: async (path: string) => {
+      const url = `${BUNNY_STORAGE_URL}${path}`
+      console.log(`Bunny Client GET: ${url}`)
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            AccessKey: BUNNY_API_KEY,
+            Accept: "application/json",
+          },
+        })
+        return response
+      } catch (e: any) {
+        console.error(`Bunny Client GET error: ${e.message}`)
+        throw e
+      }
+    },
+    put: async (path: string, data: any) => {
+      const url = `${BUNNY_STORAGE_URL}${path}`
+      console.log(`Bunny Client PUT: ${url}`)
+      try {
+        const response = await fetch(url, {
+          method: "PUT",
+          headers: {
+            AccessKey: BUNNY_API_KEY,
+            "Content-Type": "application/json",
+          },
+          body: data,
+        })
+        return response
+      } catch (e: any) {
+        console.error(`Bunny Client PUT error: ${e.message}`)
+        throw e
+      }
+    },
+    delete: async (path: string) => {
+      const url = `${BUNNY_STORAGE_URL}${path}`
+      console.log(`Bunny Client DELETE: ${url}`)
+      try {
+        const response = await fetch(url, {
+          method: "DELETE",
+          headers: {
+            AccessKey: BUNNY_API_KEY,
+          },
+        })
+        return response
+      } catch (e: any) {
+        console.error(`Bunny Client DELETE error: ${e.message}`)
+        throw e
+      }
+    },
+  }
+
+  return bunnyClient
 }

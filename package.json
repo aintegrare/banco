@@ -63,7 +63,8 @@
     "pdfjs-dist": "latest",
     "framer-motion": "latest",
     "react-beautiful-dnd": "latest",
-    "@supabase/supabase-js": "latest"
+    "@supabase/supabase-js": "latest",
+    "pdf-parse": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

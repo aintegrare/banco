@@ -5,7 +5,11 @@ import type React from "react"
 import { useState, useRef } from "react"
 import { Upload, File, Loader2, X, CheckCircle, AlertTriangle, ImageIcon } from "lucide-react"
 
-export function FileUploader() {
+interface FileUploaderProps {
+  onUploadSuccess?: () => void
+}
+
+export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
   const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -124,6 +128,12 @@ export function FileUploader() {
 
         setProcessingStatus("Concluído!")
         setSuccess(data)
+
+        // Notificar o componente pai sobre o upload bem-sucedido
+        if (onUploadSuccess) {
+          onUploadSuccess()
+        }
+
         clearFile()
       } catch (fetchError) {
         console.error("FileUploader: Erro na chamada fetch", fetchError)
@@ -178,6 +188,11 @@ export function FileUploader() {
         fileUrl: data.fileUrl,
         chunksProcessed: 0,
       })
+
+      // Notificar o componente pai sobre o upload bem-sucedido
+      if (onUploadSuccess) {
+        onUploadSuccess()
+      }
     } catch (err) {
       console.error("FileUploader: Erro no teste de conexão", err)
       setError(err instanceof Error ? err.message : "Erro desconhecido")

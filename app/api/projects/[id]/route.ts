@@ -116,36 +116,46 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       projectId = projectByName.id.toString()
     }
 
-    // Abordagem simplificada: obter um projeto existente e usar suas propriedades
-    console.log("Obtendo um projeto existente para determinar as colunas disponíveis...")
-    const { data: sampleProject, error: sampleError } = await supabase.from("projects").select("*").limit(1).single()
+    // Verificar se a tabela projects tem a coluna updated_at
+    const { data: columnInfo, error: columnError } = await supabase.rpc("get_table_columns", { table_name: "projects" })
 
-    if (sampleError) {
-      console.error("Erro ao obter projeto de exemplo:", sampleError)
-      throw new Error("Não foi possível determinar as colunas da tabela projects")
+    if (columnError) {
+      console.error("Erro ao verificar colunas da tabela:", columnError)
+      // Continuar sem verificar as colunas
     }
 
-    // Usar as chaves do objeto como nomes de colunas
-    const columnNames = Object.keys(sampleProject)
+    // Extrair nomes de colunas do resultado
+    const columnNames = columnInfo ? columnInfo.map((col: any) => col.column_name) : []
     console.log("Colunas disponíveis na tabela projects:", columnNames)
 
     // Criar um objeto com apenas as colunas que existem na tabela
     const updateData: Record<string, any> = {}
 
     // Adicionar apenas as colunas que existem
-    if (columnNames.includes("name") && body.name) updateData.name = body.name
-    if (columnNames.includes("description") && body.description !== undefined) updateData.description = body.description
-    if (columnNames.includes("status") && body.status) updateData.status = body.status
-    if (columnNames.includes("start_date") && body.start_date !== undefined) updateData.start_date = body.start_date
-    if (columnNames.includes("end_date") && body.end_date !== undefined) updateData.end_date = body.end_date
-    if (columnNames.includes("progress") && body.progress !== undefined) updateData.progress = body.progress
-    if (columnNames.includes("color") && body.color) updateData.color = body.color
+    if (body.name) updateData.name = body.name
+    if (body.description !== undefined) updateData.description = body.description
+    if (body.status) updateData.status = body.status
+    if (body.start_date !== undefined) updateData.start_date = body.start_date
+    if (body.end_date !== undefined) updateData.end_date = body.end_date
+    if (body.progress !== undefined) {
+      updateData.progress = body.progress === "" ? 0 : Number(body.progress)
+    }
+    if (body.color) updateData.color = body.color
 
-    // Adicionar client e budget apenas se existirem
-    if (columnNames.includes("client") && body.client !== undefined) updateData.client = body.client
-    if (columnNames.includes("budget") && body.budget !== undefined) updateData.budget = body.budget
+    // Adicionar client e budget apenas se existirem no body
+    if (body.client !== undefined) updateData.client = body.client
+    if (body.budget !== undefined) {
+      // Se budget for numérico no banco de dados, converta para número ou null
+      if (body.budget === "") {
+        updateData.budget = null
+      } else if (!isNaN(Number(body.budget))) {
+        updateData.budget = Number(body.budget)
+      } else {
+        updateData.budget = body.budget // Mantém como string se não for numérico
+      }
+    }
 
-    // Adicionar updated_at apenas se existir
+    // Adicionar updated_at apenas se a coluna existir na tabela
     if (columnNames.includes("updated_at")) {
       updateData.updated_at = new Date().toISOString()
     }

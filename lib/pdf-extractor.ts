@@ -11,22 +11,55 @@ export async function extractPDFText(pdfUrl: string): Promise<string> {
       return "URL inválida. Verifique se o endereço está correto."
     }
 
-    // Em vez de tentar processar o PDF diretamente, vamos usar uma abordagem simplificada
-    // para demonstração e teste
+    // Buscar o arquivo PDF
+    const pdfResponse = await fetch(pdfUrl)
+    if (!pdfResponse.ok) {
+      throw new Error(`Falha ao buscar o PDF: ${pdfResponse.status} ${pdfResponse.statusText}`)
+    }
 
-    // Simular extração de texto com base na URL
-    const simulatedText = generateSimulatedText(pdfUrl)
+    // Converter para ArrayBuffer
+    const pdfBuffer = await pdfResponse.arrayBuffer()
 
-    console.log(`PDF Extractor: Extração simulada concluída, ${simulatedText.length} caracteres gerados`)
+    // Importar pdf-parse dinamicamente para evitar problemas com SSR
+    const pdfParse = (await import("pdf-parse")).default
 
-    return simulatedText
+    // Extrair o texto do PDF
+    const data = await pdfParse(Buffer.from(pdfBuffer))
+
+    // Verificar se o texto foi extraído com sucesso
+    if (!data.text || data.text.trim().length === 0) {
+      console.warn("PDF Extractor: Nenhum texto extraído do PDF")
+      return "Não foi possível extrair texto deste PDF. O arquivo pode estar protegido, ser uma imagem digitalizada ou estar corrompido."
+    }
+
+    console.log(`PDF Extractor: Extração concluída, ${data.text.length} caracteres extraídos`)
+
+    // Limpar e normalizar o texto extraído
+    const cleanedText = cleanPdfText(data.text)
+    return cleanedText
   } catch (error) {
     console.error("PDF Extractor: Erro na extração:", error)
     return `Erro na extração do PDF: ${error instanceof Error ? error.message : String(error)}`
   }
 }
 
-// Função para gerar texto simulado com base na URL do PDF
+// Função para limpar e normalizar o texto extraído do PDF
+function cleanPdfText(text: string): string {
+  return (
+    text
+      // Remover múltiplos espaços em branco
+      .replace(/\s+/g, " ")
+      // Remover quebras de página e outros caracteres especiais
+      .replace(/\f/g, "\n")
+      // Normalizar quebras de linha
+      .replace(/\r\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      // Remover espaços em branco no início e fim
+      .trim()
+  )
+}
+
+// Mantemos a função de simulação para fallback em caso de erro
 function generateSimulatedText(pdfUrl: string): string {
   // Extrair o nome do arquivo da URL
   const urlParts = pdfUrl.split("/")
@@ -66,7 +99,3 @@ Para implementar a extração real, será necessário configurar adequadamente a
 de processamento de PDF no ambiente de produção.
   `.trim()
 }
-
-// Nota: Para implementar a extração real de PDF em um ambiente serverless,
-// recomenda-se usar um serviço externo como AWS Textract, Google Cloud Vision OCR,
-// ou uma API dedicada para extração de texto de PDFs.

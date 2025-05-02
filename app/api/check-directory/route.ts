@@ -1,9 +1,12 @@
-import { NextResponse } from "next/server"
-import { listBunnyFiles } from "@/lib/bunny"
+import { type NextRequest, NextResponse } from "next/server"
+import { getBunnyClient, getBunnyPublicUrl } from "@/lib/bunny"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    console.log("API Check Directory: Verificando diretório 'documents'")
+    const searchParams = request.nextUrl.searchParams
+    const directory = searchParams.get("directory") || "documents"
+
+    console.log(`API Check Directory: Verificando diretório: ${directory}`)
 
     // Verificar se as variáveis de ambiente estão configuradas
     if (!process.env.BUNNY_API_KEY || !process.env.BUNNY_STORAGE_ZONE) {
@@ -16,45 +19,45 @@ export async function GET() {
       )
     }
 
-    // Primeiro, verificar o diretório raiz
-    console.log("API Check Directory: Verificando diretório raiz")
-    const rootFiles = await listBunnyFiles("")
+    const bunnyClient = getBunnyClient()
 
-    // Verificar se o diretório 'documents' existe
-    const documentsDir = rootFiles.find((f) => f.ObjectName === "documents" && f.IsDirectory)
+    // Verificar se o diretório existe
+    try {
+      console.log(`API Check Directory: Verificando se o diretório ${directory} existe`)
+      const response = await bunnyClient.get(`/${directory}/`)
 
-    if (!documentsDir) {
-      console.log("API Check Directory: Diretório 'documents' não encontrado no diretório raiz")
+      if (!response.ok) {
+        console.log(`API Check Directory: Diretório ${directory} não existe`)
+        return NextResponse.json({
+          exists: false,
+          message: `O diretório ${directory} não existe.`,
+        })
+      }
+
+      const files = await response.json()
+      console.log(`API Check Directory: Diretório ${directory} existe com ${files.length} arquivos`)
+
+      // Adicionar URLs públicas aos arquivos
+      const filesWithUrls = files.map((file: any) => ({
+        ...file,
+        PublicUrl: getBunnyPublicUrl(file.Path),
+      }))
+
+      return NextResponse.json({
+        exists: true,
+        fileCount: files.length,
+        files: filesWithUrls,
+      })
+    } catch (error) {
+      console.error(`API Check Directory: Erro ao verificar diretório ${directory}:`, error)
       return NextResponse.json({
         exists: false,
-        message: "O diretório 'documents' não existe no diretório raiz",
-        rootFiles,
+        error: `Erro ao verificar diretório ${directory}`,
+        message: error instanceof Error ? error.message : String(error),
       })
     }
-
-    console.log("API Check Directory: Diretório 'documents' encontrado, verificando seu conteúdo")
-
-    // Verificar o conteúdo do diretório 'documents'
-    const documentsFiles = await listBunnyFiles("documents")
-
-    // Verificar e exibir os caminhos completos para depuração
-    if (documentsFiles.length > 0) {
-      console.log("API Check Directory: Exemplos de caminhos de arquivos:")
-      documentsFiles.slice(0, 3).forEach((file) => {
-        console.log(`- Nome: ${file.ObjectName}, Path: ${file.Path}, URL: ${file.PublicUrl}`)
-      })
-    }
-
-    return NextResponse.json({
-      exists: true,
-      message: "Diretório 'documents' existe",
-      fileCount: documentsFiles.length,
-      files: documentsFiles,
-      rootFiles,
-    })
   } catch (error) {
-    console.error("API Check Directory: Erro ao verificar diretório:", error)
-
+    console.error("API Check Directory: Erro geral:", error)
     return NextResponse.json(
       {
         error: "Erro ao verificar diretório",

@@ -37,7 +37,11 @@ interface BunnyFile {
   PublicUrl?: string
 }
 
-export function FileList() {
+interface FileListProps {
+  initialDirectory?: string
+}
+
+export function FileList({ initialDirectory = "documents" }: FileListProps) {
   const [files, setFiles] = useState<BunnyFile[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -47,7 +51,7 @@ export function FileList() {
   const [directoryInfo, setDirectoryInfo] = useState<any | null>(null)
   const [isCheckingDirectory, setIsCheckingDirectory] = useState(false)
   const [debugInfo, setDebugInfo] = useState<string | null>(null)
-  const [selectedDirectory, setSelectedDirectory] = useState<string>("documents")
+  const [selectedDirectory, setSelectedDirectory] = useState<string>(initialDirectory)
   const [previewFile, setPreviewFile] = useState<BunnyFile | null>(null)
 
   const fetchFiles = async (directory = selectedDirectory) => {
@@ -98,8 +102,8 @@ export function FileList() {
   }
 
   useEffect(() => {
-    fetchFiles()
-  }, [])
+    fetchFiles(selectedDirectory)
+  }, [selectedDirectory])
 
   const handleDelete = async (path: string) => {
     if (!confirm("Tem certeza que deseja excluir este arquivo? Esta ação não pode ser desfeita.")) {
@@ -165,7 +169,6 @@ export function FileList() {
 
       setDirectoryCreated(true)
       await fetchFiles(directory)
-      setSelectedDirectory(directory)
     } catch (err) {
       console.error("Erro ao criar diretório:", err)
       setError(err instanceof Error ? err.message : "Erro ao criar diretório")
@@ -180,7 +183,7 @@ export function FileList() {
     setError(null)
 
     try {
-      const response = await fetch("/api/check-directory")
+      const response = await fetch(`/api/check-directory?directory=${selectedDirectory}`)
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
@@ -349,7 +352,7 @@ export function FileList() {
             Criar Diretório
           </button>
           <button
-            onClick={fetchFiles}
+            onClick={() => fetchFiles(selectedDirectory)}
             className="flex items-center text-sm text-[#4b7bb5] hover:text-[#3d649e]"
             disabled={isLoading}
           >
