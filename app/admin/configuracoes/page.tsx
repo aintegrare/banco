@@ -247,6 +247,35 @@ export default function ConfiguracoesPage() {
               </div>
             </div>
           </div>
+
+          {/* Adicionar um novo card para configurações de OCR na seção de configurações */}
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <h2 className="text-xl font-bold text-[#4072b0] mb-4">Configurações de OCR</h2>
+
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-1">Status do OCR</h3>
+                <div className="px-4 py-2 bg-green-100 rounded-md text-green-700 flex items-center">
+                  <span className="h-2 w-2 bg-green-500 rounded-full mr-2"></span>
+                  Ativo
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-1">Idioma Principal</h3>
+                <div className="px-4 py-2 bg-gray-100 rounded-md text-gray-700">Português</div>
+              </div>
+
+              <div>
+                <Link
+                  href="/admin/configuracoes/ocr"
+                  className="inline-flex items-center px-4 py-2 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:ring-offset-2 text-sm"
+                >
+                  Configurar OCR
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
