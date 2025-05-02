@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
-import { generateSimpleEmbedding } from "./embeddings"
+import { defaultEmbeddingProvider, generateSimpleEmbedding } from "./embeddings"
 import { extractPDFText } from "./pdf-extractor"
 
 // Configuração do cliente Supabase
@@ -184,7 +184,7 @@ export async function listDocumentMetadata(): Promise<DocumentMetadata[]> {
   }
 }
 
-// Função para gerar embeddings de texto usando a API do Claude
+// Função para gerar embeddings de texto usando provedores configurados
 export async function generateEmbeddings(text: string) {
   try {
     console.log("Gerando embedding para texto de tamanho:", text.length)
@@ -192,61 +192,18 @@ export async function generateEmbeddings(text: string) {
     // Limitar o tamanho do texto para evitar erros com a API
     const limitedText = text.slice(0, 100000) // Limitar a 100k caracteres
 
-    // Verificar se a chave da API está disponível
-    if (!process.env.ANTHROPIC_API_KEY) {
-      console.log("Chave da API Anthropic não encontrada, usando fallback local para embeddings")
-      return generateSimpleEmbedding(text)
-    }
-
     try {
-      // Tentar usar a API Anthropic com timeout
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 segundos de timeout
-
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": process.env.ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-3-haiku-20240307",
-          max_tokens: 1024,
-          messages: [
-            {
-              role: "user",
-              content: limitedText,
-            },
-          ],
-          system: "Gere um embedding semântico para este texto. Responda apenas com o embedding.",
-        }),
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error("Erro na resposta da API de embeddings:", errorData)
-        throw new Error(errorData.error?.message || `Erro ao gerar embeddings: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      // Como a API de mensagens não retorna embeddings diretamente,
-      // vamos usar o fallback local em vez de tentar extrair embeddings da resposta
-      console.log("Usando fallback local para embeddings devido à limitação da API")
-      return generateSimpleEmbedding(text)
+      // Usar o provedor de embeddings padrão (composite)
+      return await defaultEmbeddingProvider.generateEmbedding(limitedText)
     } catch (apiError) {
       console.error("Erro ao chamar API de embeddings:", apiError)
       console.log("Usando fallback local para embeddings após erro na API")
-      return generateSimpleEmbedding(text)
+      return generateSimpleEmbedding(limitedText)
     }
   } catch (error) {
     console.error("Erro ao gerar embeddings:", error)
     // Usar o fallback local em caso de erro
-    console.log("Usando fallback local para embeddings devido a erro na API")
+    console.log("Usando fallback local para embeddings devido a erro")
     return generateSimpleEmbedding(text)
   }
 }

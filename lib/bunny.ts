@@ -371,3 +371,33 @@ export function getBunnyClient() {
 
   return bunnyClient
 }
+
+// Função para obter os headers de autenticação para o Bunny CDN
+export function getBunnyHeaders(): Record<string, string> {
+  const apiKey = process.env.BUNNY_API_KEY
+
+  if (!apiKey) {
+    console.warn("BUNNY_API_KEY não encontrada nas variáveis de ambiente")
+    return {}
+  }
+
+  return {
+    AccessKey: apiKey,
+    // Adicionar outros headers necessários para autenticação
+    Accept: "application/json, application/pdf, */*",
+    "User-Agent": "Integrare-PDF-Processor/1.0",
+  }
+}
+
+// Função para verificar se as credenciais do Bunny estão configuradas
+export function checkBunnyCredentials(): { configured: boolean; missing: string[] } {
+  const missing: string[] = []
+
+  if (!process.env.BUNNY_API_KEY) missing.push("BUNNY_API_KEY")
+  if (!process.env.BUNNY_STORAGE_ZONE) missing.push("BUNNY_STORAGE_ZONE")
+
+  return {
+    configured: missing.length === 0,
+    missing,
+  }
+}
