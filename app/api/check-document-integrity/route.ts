@@ -2,6 +2,29 @@ import { type NextRequest, NextResponse } from "next/server"
 import { fixBunnyUrl } from "@/lib/bunny"
 import * as pdfjs from "pdfjs-dist"
 
+// Polyfill para DOMMatrix no ambiente do servidor
+if (typeof global !== "undefined" && typeof DOMMatrix === "undefined") {
+  // @ts-ignore
+  global.DOMMatrix = class DOMMatrix {
+    constructor(transform?: string | number[]) {
+      // Implementação mínima para evitar erros
+    }
+    // Métodos mínimos necessários
+    translate() {
+      return this
+    }
+    scale() {
+      return this
+    }
+    multiply() {
+      return this
+    }
+    inverse() {
+      return this
+    }
+  }
+}
+
 // Configurar o worker do PDF.js
 const PDFJS_WORKER_SRC = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js"
 if (typeof window === "undefined") {

@@ -116,38 +116,37 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       projectId = projectByName.id.toString()
     }
 
-    // Primeiro, buscar o esquema da tabela para saber quais campos existem
-    const { data: columns, error: columnsError } = await supabase.rpc("get_table_columns", { table_name: "projects" })
+    // Primeiro, buscar o projeto atual para ver quais campos ele tem
+    const { data: currentProject, error: fetchError } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("id", projectId)
+      .single()
 
-    if (columnsError) {
-      console.error("Erro ao buscar colunas da tabela:", columnsError)
-      throw columnsError
+    if (fetchError) {
+      console.error("Erro ao buscar projeto atual:", fetchError)
+      throw fetchError
     }
 
-    // Criar um conjunto com os nomes das colunas para fácil verificação
-    const columnNames = new Set(columns.map((col) => col.column_name))
-    console.log("Colunas disponíveis na tabela projects:", Array.from(columnNames))
-
-    // Criar um objeto com apenas os campos que existem na tabela
+    // Criar um objeto com apenas os campos que existem no projeto atual
     const updateData = {}
 
-    // Adicionar apenas os campos que existem na tabela e que foram enviados no body
-    if (body.name !== undefined && columnNames.has("name")) updateData.name = body.name
-    if (body.description !== undefined && columnNames.has("description")) updateData.description = body.description
-    if (body.status !== undefined && columnNames.has("status")) updateData.status = body.status
-    if (body.start_date !== undefined && columnNames.has("start_date")) updateData.start_date = body.start_date
-    if (body.end_date !== undefined && columnNames.has("end_date")) updateData.end_date = body.end_date
-    if (body.progress !== undefined && columnNames.has("progress")) {
-      updateData.progress = body.progress === "" ? 0 : Number(body.progress)
-    }
+    // Adicionar apenas os campos que existem no projeto atual e que foram enviados no body
+    Object.keys(currentProject).forEach((key) => {
+      if (body[key] !== undefined && key !== "id") {
+        // Tratamento especial para campos numéricos
+        if (key === "progress") {
+          updateData[key] = body[key] === "" ? 0 : Number(body[key])
+        } else {
+          updateData[key] = body[key]
+        }
+      }
+    })
 
-    // Verificar se há campos adicionais no projeto que também existem na tabela
-    if (body.client !== undefined && columnNames.has("client")) updateData.client = body.client
-    if (body.budget !== undefined && columnNames.has("budget")) updateData.budget = body.budget
-
+    console.log("Campos existentes no projeto:", Object.keys(currentProject))
     console.log("Dados a serem atualizados:", updateData)
 
-    // Atualizar o projeto usando o método update com apenas os campos que existem na tabela
+    // Atualizar o projeto
     const { data: project, error: updateError } = await supabase
       .from("projects")
       .update(updateData)
@@ -206,7 +205,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     }
 
     // Buscar o projeto atualizado para retornar
-    const { data: updatedProject, error: fetchError } = await supabase
+    const { data: updatedProject, error: fetchUpdatedError } = await supabase
       .from("projects")
       .select(`
         *,
@@ -220,7 +219,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       .eq("id", projectId)
       .single()
 
-    if (fetchError) throw fetchError
+    if (fetchUpdatedError) throw fetchUpdatedError
 
     return NextResponse.json(updatedProject)
   } catch (error) {
