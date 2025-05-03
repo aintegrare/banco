@@ -3,7 +3,15 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Settings, PenToolIcon as Tool, FolderOpen, FileSearch, Database } from "lucide-react"
+import {
+  LayoutDashboard,
+  Settings,
+  PenToolIcon as Tool,
+  FolderOpen,
+  FileSearch,
+  Database,
+  MessageSquare,
+} from "lucide-react"
 
 const navItems = [
   {
@@ -35,6 +43,11 @@ const navItems = [
     title: "Embeddings",
     href: "/admin/configuracoes/embeddings",
     icon: Database,
+  },
+  {
+    href: "/admin/configuracoes/chat",
+    title: "Chat (Jaque)",
+    icon: MessageSquare,
   },
 ]
 

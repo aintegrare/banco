@@ -1,114 +1,65 @@
-// Importar apenas o que precisamos do pdfjs-dist
-import * as pdfjs from "pdfjs-dist"
-import type { PDFDocumentProxy } from "pdfjs-dist"
-import { getBunnyHeaders } from "./bunny"
-
-// Configuração do worker para o pdfjs
-// Não importamos diretamente o worker, mas configuramos o caminho para ele
-// Isso evita o erro de "Can't resolve 'pdfjs-dist/build/pdf.worker.entry'"
-if (typeof window !== "undefined") {
-  // Só configuramos o worker no lado do cliente
-  pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
-}
-
-// Função para extrair texto de um PDF
-export async function extractPDFText(url: string): Promise<string> {
+// Função principal para extrair texto de PDFs
+export async function extractPDFText(pdfUrl: string): Promise<string> {
   try {
-    console.log(`Extraindo texto do PDF: ${url}`)
+    console.log("PDF Extractor: Iniciando extração de", pdfUrl)
 
-    // Verificar se a URL é do Bunny CDN
-    const isBunnyCDN = url.includes("b-cdn.net")
-
-    // Preparar opções para carregamento do PDF
-    const loadingOptions: any = {
-      verbosity: 1, // Aumentar verbosidade para debug
+    // Verificar se a URL é válida
+    try {
+      new URL(pdfUrl)
+    } catch (urlError) {
+      console.error("PDF Extractor: URL inválida:", pdfUrl)
+      return "URL inválida. Verifique se o endereço está correto."
     }
 
-    // Adicionar headers de autenticação se for do Bunny CDN
-    if (isBunnyCDN) {
-      const headers = getBunnyHeaders()
-      loadingOptions.httpHeaders = headers
+    // Buscar o arquivo PDF
+    const pdfResponse = await fetch(pdfUrl)
+    if (!pdfResponse.ok) {
+      throw new Error(`Falha ao buscar o PDF: ${pdfResponse.status} ${pdfResponse.statusText}`)
     }
 
-    // Carregar o documento PDF
-    console.log("Carregando documento PDF...")
-    const loadingTask = pdfjs.getDocument({
-      url,
-      ...loadingOptions,
-    })
+    // Converter para ArrayBuffer
+    const pdfBuffer = await pdfResponse.arrayBuffer()
 
-    // Adicionar timeout para evitar bloqueio indefinido
-    const timeoutPromise = new Promise<PDFDocumentProxy>((_, reject) => {
-      setTimeout(() => reject(new Error("Timeout ao carregar o PDF")), 30000)
-    })
+    // Importar pdf-parse dinamicamente para evitar problemas com SSR
+    const pdfParse = (await import("pdf-parse")).default
 
-    // Carregar o documento com timeout
-    const pdfDocument = await Promise.race([loadingTask.promise, timeoutPromise])
+    // Extrair o texto do PDF
+    const data = await pdfParse(Buffer.from(pdfBuffer))
 
-    console.log(`PDF carregado com ${pdfDocument.numPages} páginas`)
-
-    // Extrair texto de todas as páginas
-    let fullText = ""
-
-    for (let i = 1; i <= pdfDocument.numPages; i++) {
-      try {
-        console.log(`Processando página ${i}/${pdfDocument.numPages}`)
-        const page = await pdfDocument.getPage(i)
-        const textContent = await page.getTextContent()
-
-        // Extrair texto dos itens
-        const pageText = textContent.items.map((item: any) => item.str).join(" ")
-
-        fullText += pageText + "\n\n"
-      } catch (pageError) {
-        console.error(`Erro ao processar página ${i}:`, pageError)
-        fullText += `[Erro na extração da página ${i}]\n\n`
-      }
+    // Verificar se o texto foi extraído com sucesso
+    if (!data.text || data.text.trim().length === 0) {
+      console.warn("PDF Extractor: Nenhum texto extraído do PDF")
+      return "Não foi possível extrair texto deste PDF. O arquivo pode estar protegido, ser uma imagem digitalizada ou estar corrompido."
     }
 
-    // Verificar se o texto extraído é válido
-    if (!fullText || fullText.trim().length === 0) {
-      console.warn("Texto extraído vazio, o PDF pode estar protegido ou ser uma imagem")
-      throw new Error(
-        "Não foi possível extrair texto do PDF. O arquivo pode estar protegido ou ser uma imagem digitalizada.",
-      )
-    }
+    console.log(`PDF Extractor: Extração concluída, ${data.text.length} caracteres extraídos`)
 
-    // Limpar o documento para liberar recursos
-    pdfDocument.destroy()
-
-    return fullText.trim()
+    // Limpar e normalizar o texto extraído
+    const cleanedText = cleanPdfText(data.text)
+    return cleanedText
   } catch (error) {
-    console.error("Erro ao extrair texto do PDF:", error)
-
-    // Verificar se é um erro de PDF protegido
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    if (errorMessage.includes("password") || errorMessage.includes("protected") || errorMessage.includes("encrypted")) {
-      throw new Error("O PDF está protegido por senha e não pode ser processado.")
-    }
-
-    // Verificar se é um erro de acesso
-    if (
-      errorMessage.includes("401") ||
-      errorMessage.includes("403") ||
-      errorMessage.includes("not authorized") ||
-      errorMessage.includes("access denied")
-    ) {
-      throw new Error("Acesso negado ao PDF. Verifique as credenciais de autenticação.")
-    }
-
-    // Se for um erro relacionado ao worker, fornecer uma mensagem mais clara
-    if (errorMessage.includes("worker") || errorMessage.includes("module not found")) {
-      throw new Error("Erro na inicialização do PDF.js worker. Verifique a configuração do ambiente.")
-    }
-
-    // Fallback para extração simulada em caso de erro
-    console.warn("Usando extração simulada como fallback devido a erro:", error)
-    return generateSimulatedText(url)
+    console.error("PDF Extractor: Erro na extração:", error)
+    return `Erro na extração do PDF: ${error instanceof Error ? error.message : String(error)}`
   }
 }
 
-// Função para gerar texto simulado (fallback)
+// Função para limpar e normalizar o texto extraído do PDF
+function cleanPdfText(text: string): string {
+  return (
+    text
+      // Remover múltiplos espaços em branco
+      .replace(/\s+/g, " ")
+      // Remover quebras de página e outros caracteres especiais
+      .replace(/\f/g, "\n")
+      // Normalizar quebras de linha
+      .replace(/\r\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      // Remover espaços em branco no início e fim
+      .trim()
+  )
+}
+
+// Mantemos a função de simulação para fallback em caso de erro
 function generateSimulatedText(pdfUrl: string): string {
   // Extrair o nome do arquivo da URL
   const urlParts = pdfUrl.split("/")
@@ -146,5 +97,5 @@ REFERÊNCIAS
 Este texto foi gerado como demonstração do sistema de extração de PDF.
 Para implementar a extração real, será necessário configurar adequadamente as bibliotecas 
 de processamento de PDF no ambiente de produção.
-`.trim()
+  `.trim()
 }

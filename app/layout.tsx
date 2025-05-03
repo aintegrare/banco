@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { AppDock } from "@/components/layout/app-dock"
 import { ThemeProvider } from "@/components/theme-provider"
+import { ChatWidget } from "@/components/chat/chat-widget"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -24,6 +25,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="light">
           {children}
           <AppDock />
+          <ChatWidget />
         </ThemeProvider>
       </body>
     </html>

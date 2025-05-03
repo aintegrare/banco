@@ -41,9 +41,8 @@ interface Project {
   start_date: string | null
   end_date: string | null
   progress: number
-  color: string
-  client: string
-  budget: string
+  client?: string
+  budget?: string
   members: ProjectMember[]
 }
 
@@ -65,6 +64,9 @@ export function EditProjectDialog({ project, isOpen, onClose, onSuccess }: EditP
   const { toast } = useToast()
   const router = useRouter()
 
+  // Verificar quais campos existem no projeto
+  const [availableFields, setAvailableFields] = useState<Record<string, boolean>>({})
+
   // Reset form state when dialog opens/closes
   useEffect(() => {
     if (isOpen) {
@@ -75,6 +77,13 @@ export function EditProjectDialog({ project, isOpen, onClose, onSuccess }: EditP
   // Load project data when dialog opens
   useEffect(() => {
     if (project && isOpen) {
+      // Determinar quais campos existem no projeto
+      const fields: Record<string, boolean> = {}
+      Object.keys(project).forEach((key) => {
+        fields[key] = true
+      })
+      setAvailableFields(fields)
+
       setFormData({
         name: project.name || "",
         description: project.description || "",
@@ -82,10 +91,17 @@ export function EditProjectDialog({ project, isOpen, onClose, onSuccess }: EditP
         start_date: project.start_date || null,
         end_date: project.end_date || null,
         progress: project.progress || 0,
-        color: project.color || "#4b7bb5",
-        client: project.client || "",
-        budget: project.budget || "",
       })
+
+      // Adicionar client e budget apenas se existirem no projeto
+      if (project.hasOwnProperty("client")) {
+        setFormData((prev) => ({ ...prev, client: project.client || "" }))
+      }
+
+      if (project.hasOwnProperty("budget")) {
+        setFormData((prev) => ({ ...prev, budget: project.budget || "" }))
+      }
+
       setSelectedMembers(project.members || [])
     }
   }, [project, isOpen])
@@ -162,48 +178,67 @@ export function EditProjectDialog({ project, isOpen, onClose, onSuccess }: EditP
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Validação básica
+    if (!formData.name || formData.name.trim() === "") {
+      toast({
+        title: "Erro de validação",
+        description: "O nome do projeto é obrigatório",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
 
     try {
-      const projectData = {
-        ...formData,
-        members: selectedMembers.map((member) => ({
-          user_id: member.user_id,
-          role: member.role,
-          id: member.id > 0 ? member.id : undefined, // Enviar ID apenas se for um membro existente
-        })),
+      // Criar um objeto com apenas os campos necessários para a atualização
+      const updateData: Record<string, any> = {
+        name: formData.name,
+        description: formData.description,
+        status: formData.status,
+        start_date: formData.start_date,
+        end_date: formData.end_date,
+        progress: formData.progress,
       }
+
+      // Adicionar membros
+      updateData.members = selectedMembers.map((member) => ({
+        user_id: member.user_id,
+        role: member.role,
+        id: member.id > 0 ? member.id : undefined, // Enviar ID apenas se for um membro existente
+      }))
 
       const response = await fetch(`/api/projects/${project.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(projectData),
+        body: JSON.stringify(updateData),
       })
 
-      if (response.ok) {
-        setIsSaved(true)
-        toast({
-          title: "Projeto atualizado",
-          description: "As alterações foram salvas com sucesso.",
-        })
-
-        // Aguardar um momento para mostrar o feedback visual antes de fechar
-        setTimeout(() => {
-          if (onSuccess) onSuccess()
-          onClose()
-          router.refresh()
-        }, 1000)
-      } else {
+      if (!response.ok) {
         const error = await response.json()
         throw new Error(error.message || "Erro ao atualizar projeto")
       }
-    } catch (error) {
+
+      setIsSaved(true)
+      toast({
+        title: "Projeto atualizado",
+        description: "As alterações foram salvas com sucesso.",
+      })
+
+      // Aguardar um momento para mostrar o feedback visual antes de fechar
+      setTimeout(() => {
+        if (onSuccess) onSuccess()
+        onClose()
+        router.refresh()
+      }, 1000)
+    } catch (error: any) {
       console.error("Erro ao atualizar projeto:", error)
       toast({
         title: "Erro",
-        description: "Não foi possível atualizar o projeto. Tente novamente.",
+        description: error.message || "Não foi possível atualizar o projeto. Tente novamente.",
         variant: "destructive",
       })
     } finally {
@@ -238,15 +273,19 @@ export function EditProjectDialog({ project, isOpen, onClose, onSuccess }: EditP
                 />
               </div>
 
-              <div>
-                <Label htmlFor="client">Cliente</Label>
-                <Input id="client" name="client" value={formData.client || ""} onChange={handleInputChange} />
-              </div>
+              {availableFields.client && (
+                <div>
+                  <Label htmlFor="client">Cliente</Label>
+                  <Input id="client" name="client" value={formData.client || ""} onChange={handleInputChange} />
+                </div>
+              )}
 
-              <div>
-                <Label htmlFor="budget">Orçamento</Label>
-                <Input id="budget" name="budget" value={formData.budget || ""} onChange={handleInputChange} />
-              </div>
+              {availableFields.budget && (
+                <div>
+                  <Label htmlFor="budget">Orçamento</Label>
+                  <Input id="budget" name="budget" value={formData.budget || ""} onChange={handleInputChange} />
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="status">Status</Label>
@@ -265,26 +304,6 @@ export function EditProjectDialog({ project, isOpen, onClose, onSuccess }: EditP
                     <SelectItem value="cancelado">Cancelado</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="color">Cor</Label>
-                <div className="flex items-center space-x-2">
-                  <Input
-                    id="color"
-                    name="color"
-                    type="color"
-                    value={formData.color || "#4b7bb5"}
-                    onChange={handleInputChange}
-                    className="w-12 h-10 p-1"
-                  />
-                  <Input
-                    name="color"
-                    value={formData.color || "#4b7bb5"}
-                    onChange={handleInputChange}
-                    className="flex-1"
-                  />
-                </div>
               </div>
             </div>
 

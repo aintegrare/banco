@@ -48,16 +48,6 @@ export function SearchInterface() {
         body: JSON.stringify({ query: query.trim() }),
       })
 
-      // Verificar primeiro se a resposta está ok antes de tentar analisar o JSON
-      if (!response.ok) {
-        // Tentar obter o texto da resposta para diagnóstico
-        const responseText = await response.text().catch(() => "Não foi possível ler o corpo da resposta")
-
-        throw new Error(
-          `Erro do servidor: ${response.status} ${response.statusText}. Detalhes: ${responseText.substring(0, 150)}...`,
-        )
-      }
-
       // Verificar se a resposta é um JSON válido
       let data
       try {
@@ -69,8 +59,13 @@ export function SearchInterface() {
         const responseText = await response.text().catch(() => "Não foi possível ler o corpo da resposta")
 
         throw new Error(
-          `Resposta inválida do servidor (não é um JSON válido). Corpo: ${responseText.substring(0, 150)}...`,
+          `Resposta inválida do servidor. Status: ${response.status}. Corpo: ${responseText.substring(0, 100)}...`,
         )
+      }
+
+      if (!response.ok) {
+        console.error("SearchInterface: Erro na resposta da API:", data)
+        throw new Error(data.message || data.error || "Erro na busca")
       }
 
       console.log("SearchInterface: Resposta recebida:", {
@@ -121,24 +116,17 @@ export function SearchInterface() {
     try {
       const response = await fetch("/api/diagnose")
 
-      // Verificar primeiro se a resposta está ok
-      if (!response.ok) {
-        const responseText = await response.text().catch(() => "Não foi possível ler o corpo da resposta")
-        throw new Error(
-          `Erro do servidor: ${response.status} ${response.statusText}. Detalhes: ${responseText.substring(0, 150)}...`,
-        )
-      }
-
       // Verificar se a resposta é um JSON válido
       let data
       try {
         data = await response.json()
       } catch (jsonError) {
         console.error("SearchInterface: Erro ao analisar resposta JSON do diagnóstico:", jsonError)
-        const responseText = await response.text().catch(() => "Não foi possível ler o corpo da resposta")
-        throw new Error(
-          `Resposta inválida do servidor (não é um JSON válido). Corpo: ${responseText.substring(0, 150)}...`,
-        )
+        throw new Error("Resposta inválida do servidor durante o diagnóstico")
+      }
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || "Erro no diagnóstico")
       }
 
       setDiagnosticResult(data)

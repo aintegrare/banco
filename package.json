@@ -53,7 +53,7 @@
     "react-hook-form": "^7.54.1",
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.0",
-    "sonner": "^1.7.1",
+    "sonner": "latest",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.6",
@@ -63,7 +63,8 @@
     "pdfjs-dist": "latest",
     "framer-motion": "latest",
     "react-beautiful-dnd": "latest",
-    "@supabase/supabase-js": "latest"
+    "@supabase/supabase-js": "latest",
+    "pdf-parse": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

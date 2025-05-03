@@ -5,6 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import { X, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 interface CreateProjectDialogProps {
   onClose: () => void
@@ -57,6 +58,12 @@ export function CreateProjectDialog({ onClose }: CreateProjectDialogProps) {
 
       // Redirecionar para a página do novo projeto
       router.push(`/projetos/${newProject.id}`)
+
+      // Mostrar toast de sucesso
+      toast({
+        title: "Projeto criado",
+        description: "O projeto foi criado com sucesso!",
+      })
     } catch (err: any) {
       console.error("Erro ao criar projeto:", err)
       setError(err.message || "Ocorreu um erro ao criar o projeto. Por favor, tente novamente.")

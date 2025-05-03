@@ -99,27 +99,32 @@ export function ProjectKanban({ tasks: initialTasks, projectId }: ProjectKanbanP
       return
     }
 
-    // Encontrar a tarefa que está sendo movida
-    const taskToUpdate = tasks.find((task) => task.id.toString() === draggableId)
-
-    if (!taskToUpdate) {
-      console.error("Tarefa não encontrada:", draggableId)
-      return
-    }
-
-    // Atualizar o status da tarefa localmente
-    const updatedTasks = tasks.map((task) => {
-      if (task.id.toString() === draggableId) {
-        return { ...task, status: destination.droppableId }
-      }
-      return task
-    })
-
-    // Atualizar o estado local imediatamente para feedback visual
-    setTasks(updatedTasks)
-    setIsUpdating(true)
-
     try {
+      // Encontrar a tarefa que está sendo movida
+      const taskToUpdate = tasks.find((task) => task.id.toString() === draggableId)
+
+      if (!taskToUpdate) {
+        console.error("Tarefa não encontrada:", draggableId)
+        toast({
+          title: "Erro",
+          description: "Tarefa não encontrada",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Atualizar o status da tarefa localmente
+      const updatedTasks = tasks.map((task) => {
+        if (task.id.toString() === draggableId) {
+          return { ...task, status: destination.droppableId }
+        }
+        return task
+      })
+
+      // Atualizar o estado local imediatamente para feedback visual
+      setTasks(updatedTasks)
+      setIsUpdating(true)
+
       // Atualizar o status da tarefa no servidor
       const response = await fetch(`/api/tasks/${draggableId}`, {
         method: "PUT",
@@ -133,7 +138,8 @@ export function ProjectKanban({ tasks: initialTasks, projectId }: ProjectKanbanP
       })
 
       if (!response.ok) {
-        throw new Error("Falha ao atualizar status da tarefa")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Falha ao atualizar status da tarefa")
       }
 
       toast({
@@ -148,7 +154,7 @@ export function ProjectKanban({ tasks: initialTasks, projectId }: ProjectKanbanP
 
       toast({
         title: "Erro",
-        description: "Não foi possível atualizar o status da tarefa",
+        description: error.message || "Não foi possível atualizar o status da tarefa",
         variant: "destructive",
       })
     } finally {

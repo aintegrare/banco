@@ -31,12 +31,22 @@ export default function ProjectsPage() {
   useEffect(() => {
     const fetchProjects = async () => {
       setIsLoading(true)
+      setError(null)
+
       try {
         const response = await fetch("/api/projects")
+
         if (!response.ok) {
-          throw new Error("Falha ao carregar projetos")
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Falha ao carregar projetos")
         }
+
         const data = await response.json()
+
+        if (!Array.isArray(data)) {
+          throw new Error("Formato de dados inválido")
+        }
+
         setProjects(data || [])
       } catch (error: any) {
         console.error("Erro ao carregar projetos:", error)

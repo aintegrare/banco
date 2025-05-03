@@ -190,7 +190,9 @@ export default function ProjectDashboard() {
         <Card className="max-w-md mx-auto">
           <CardHeader>
             <CardTitle>Projeto não encontrado</CardTitle>
-            <CardDescription>Não foi possível encontrar o projeto "{projectId.replace(/-/g, " ")}".</CardDescription>
+            <CardDescription>
+              Não foi possível encontrar o projeto "{projectId.toString().replace(/-/g, " ")}".
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-gray-500 mb-4">

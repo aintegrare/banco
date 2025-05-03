@@ -5,7 +5,8 @@ const BUNNY_STORAGE_REGION = process.env.BUNNY_STORAGE_REGION || ""
 
 // URLs corretas conforme configuração do Bunny.net
 const BUNNY_STORAGE_URL = `https://storage.bunnycdn.com/${BUNNY_STORAGE_ZONE}`
-const BUNNY_PULLZONE_URL = `https://integrare.b-cdn.net` // URL fixa da Pull Zone
+// URL fixa da Pull Zone - sem incluir o nome da zona de armazenamento
+const BUNNY_PULLZONE_URL = `https://integrare.b-cdn.net`
 
 // Adicionar logs para depuração
 console.log(`Bunny Config: URL de Storage: ${BUNNY_STORAGE_URL}`)
@@ -63,6 +64,7 @@ export async function uploadFileToBunny(
       }
 
       // Retorna a URL pública do arquivo através da Pull Zone
+      // Não incluir o nome da zona de armazenamento na URL pública
       const publicUrl = `${BUNNY_PULLZONE_URL}/${normalizedPath}`
       console.log(`Bunny Upload: Upload concluído com sucesso. URL pública: ${publicUrl}`)
       return publicUrl
@@ -154,7 +156,7 @@ export async function listBunnyFiles(directory = ""): Promise<any[]> {
             ...file,
             // Garantir que o Path esteja correto
             Path: fullPath,
-            // Gerar URL pública correta
+            // Gerar URL pública correta - sem incluir o nome da zona de armazenamento
             PublicUrl: `${BUNNY_PULLZONE_URL}/${fullPath}`,
           }
         })
@@ -306,7 +308,12 @@ export async function downloadBunnyFile(filePath: string): Promise<Buffer> {
 export function getBunnyPublicUrl(filePath: string): string {
   // Normalizar o caminho do arquivo
   const normalizedPath = filePath ? filePath.replace(/\/+/g, "/").replace(/^\//, "") : ""
-  return `${BUNNY_PULLZONE_URL}/${normalizedPath}`
+
+  // Remover qualquer prefixo "zona-de-guardar/" se existir
+  const cleanPath = normalizedPath.replace(/^zona-de-guardar\//, "")
+
+  // Retornar a URL pública correta
+  return `${BUNNY_PULLZONE_URL}/${cleanPath}`
 }
 
 // Função para criar um cliente Bunny.net
@@ -400,4 +407,17 @@ export function checkBunnyCredentials(): { configured: boolean; missing: string[
     configured: missing.length === 0,
     missing,
   }
+}
+
+// Função para corrigir URLs com prefixo incorreto
+export function fixBunnyUrl(url: string): string {
+  if (!url) return url
+
+  // Verificar se a URL contém o prefixo incorreto "zona-de-guardar"
+  if (url.includes("zona-de-guardar")) {
+    // Remover o prefixo "zona-de-guardar/" da URL
+    return url.replace(/\/zona-de-guardar\//, "/")
+  }
+
+  return url
 }

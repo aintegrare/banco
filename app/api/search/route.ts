@@ -157,7 +157,6 @@ export async function POST(request: NextRequest) {
           error: "Erro ao gerar embeddings para a consulta",
           message: embeddingError instanceof Error ? embeddingError.message : String(embeddingError),
           aiResponse: "Ocorreu um erro ao processar sua consulta. Por favor, tente novamente mais tarde.",
-          results: [],
         },
         { status: 500 },
       )
