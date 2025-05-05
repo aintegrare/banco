@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getBunnyClient, getBunnyPublicUrl } from "@/lib/bunny"
+import { getBunnyClient, getBunnyPublicUrl, getFileNameFromPath, isValidFileUrl } from "@/lib/bunny"
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,11 +54,29 @@ export async function GET(request: NextRequest) {
     const files = await response.json()
     console.log(`API Files: ${files.length} arquivos encontrados no diretório ${directory}`)
 
-    // Adicionar URLs públicas aos arquivos
-    const filesWithUrls = files.map((file: any) => ({
-      ...file,
-      PublicUrl: getBunnyPublicUrl(file.Path),
-    }))
+    // Adicionar URLs públicas aos arquivos com validação
+    const filesWithUrls = files.map((file: any) => {
+      // Construir o caminho completo do arquivo
+      const fullPath = file.IsDirectory ? `${directory}/${file.ObjectName}/` : `${directory}/${file.ObjectName}`
+
+      // Gerar a URL pública
+      const publicUrl = getBunnyPublicUrl(fullPath)
+
+      // Verificar se a URL é válida para arquivos (não diretórios)
+      if (!file.IsDirectory && !isValidFileUrl(publicUrl)) {
+        console.warn(`API Files: URL inválida gerada para o arquivo: ${file.ObjectName}, URL: ${publicUrl}`)
+      }
+
+      // Log para depuração
+      console.log(`API Files: Arquivo: ${file.ObjectName}, Caminho: ${fullPath}, URL: ${publicUrl}`)
+
+      return {
+        ...file,
+        Path: fullPath,
+        PublicUrl: publicUrl,
+        FileName: getFileNameFromPath(file.ObjectName),
+      }
+    })
 
     return NextResponse.json({ files: filesWithUrls })
   } catch (error) {

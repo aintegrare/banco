@@ -78,7 +78,7 @@ export async function uploadFileToBunny(
   }
 }
 
-// Função para listar arquivos em um diretório - CORRIGIDA
+// Função para listar arquivos em um diretório - CORRIGIDA E MELHORADA
 export async function listBunnyFiles(directory = ""): Promise<any[]> {
   try {
     if (!BUNNY_API_KEY || !BUNNY_STORAGE_ZONE) {
@@ -147,17 +147,26 @@ export async function listBunnyFiles(directory = ""): Promise<any[]> {
       // Adicionar a URL pública para cada arquivo
       if (Array.isArray(files)) {
         return files.map((file) => {
-          // Garantir que o Path esteja completo
-          const fullPath = file.IsDirectory
-            ? `${formattedDirectory}${file.ObjectName}/`
-            : `${formattedDirectory}${file.ObjectName}`
+          if (file.IsDirectory) {
+            // Para diretórios, apenas adicionar o nome do diretório ao caminho
+            const fullPath = `${formattedDirectory}${file.ObjectName}/`
+            return {
+              ...file,
+              Path: fullPath,
+              PublicUrl: `${BUNNY_PULLZONE_URL}/${fullPath}`,
+            }
+          } else {
+            // Para arquivos, garantir que o nome do arquivo esteja incluído no caminho
+            const fullPath = `${formattedDirectory}${file.ObjectName}`
 
-          return {
-            ...file,
-            // Garantir que o Path esteja correto
-            Path: fullPath,
-            // Gerar URL pública correta - sem incluir o nome da zona de armazenamento
-            PublicUrl: `${BUNNY_PULLZONE_URL}/${fullPath}`,
+            // Log para depuração
+            console.log(`Bunny List: Arquivo: ${file.ObjectName}, Caminho completo: ${fullPath}`)
+
+            return {
+              ...file,
+              Path: fullPath,
+              PublicUrl: `${BUNNY_PULLZONE_URL}/${fullPath}`,
+            }
           }
         })
       }
@@ -304,16 +313,31 @@ export async function downloadBunnyFile(filePath: string): Promise<Buffer> {
   }
 }
 
-// Função para obter a URL pública de um arquivo
+// Função para obter a URL pública de um arquivo - CORRIGIDA
 export function getBunnyPublicUrl(filePath: string): string {
+  if (!filePath) {
+    console.warn("Bunny URL: Caminho de arquivo vazio ou nulo")
+    return `${BUNNY_PULLZONE_URL}/`
+  }
+
   // Normalizar o caminho do arquivo
-  const normalizedPath = filePath ? filePath.replace(/\/+/g, "/").replace(/^\//, "") : ""
+  const normalizedPath = filePath.replace(/\/+/g, "/").replace(/^\//, "")
 
   // Remover qualquer prefixo "zona-de-guardar/" se existir
   const cleanPath = normalizedPath.replace(/^zona-de-guardar\//, "")
 
+  // Log para depuração
+  console.log(`Bunny URL: Gerando URL pública para caminho: ${filePath} -> ${cleanPath}`)
+
+  // Verificar se o caminho termina com uma barra (diretório) e não tem um nome de arquivo
+  if (cleanPath.endsWith("/") || cleanPath === "") {
+    console.warn(`Bunny URL: Caminho parece ser um diretório ou está vazio: ${cleanPath}`)
+  }
+
   // Retornar a URL pública correta
-  return `${BUNNY_PULLZONE_URL}/${cleanPath}`
+  const publicUrl = `${BUNNY_PULLZONE_URL}/${cleanPath}`
+  console.log(`Bunny URL: URL pública gerada: ${publicUrl}`)
+  return publicUrl
 }
 
 // Função para criar um cliente Bunny.net
@@ -420,4 +444,35 @@ export function fixBunnyUrl(url: string): string {
   }
 
   return url
+}
+
+// Nova função para extrair o nome do arquivo de um caminho
+export function getFileNameFromPath(path: string): string {
+  if (!path) return ""
+
+  // Remover qualquer parâmetro de consulta
+  const pathWithoutQuery = path.split("?")[0]
+
+  // Obter o último segmento do caminho após a última barra
+  const segments = pathWithoutQuery.split("/")
+  return segments[segments.length - 1]
+}
+
+// Nova função para verificar se uma URL é válida e completa
+export function isValidFileUrl(url: string): boolean {
+  if (!url) return false
+
+  try {
+    const parsedUrl = new URL(url)
+    // Verificar se a URL tem um caminho além do domínio
+    if (parsedUrl.pathname === "/" || parsedUrl.pathname === "") {
+      return false
+    }
+
+    // Verificar se o caminho termina com uma extensão de arquivo
+    const fileName = getFileNameFromPath(parsedUrl.pathname)
+    return fileName !== "" && fileName.includes(".")
+  } catch (e) {
+    return false
+  }
 }

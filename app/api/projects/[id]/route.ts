@@ -116,47 +116,35 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       projectId = projectByName.id.toString()
     }
 
-    // Primeiro, buscar o projeto atual para ver quais campos ele tem
-    const { data: currentProject, error: fetchError } = await supabase
-      .from("projects")
-      .select("*")
-      .eq("id", projectId)
-      .single()
+    // Extrair apenas os campos que sabemos que existem na tabela
+    // Isso evita tentar atualizar campos que não existem na tabela
+    const updateData: Record<string, any> = {}
 
-    if (fetchError) {
-      console.error("Erro ao buscar projeto atual:", fetchError)
-      throw fetchError
+    // Campos básicos que sabemos que existem
+    if (body.name) updateData.name = body.name
+    if (body.description !== undefined) updateData.description = body.description
+    if (body.status) updateData.status = body.status
+    if (body.start_date !== undefined) updateData.start_date = body.start_date
+    if (body.end_date !== undefined) updateData.end_date = body.end_date
+    if (body.progress !== undefined) {
+      updateData.progress = body.progress === "" ? 0 : Number(body.progress)
     }
 
-    // Criar um objeto com apenas os campos que existem no projeto atual
-    const updateData = {}
+    // Removido o campo color que não existe na tabela
 
-    // Adicionar apenas os campos que existem no projeto atual e que foram enviados no body
-    Object.keys(currentProject).forEach((key) => {
-      if (body[key] !== undefined && key !== "id") {
-        // Tratamento especial para campos numéricos
-        if (key === "progress") {
-          updateData[key] = body[key] === "" ? 0 : Number(body[key])
-        } else {
-          updateData[key] = body[key]
-        }
-      }
-    })
-
-    console.log("Campos existentes no projeto:", Object.keys(currentProject))
     console.log("Dados a serem atualizados:", updateData)
 
     // Atualizar o projeto
-    const { data: project, error: updateError } = await supabase
+    const { data: project, error: projectError } = await supabase
       .from("projects")
       .update(updateData)
       .eq("id", projectId)
       .select()
       .single()
 
-    if (updateError) {
-      console.error("Erro ao atualizar projeto:", updateError)
-      throw updateError
+    if (projectError) {
+      console.error("Erro ao atualizar projeto:", projectError)
+      throw projectError
     }
 
     // Gerenciar membros do projeto
@@ -204,24 +192,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       }
     }
 
-    // Buscar o projeto atualizado para retornar
-    const { data: updatedProject, error: fetchUpdatedError } = await supabase
-      .from("projects")
-      .select(`
-        *,
-        members:project_members(
-          id,
-          user_id,
-          role,
-          user:users(id, name, email, role)
-        )
-      `)
-      .eq("id", projectId)
-      .single()
-
-    if (fetchUpdatedError) throw fetchUpdatedError
-
-    return NextResponse.json(updatedProject)
+    return NextResponse.json(project)
   } catch (error) {
     console.error(`Erro ao atualizar projeto ${params.id}:`, error)
     return NextResponse.json({ error: "Erro ao atualizar projeto" }, { status: 500 })

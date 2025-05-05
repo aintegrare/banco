@@ -291,7 +291,10 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     if (isImage(file.ObjectName)) {
       setPreviewFile(file)
     } else {
-      window.open(file.PublicUrl || getBunnyPublicUrl(file.Path), "_blank")
+      // Verificar se a URL pública é válida
+      const url = file.PublicUrl || getBunnyPublicUrl(file.Path)
+      console.log(`Preview: Abrindo arquivo ${file.ObjectName} com URL: ${url}`)
+      window.open(url, "_blank")
     }
   }
 
@@ -475,6 +478,12 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
                         rel="noopener noreferrer"
                         className="text-blue-500 hover:text-blue-700"
                         title="Abrir arquivo"
+                        onClick={(e) => {
+                          // Log para depuração
+                          console.log(
+                            `Abrindo arquivo: ${file.ObjectName}, URL: ${file.PublicUrl || getBunnyPublicUrl(file.Path)}`,
+                          )
+                        }}
                       >
                         <ExternalLink className="h-4 w-4" />
                       </a>
