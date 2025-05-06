@@ -25,6 +25,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Nenhum arquivo enviado" }, { status: 400 })
     }
 
+    // Verificar tamanho do arquivo (30MB = 30 * 1024 * 1024 bytes)
+    if (file.size > 30 * 1024 * 1024) {
+      console.error(`API Upload: Arquivo muito grande - ${file.size} bytes`)
+      return NextResponse.json(
+        {
+          error: "O arquivo excede o tamanho máximo de 30MB.",
+        },
+        { status: 400 },
+      )
+    }
+
     console.log(`API Upload: Arquivo recebido - Nome: ${file.name}, Tamanho: ${file.size}, Tipo: ${file.type}`)
 
     // Verificar o tipo de arquivo

@@ -12,6 +12,7 @@ export function useChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
 
   // Carregar mensagens do localStorage ao iniciar
   useEffect(() => {
@@ -52,6 +53,18 @@ export function useChat() {
     setError(null)
 
     try {
+      // Adicionar mensagem temporária de "digitando..."
+      const tempId = Date.now().toString()
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Digitando...",
+          timestamp: new Date(),
+          id: tempId,
+        } as any,
+      ])
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -66,8 +79,12 @@ export function useChat() {
         }),
       })
 
+      // Remover a mensagem temporária
+      setMessages((prev) => prev.filter((msg: any) => msg.id !== tempId))
+
       if (!response.ok) {
-        throw new Error(`Erro na API: ${response.status}`)
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error?.details || errorData.error || `Erro na API: ${response.status}`)
       }
 
       const data = await response.json()
@@ -80,9 +97,25 @@ export function useChat() {
           timestamp: new Date(),
         },
       ])
+
+      // Resetar contador de retry em caso de sucesso
+      setRetryCount(0)
     } catch (err) {
       console.error("Erro ao enviar mensagem:", err)
-      setError("Não foi possível obter uma resposta. Por favor, tente novamente mais tarde.")
+
+      // Incrementar contador de retry
+      setRetryCount((prev) => prev + 1)
+
+      // Mensagem de erro personalizada baseada no número de tentativas
+      if (retryCount >= 2) {
+        setError(
+          "Estamos enfrentando dificuldades técnicas. Por favor, tente novamente mais tarde ou entre em contato com o suporte.",
+        )
+      } else {
+        setError(
+          "Não foi possível obter uma resposta. O serviço pode estar temporariamente sobrecarregado. Por favor, tente novamente.",
+        )
+      }
     } finally {
       setIsLoading(false)
     }
@@ -91,6 +124,8 @@ export function useChat() {
   const clearMessages = () => {
     setMessages([])
     localStorage.removeItem("chat-messages")
+    setError(null)
+    setRetryCount(0)
   }
 
   return {

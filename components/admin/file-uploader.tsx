@@ -28,6 +28,12 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
       setDetailedError(null)
       setSuccess(null)
 
+      // Verificar tamanho do arquivo (30MB = 30 * 1024 * 1024 bytes)
+      if (selectedFile.size > 30 * 1024 * 1024) {
+        setError("O arquivo excede o tamanho máximo de 30MB.")
+        return
+      }
+
       // Criar preview para imagens
       if (selectedFile.type.startsWith("image/")) {
         const reader = new FileReader()
@@ -56,6 +62,12 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
       setError(null)
       setDetailedError(null)
       setSuccess(null)
+
+      // Verificar tamanho do arquivo (30MB = 30 * 1024 * 1024 bytes)
+      if (selectedFile.size > 30 * 1024 * 1024) {
+        setError("O arquivo excede o tamanho máximo de 30MB.")
+        return
+      }
 
       // Criar preview para imagens
       if (selectedFile.type.startsWith("image/")) {
@@ -238,7 +250,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
             <div className="flex flex-col items-center">
               <Upload className="h-12 w-12 text-gray-400 mb-2" />
               <p className="text-gray-600 mb-1">Arraste e solte um arquivo aqui ou clique para selecionar</p>
-              <p className="text-xs text-gray-500">PDF, DOC, DOCX, TXT, JPG, PNG, GIF, WEBP (máx. 10MB)</p>
+              <p className="text-xs text-gray-500">PDF, DOC, DOCX, TXT, JPG, PNG, GIF, WEBP (máx. 30MB)</p>
             </div>
           </label>
         ) : (

@@ -313,6 +313,78 @@ export async function downloadBunnyFile(filePath: string): Promise<Buffer> {
   }
 }
 
+// Modificar a função renameBunnyFile para garantir que o caminho seja atualizado corretamente
+
+// Substituir a função renameBunnyFile atual por esta versão melhorada:
+export async function renameBunnyFile(oldPath: string, newName: string): Promise<string> {
+  try {
+    if (!BUNNY_API_KEY || !BUNNY_STORAGE_ZONE) {
+      throw new Error("Configurações do Bunny.net incompletas. Verifique as variáveis de ambiente.")
+    }
+
+    // Normalizar o caminho do arquivo
+    const normalizedPath = oldPath.replace(/\/+/g, "/").replace(/^\//, "")
+
+    // Extrair o diretório do caminho antigo
+    const lastSlashIndex = normalizedPath.lastIndexOf("/")
+    const directory = lastSlashIndex >= 0 ? normalizedPath.substring(0, lastSlashIndex + 1) : ""
+
+    // Construir o novo caminho completo
+    const newPath = directory + newName
+
+    console.log(`Bunny Rename: Renomeando de ${normalizedPath} para ${newPath}`)
+
+    // Primeiro, baixar o arquivo original
+    const fileContent = await downloadBunnyFile(normalizedPath)
+
+    // Determinar o tipo de conteúdo com base na extensão do arquivo
+    const extension = newName.split(".").pop()?.toLowerCase() || ""
+    let contentType = "application/octet-stream"
+
+    // Mapear extensões comuns para tipos MIME
+    const mimeTypes: Record<string, string> = {
+      pdf: "application/pdf",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      gif: "image/gif",
+      webp: "image/webp",
+      svg: "image/svg+xml",
+      txt: "text/plain",
+      html: "text/html",
+      css: "text/css",
+      js: "application/javascript",
+      json: "application/json",
+      xml: "application/xml",
+      zip: "application/zip",
+      doc: "application/msword",
+      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      xls: "application/vnd.ms-excel",
+      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ppt: "application/vnd.ms-powerpoint",
+      pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    }
+
+    if (extension && extension in mimeTypes) {
+      contentType = mimeTypes[extension]
+    }
+
+    // Fazer upload do arquivo com o novo nome
+    const newUrl = await uploadFileToBunny(newPath, fileContent, contentType)
+    console.log(`Bunny Rename: Novo arquivo criado em: ${newPath}, URL: ${newUrl}`)
+
+    // Excluir o arquivo original
+    const deleteResult = await deleteBunnyFile(normalizedPath)
+    console.log(`Bunny Rename: Arquivo original excluído: ${deleteResult}`)
+
+    // Retornar a URL pública do novo arquivo
+    return newUrl
+  } catch (error) {
+    console.error("Bunny Rename: Erro geral:", error)
+    throw error
+  }
+}
+
 // Função para obter a URL pública de um arquivo - CORRIGIDA
 export function getBunnyPublicUrl(filePath: string): string {
   if (!filePath) {

@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { AlertCircle, Loader2, FileText } from "lucide-react"
-import { PDFTextExtractor } from "./pdf-text-extractor"
 
 interface DocumentIntegrityResult {
   url: string
@@ -21,7 +20,6 @@ export function DocumentIntegrityChecker() {
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<DocumentIntegrityResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [pdfText, setPdfText] = useState<string | null>(null)
 
   const handleCheck = async () => {
     if (!url) {
@@ -32,7 +30,6 @@ export function DocumentIntegrityChecker() {
     setIsLoading(true)
     setError(null)
     setResult(null)
-    setPdfText(null)
 
     try {
       const response = await fetch(`/api/check-document-integrity?url=${encodeURIComponent(url)}`)
@@ -44,11 +41,6 @@ export function DocumentIntegrityChecker() {
 
       const data = await response.json()
       setResult(data)
-
-      // Se for um PDF, o texto será extraído pelo componente cliente
-      if (data.contentType?.includes("application/pdf")) {
-        data.textContent = null
-      }
     } catch (err) {
       console.error("Erro ao verificar integridade do documento:", err)
       setError(err instanceof Error ? err.message : "Erro desconhecido ao verificar documento")
@@ -57,24 +49,10 @@ export function DocumentIntegrityChecker() {
     }
   }
 
-  const handlePdfTextExtracted = (text: string) => {
-    setPdfText(text)
-    if (result) {
-      setResult({
-        ...result,
-        textContent: text,
-        textLength: text.length,
-        isComplete: text.length > 100,
-      })
-    }
-  }
-
   const getStatusColor = (status: boolean | null) => {
     if (status === null) return "bg-gray-400"
     return status ? "bg-green-500" : "bg-red-500"
   }
-
-  const displayTextContent = result?.textContent || pdfText
 
   return (
     <div className="bg-white rounded-xl shadow-md p-6">
@@ -161,20 +139,14 @@ export function DocumentIntegrityChecker() {
                   </p>
                 </div>
 
-                {result.contentType?.includes("application/pdf") && !pdfText && (
-                  <PDFTextExtractor url={result.url} onTextExtracted={handlePdfTextExtracted} />
-                )}
-
-                {(displayTextContent !== null || pdfText !== null) && (
-                  <div className="flex items-center">
-                    <div className={`h-4 w-4 rounded-full mr-2 ${getStatusColor(displayTextContent !== null)}`}></div>
-                    <p>
-                      {displayTextContent !== null
-                        ? `Texto extraído com sucesso (${displayTextContent.length} caracteres)`
-                        : "Não foi possível extrair texto do documento"}
-                    </p>
-                  </div>
-                )}
+                <div className="flex items-center">
+                  <div className={`h-4 w-4 rounded-full mr-2 ${getStatusColor(result.textContent !== null)}`}></div>
+                  <p>
+                    {result.textContent !== null
+                      ? `Texto extraído com sucesso (${result.textLength} caracteres)`
+                      : "Não foi possível extrair texto do documento"}
+                  </p>
+                </div>
 
                 <div className="flex items-center">
                   <div className={`h-4 w-4 rounded-full mr-2 ${getStatusColor(result.isComplete)}`}></div>
@@ -204,14 +176,14 @@ export function DocumentIntegrityChecker() {
             </div>
           )}
 
-          {displayTextContent && (
+          {result.textContent && (
             <div className="mt-4">
               <h4 className="font-medium text-gray-700 mb-2 flex items-center">
                 <FileText className="h-4 w-4 mr-2" />
                 Amostra do conteúdo extraído:
               </h4>
               <div className="bg-white border border-gray-200 rounded-md p-3 max-h-60 overflow-y-auto">
-                <pre className="text-xs whitespace-pre-wrap font-mono">{displayTextContent.substring(0, 1000)}...</pre>
+                <pre className="text-xs whitespace-pre-wrap font-mono">{result.textContent.substring(0, 1000)}...</pre>
               </div>
             </div>
           )}
