@@ -2,13 +2,13 @@
 
 import type React from "react"
 import { useState, useEffect, useCallback, useRef } from "react"
-import { CheckCircle, Circle, Plus, Trash2, Loader2, ClipboardList, AlertCircle } from "lucide-react"
+import { CheckCircle, Circle, Plus, Trash2, Loader2, ClipboardList, AlertCircle, Edit, X, Save } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase/client"
 
 interface FolderTask {
   id: string
   folder_path: string
-  description: string
+  description: string | null // Tornando description explicitamente opcional
   is_completed: boolean
   created_at: string
 }
@@ -25,6 +25,8 @@ export function FolderTasks({ folderPath, onTaskCountChange }: FolderTasksProps)
   const [isAdding, setIsAdding] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pendingTaskCount, setPendingTaskCount] = useState(0)
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [editDescription, setEditDescription] = useState("")
 
   // Usar uma ref para evitar loops infinitos com o callback
   const onTaskCountChangeRef = useRef(onTaskCountChange)
@@ -88,13 +90,13 @@ export function FolderTasks({ folderPath, onTaskCountChange }: FolderTasksProps)
     return () => {
       isMounted = false
     }
-  }, [folderPath, notifyTaskCount]) // Removido onTaskCountChange das dependências
+  }, [folderPath, notifyTaskCount])
 
   // Adicionar nova tarefa
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!newTaskDescription.trim()) return
+    if (!newTaskDescription || !newTaskDescription.trim()) return
 
     setIsAdding(true)
     setError(null)
@@ -185,6 +187,48 @@ export function FolderTasks({ folderPath, onTaskCountChange }: FolderTasksProps)
     }
   }
 
+  // Iniciar edição de tarefa
+  const startEditTask = (task: FolderTask) => {
+    setEditingTaskId(task.id)
+    setEditDescription(task.description || "")
+  }
+
+  // Salvar edição de tarefa
+  const saveEditTask = async (taskId: string) => {
+    if (!editDescription || !editDescription.trim()) return
+
+    try {
+      const supabase = getSupabaseClient()
+      const { error } = await supabase
+        .from("folder_tasks")
+        .update({ description: editDescription.trim() })
+        .eq("id", taskId)
+
+      if (error) throw error
+
+      // Atualizar estado local
+      const updatedTasks = tasks.map((task) => {
+        if (task.id === taskId) {
+          return { ...task, description: editDescription.trim() }
+        }
+        return task
+      })
+
+      setTasks(updatedTasks)
+      setEditingTaskId(null)
+      setEditDescription("")
+    } catch (err) {
+      console.error("Erro ao atualizar tarefa:", err)
+      setError("Não foi possível atualizar a tarefa.")
+    }
+  }
+
+  // Cancelar edição
+  const cancelEdit = () => {
+    setEditingTaskId(null)
+    setEditDescription("")
+  }
+
   // Formatar data
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -225,21 +269,21 @@ export function FolderTasks({ folderPath, onTaskCountChange }: FolderTasksProps)
       )}
 
       <form onSubmit={handleAddTask} className="p-4 border-b border-gray-200">
-        <div className="flex gap-2">
-          <input
-            type="text"
+        <div className="flex flex-col gap-2">
+          <textarea
             value={newTaskDescription}
             onChange={(e) => setNewTaskDescription(e.target.value)}
-            placeholder="Adicionar nova tarefa..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5]"
+            placeholder="Adicionar nova tarefa com descrição..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5] min-h-[80px]"
             disabled={isAdding}
           />
           <button
             type="submit"
             disabled={isAdding || !newTaskDescription.trim()}
-            className="px-3 py-2 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] transition-colors disabled:opacity-50 disabled:hover:bg-[#4b7bb5] flex items-center"
+            className="px-3 py-2 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] transition-colors disabled:opacity-50 disabled:hover:bg-[#4b7bb5] flex items-center justify-center"
           >
             {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            <span className="ml-1">{isAdding ? "Adicionando..." : "Adicionar"}</span>
           </button>
         </div>
       </form>
@@ -254,28 +298,67 @@ export function FolderTasks({ folderPath, onTaskCountChange }: FolderTasksProps)
           <ul className="divide-y divide-gray-100">
             {tasks.map((task) => (
               <li key={task.id} className="p-3 hover:bg-gray-50 transition-colors">
-                <div className="flex items-start gap-3">
-                  <button
-                    onClick={() => toggleTaskStatus(task.id, task.is_completed)}
-                    className="mt-0.5 flex-shrink-0 text-[#4b7bb5] hover:text-[#3d649e] transition-colors"
-                    title={task.is_completed ? "Marcar como pendente" : "Marcar como concluída"}
-                  >
-                    {task.is_completed ? <CheckCircle className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${task.is_completed ? "line-through text-gray-400" : "text-gray-700"}`}>
-                      {task.description}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">{formatDate(task.created_at)}</p>
+                {editingTaskId === task.id ? (
+                  <div className="flex flex-col gap-2">
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5] min-h-[80px]"
+                      autoFocus
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => saveEditTask(task.id)}
+                        disabled={!editDescription.trim()}
+                        className="px-2 py-1 bg-[#4b7bb5] text-white text-xs rounded hover:bg-[#3d649e] transition-colors flex items-center"
+                      >
+                        <Save className="h-3 w-3 mr-1" />
+                        Salvar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300 transition-colors flex items-center"
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Cancelar
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => deleteTask(task.id, task.is_completed)}
-                    className="flex-shrink-0 p-1 text-gray-400 hover:text-red-500 transition-colors rounded-full hover:bg-red-50"
-                    title="Excluir tarefa"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
+                ) : (
+                  <div className="flex items-start gap-3">
+                    <button
+                      onClick={() => toggleTaskStatus(task.id, task.is_completed)}
+                      className="mt-0.5 flex-shrink-0 text-[#4b7bb5] hover:text-[#3d649e] transition-colors"
+                      title={task.is_completed ? "Marcar como pendente" : "Marcar como concluída"}
+                    >
+                      {task.is_completed ? <CheckCircle className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm ${task.is_completed ? "line-through text-gray-400" : "text-gray-700"}`}>
+                        {task.description}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">{formatDate(task.created_at)}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => startEditTask(task)}
+                        className="flex-shrink-0 p-1 text-gray-400 hover:text-[#4b7bb5] transition-colors rounded-full hover:bg-blue-50"
+                        title="Editar tarefa"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => deleteTask(task.id, task.is_completed)}
+                        className="flex-shrink-0 p-1 text-gray-400 hover:text-red-500 transition-colors rounded-full hover:bg-red-50"
+                        title="Excluir tarefa"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
