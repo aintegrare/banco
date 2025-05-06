@@ -16,12 +16,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "O nome do arquivo contém caracteres inválidos" }, { status: 400 })
     }
 
+    // Verificar se é uma pasta (termina com /)
+    const isDirectory = oldPath.endsWith("/") || oldPath.endsWith("\\")
+    console.log(`API Rename File: Tipo de item: ${isDirectory ? "Pasta" : "Arquivo"}`)
+
+    // Usar a função de renomeação apropriada
     const newUrl = await renameBunnyFile(oldPath, newName)
 
     return NextResponse.json({
       success: true,
       newUrl,
-      message: "Arquivo renomeado com sucesso",
+      message: `${isDirectory ? "Pasta" : "Arquivo"} renomeado com sucesso`,
     })
   } catch (error) {
     console.error("Erro ao renomear arquivo:", error)

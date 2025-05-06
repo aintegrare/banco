@@ -313,9 +313,138 @@ export async function downloadBunnyFile(filePath: string): Promise<Buffer> {
   }
 }
 
-// Modificar a função renameBunnyFile para garantir que o caminho seja atualizado corretamente
+// NOVA IMPLEMENTAÇÃO SEGURA para renomear pastas
+export async function renameBunnyFolder(oldPath: string, newName: string): Promise<string> {
+  try {
+    if (!BUNNY_API_KEY || !BUNNY_STORAGE_ZONE) {
+      throw new Error("Configurações do Bunny.net incompletas. Verifique as variáveis de ambiente.")
+    }
 
-// Substituir a função renameBunnyFile atual por esta versão melhorada:
+    // Normalizar o caminho da pasta
+    const normalizedPath = oldPath.replace(/\/+/g, "/").replace(/^\//, "")
+
+    // Garantir que o caminho termine com uma barra
+    const formattedPath = normalizedPath.endsWith("/") ? normalizedPath : `${normalizedPath}/`
+
+    // Extrair o diretório pai
+    const pathParts = formattedPath.split("/").filter((part) => part.length > 0)
+    const oldFolderName = pathParts.pop() || ""
+    const parentPath = pathParts.length > 0 ? pathParts.join("/") + "/" : ""
+
+    // Construir o novo caminho
+    const newPath = `${parentPath}${newName}/`
+
+    console.log(`Bunny Rename Folder: Renomeando pasta de "${formattedPath}" para "${newPath}"`)
+    console.log(`Bunny Rename Folder: Diretório pai: "${parentPath}"`)
+
+    // 1. Verificar se a pasta de origem existe e listar seu conteúdo
+    console.log(`Bunny Rename Folder: Verificando pasta de origem: ${formattedPath}`)
+    let sourceFiles
+    try {
+      sourceFiles = await listBunnyFiles(formattedPath)
+      console.log(`Bunny Rename Folder: Pasta de origem contém ${sourceFiles.length} itens`)
+    } catch (error) {
+      console.error(`Bunny Rename Folder: Erro ao listar pasta de origem:`, error)
+      throw new Error(`Não foi possível acessar a pasta de origem: ${error.message}`)
+    }
+
+    // 2. Criar a pasta de destino
+    console.log(`Bunny Rename Folder: Criando pasta de destino: ${newPath}`)
+    try {
+      await createBunnyDirectory(newPath)
+      console.log(`Bunny Rename Folder: Pasta de destino criada com sucesso`)
+    } catch (error) {
+      console.error(`Bunny Rename Folder: Erro ao criar pasta de destino:`, error)
+      throw new Error(`Não foi possível criar a pasta de destino: ${error.message}`)
+    }
+
+    // 3. Copiar todos os arquivos e subpastas para a nova pasta
+    console.log(`Bunny Rename Folder: Copiando ${sourceFiles.length} itens para a nova pasta`)
+
+    const copyPromises = sourceFiles.map(async (file) => {
+      const relativePath = file.Path.substring(formattedPath.length)
+      const newItemPath = `${newPath}${relativePath}`
+
+      if (file.IsDirectory) {
+        // Para pastas, criar a pasta no novo local
+        console.log(`Bunny Rename Folder: Criando subpasta ${newItemPath}`)
+        return createBunnyDirectory(newItemPath)
+      } else {
+        // Para arquivos, baixar e fazer upload no novo local
+        console.log(`Bunny Rename Folder: Copiando arquivo ${file.Path} para ${newItemPath}`)
+        try {
+          const fileContent = await downloadBunnyFile(file.Path)
+          return uploadFileToBunny(newItemPath, fileContent)
+        } catch (error) {
+          console.error(`Bunny Rename Folder: Erro ao copiar arquivo ${file.Path}:`, error)
+          throw error
+        }
+      }
+    })
+
+    // Aguardar todas as operações de cópia
+    await Promise.all(copyPromises)
+    console.log(`Bunny Rename Folder: Todos os itens copiados com sucesso`)
+
+    // 4. Verificar se a pasta de destino contém todos os arquivos
+    console.log(`Bunny Rename Folder: Verificando pasta de destino após cópia`)
+    let destinationFiles
+    try {
+      destinationFiles = await listBunnyFiles(newPath)
+      console.log(`Bunny Rename Folder: Pasta de destino contém ${destinationFiles.length} itens`)
+
+      // Verificar se todos os arquivos foram copiados
+      if (destinationFiles.length < sourceFiles.length) {
+        console.warn(`Bunny Rename Folder: AVISO - A pasta de destino tem menos itens que a origem!`)
+        console.warn(`Bunny Rename Folder: Origem: ${sourceFiles.length}, Destino: ${destinationFiles.length}`)
+      }
+    } catch (error) {
+      console.error(`Bunny Rename Folder: Erro ao verificar pasta de destino:`, error)
+      throw new Error(`Não foi possível verificar a pasta de destino após a cópia: ${error.message}`)
+    }
+
+    // 5. Excluir a pasta de origem SOMENTE se a cópia foi bem-sucedida
+    if (destinationFiles && destinationFiles.length > 0) {
+      console.log(`Bunny Rename Folder: Excluindo pasta de origem: ${formattedPath}`)
+
+      // Excluir arquivos da pasta de origem
+      for (const file of sourceFiles) {
+        if (!file.IsDirectory) {
+          try {
+            await deleteBunnyFile(file.Path)
+            console.log(`Bunny Rename Folder: Arquivo excluído: ${file.Path}`)
+          } catch (error) {
+            console.error(`Bunny Rename Folder: Erro ao excluir arquivo ${file.Path}:`, error)
+            // Continuar mesmo se houver erro na exclusão
+          }
+        }
+      }
+
+      // Tentar excluir a pasta vazia
+      try {
+        await deleteBunnyFile(formattedPath)
+        console.log(`Bunny Rename Folder: Pasta de origem excluída com sucesso`)
+      } catch (error) {
+        console.error(`Bunny Rename Folder: Erro ao excluir pasta de origem:`, error)
+        // Não lançar erro aqui, pois a operação principal (cópia) já foi concluída
+      }
+    } else {
+      console.warn(
+        `Bunny Rename Folder: AVISO - Pasta de destino vazia ou não verificada. A pasta de origem NÃO será excluída.`,
+      )
+    }
+
+    // Retornar a URL pública da nova pasta
+    const publicUrl = `${BUNNY_PULLZONE_URL}/${newPath}`
+    console.log(`Bunny Rename Folder: Renomeação concluída. Nova URL: ${publicUrl}`)
+    return publicUrl
+  } catch (error) {
+    console.error("Bunny Rename Folder: Erro geral:", error)
+    throw error
+  }
+}
+
+// Modificar a função renameBunnyFile para garantir que o caminho seja atualizado corretamente
 export async function renameBunnyFile(oldPath: string, newName: string): Promise<string> {
   try {
     if (!BUNNY_API_KEY || !BUNNY_STORAGE_ZONE) {
@@ -324,6 +453,15 @@ export async function renameBunnyFile(oldPath: string, newName: string): Promise
 
     // Normalizar o caminho do arquivo
     const normalizedPath = oldPath.replace(/\/+/g, "/").replace(/^\//, "")
+
+    // Verificar se é uma pasta ou um arquivo
+    const isDirectory = normalizedPath.endsWith("/") || normalizedPath.endsWith("\\")
+
+    // Se for uma pasta, usar a função específica para pastas
+    if (isDirectory) {
+      console.log(`Bunny Rename: Detectada pasta, usando função específica para pastas`)
+      return renameBunnyFolder(normalizedPath, newName)
+    }
 
     // Extrair o diretório do caminho antigo
     const lastSlashIndex = normalizedPath.lastIndexOf("/")
@@ -372,6 +510,25 @@ export async function renameBunnyFile(oldPath: string, newName: string): Promise
     // Fazer upload do arquivo com o novo nome
     const newUrl = await uploadFileToBunny(newPath, fileContent, contentType)
     console.log(`Bunny Rename: Novo arquivo criado em: ${newPath}, URL: ${newUrl}`)
+
+    // Verificar se o novo arquivo foi criado com sucesso antes de excluir o original
+    try {
+      const checkResponse = await fetch(`${BUNNY_STORAGE_URL}/${newPath}`, {
+        method: "HEAD",
+        headers: {
+          AccessKey: BUNNY_API_KEY,
+        },
+      })
+
+      if (!checkResponse.ok) {
+        throw new Error(`Novo arquivo não foi criado corretamente: ${checkResponse.status}`)
+      }
+
+      console.log(`Bunny Rename: Verificação do novo arquivo bem-sucedida`)
+    } catch (checkError) {
+      console.error(`Bunny Rename: Erro ao verificar novo arquivo:`, checkError)
+      throw new Error(`Não foi possível verificar se o novo arquivo foi criado: ${checkError.message}`)
+    }
 
     // Excluir o arquivo original
     const deleteResult = await deleteBunnyFile(normalizedPath)

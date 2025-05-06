@@ -22,6 +22,8 @@ import {
   Loader2,
 } from "lucide-react"
 import { useState } from "react"
+// Adicionar o import do RenameWarningDialog
+import { RenameWarningDialog } from "./rename-warning-dialog"
 
 interface FileItem {
   id: string
@@ -53,6 +55,8 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
   const [newFileName, setNewFileName] = useState(file.name)
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameError, setRenameError] = useState<string | null>(null)
+  // Adicionar este estado dentro da função FileCard, junto com os outros estados
+  const [showRenameWarning, setShowRenameWarning] = useState(false)
 
   // Função para formatar bytes em unidades legíveis
   const formatBytes = (bytes = 0) => {
@@ -114,7 +118,7 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
     return ["jpg", "jpeg", "png", "gif", "webp"].includes(fileType)
   }
 
-  // Adicionar esta função dentro do componente FileCard
+  // Modificar a função handleRename para mostrar o aviso primeiro
   const handleRename = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -134,6 +138,18 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
       return
     }
 
+    // Se for uma pasta, mostrar o aviso primeiro
+    if (file.type === "folder") {
+      setShowRenameWarning(true)
+      return
+    }
+
+    // Se não for pasta, continuar com a renomeação
+    await executeRename()
+  }
+
+  // Adicionar esta nova função para executar a renomeação após a confirmação
+  const executeRename = async () => {
     setIsRenaming(true)
     setRenameError(null)
 
@@ -161,6 +177,7 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
       }
 
       setShowRenameModal(false)
+      setShowRenameWarning(false)
     } catch (error) {
       console.error("Erro ao renomear arquivo:", error)
       setRenameError(error instanceof Error ? error.message : "Erro ao renomear arquivo")
@@ -435,6 +452,15 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
             </form>
           </div>
         </div>
+      )}
+      {showRenameWarning && (
+        <RenameWarningDialog
+          isOpen={showRenameWarning}
+          onClose={() => setShowRenameWarning(false)}
+          onConfirm={executeRename}
+          itemName={file.name}
+          isFolder={file.type === "folder"}
+        />
       )}
     </>
   )
