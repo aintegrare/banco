@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { title, description, status, priority, project_id, assignee_id, due_date } = body
+    const { title, description, priority, project_id, due_date } = body
 
     if (!title || !project_id) {
       return NextResponse.json({ error: "Título e ID do projeto são obrigatórios" }, { status: 400 })
@@ -39,36 +39,30 @@ export async function POST(request: Request) {
 
     const supabase = createClient()
 
-    // Verificar se a tabela tasks existe
-    const { data: tableInfo, error: tableError } = await supabase
-      .from("information_schema.tables")
-      .select("table_name")
-      .eq("table_name", "tasks")
-      .eq("table_schema", "public")
-      .single()
+    // Verificar se a tabela tasks existe usando uma abordagem mais direta
+    try {
+      // Tentar fazer uma consulta simples para verificar se a tabela existe
+      const { count, error: countError } = await supabase.from("tasks").select("*", { count: "exact", head: true })
 
-    if (tableError || !tableInfo) {
-      console.log("Tabela tasks não encontrada, verificando colunas disponíveis...")
-
-      // Obter colunas disponíveis na tabela tasks usando a função RPC
-      const { data: columns, error: columnsError } = await supabase.rpc("get_table_columns", { table_name: "tasks" })
-
-      if (columnsError) {
-        console.error("Erro ao obter colunas da tabela tasks:", columnsError)
-        return NextResponse.json({ error: "Erro ao verificar estrutura da tabela" }, { status: 500 })
+      if (countError) {
+        console.error("Erro ao verificar tabela tasks:", countError)
+        // Se houver erro, provavelmente a tabela não existe ou há um problema de permissão
+        return NextResponse.json({ error: "Erro ao verificar tabela de tarefas" }, { status: 500 })
       }
 
-      console.log("Colunas disponíveis na tabela tasks:", columns)
+      console.log("Tabela tasks verificada com sucesso")
+    } catch (tableError) {
+      console.error("Exceção ao verificar tabela tasks:", tableError)
+      return NextResponse.json({ error: "Erro ao verificar estrutura da tabela" }, { status: 500 })
     }
 
     // Criar objeto com os dados da tarefa
+    // Removido o campo status para usar o valor padrão do banco de dados
     const taskData = {
       title,
       description: description || null,
-      status: status || "todo",
       priority: priority || "medium",
       project_id,
-      assignee_id: assignee_id || null,
       due_date: due_date || null,
       created_at: new Date().toISOString(),
     }

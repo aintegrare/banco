@@ -11,15 +11,6 @@ interface Project {
   name: string
 }
 
-// Lista de status disponíveis
-const STATUSES = [
-  { id: "backlog", name: "Backlog" },
-  { id: "todo", name: "A Fazer" },
-  { id: "in-progress", name: "Em Progresso" },
-  { id: "review", name: "Em Revisão" },
-  { id: "done", name: "Concluído" },
-]
-
 interface CreateTaskDialogProps {
   isOpen?: boolean
   onClose: () => void
@@ -36,7 +27,6 @@ export function CreateTaskDialog({
   const [taskTitle, setTaskTitle] = useState("")
   const [taskDescription, setTaskDescription] = useState("")
   const [projectId, setProjectId] = useState<string | number | null>(initialProject)
-  const [status, setStatus] = useState("todo")
   const [dueDate, setDueDate] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -103,7 +93,6 @@ export function CreateTaskDialog({
         body: JSON.stringify({
           title: taskTitle,
           description: taskDescription,
-          status: status,
           project_id: projectId,
           due_date: dueDate || null,
         }),
@@ -184,44 +173,24 @@ export function CreateTaskDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label htmlFor="project-select" className="block text-sm font-medium text-gray-700 mb-1">
-                Projeto
-              </label>
-              <select
-                id="project-select"
-                value={projectId?.toString() || ""}
-                onChange={(e) => setProjectId(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
-                disabled={isLoadingProjects}
-              >
-                <option value="">Selecione um projeto</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id.toString()}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="status-select" className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
-              <select
-                id="status-select"
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
-              >
-                {STATUSES.map((status) => (
-                  <option key={status.id} value={status.id}>
-                    {status.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="mb-4">
+            <label htmlFor="project-select" className="block text-sm font-medium text-gray-700 mb-1">
+              Projeto
+            </label>
+            <select
+              id="project-select"
+              value={projectId?.toString() || ""}
+              onChange={(e) => setProjectId(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
+              disabled={isLoadingProjects}
+            >
+              <option value="">Selecione um projeto</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id.toString()}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="mb-4">
