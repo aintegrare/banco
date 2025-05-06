@@ -24,7 +24,7 @@ export async function uploadFileToBunny(
     }
 
     // Normalizar o caminho do arquivo
-    const normalizedPath = filePath.replace(/\/+/g, "/").replace(/^\//, "")
+    const normalizedPath = filePath.replace(/\/+/g, "/").replace(/\/^\//, "")
 
     const url = `${BUNNY_STORAGE_URL}/${normalizedPath}`
     console.log(`Bunny Upload: Tentando fazer upload para: ${url}`)
@@ -546,5 +546,108 @@ export function isValidFileUrl(url: string): boolean {
     return fileName !== "" && fileName.includes(".")
   } catch (e) {
     return false
+  }
+}
+
+// Adicionar uma nova função para criar diretórios de forma mais robusta
+// Adicionar esta função após a função isValidFileUrl
+
+export async function createBunnyDirectory(directoryPath: string): Promise<boolean> {
+  try {
+    if (!BUNNY_API_KEY || !BUNNY_STORAGE_ZONE) {
+      throw new Error("Configurações do Bunny.net incompletas. Verifique as variáveis de ambiente.")
+    }
+
+    // Normalizar o caminho do diretório
+    const normalizedPath = directoryPath.replace(/\/+/g, "/").replace(/^\//, "")
+
+    // Garantir que o caminho termine com uma barra
+    const formattedPath = normalizedPath.endsWith("/") ? normalizedPath : `${normalizedPath}/`
+
+    console.log(`Bunny Create Directory: Tentando criar diretório: ${formattedPath}`)
+
+    // No Bunny.net, para criar um diretório vazio, precisamos criar um arquivo temporário dentro dele
+    // e depois deletar esse arquivo, assim o diretório permanece
+    const tempFilePath = `${formattedPath}.bunnydir`
+
+    console.log(`Bunny Create Directory: Criando arquivo temporário: ${tempFilePath}`)
+
+    // Criar um arquivo temporário vazio
+    const tempFileUrl = await uploadFileToBunny(tempFilePath, "", "text/plain")
+    console.log(`Bunny Create Directory: Arquivo temporário criado: ${tempFilePath}`)
+
+    // Excluir o arquivo temporário para deixar apenas o diretório
+    await deleteBunnyFile(tempFilePath)
+    console.log(`Bunny Create Directory: Arquivo temporário removido, diretório criado com sucesso: ${formattedPath}`)
+
+    return true
+  } catch (error) {
+    console.error("Bunny Create Directory: Erro geral:", error)
+    throw error
+  }
+}
+
+// Adicionar esta nova função para mover arquivos entre diretórios
+export async function moveBunnyFile(sourcePath: string, destinationPath: string): Promise<string> {
+  try {
+    if (!BUNNY_API_KEY || !BUNNY_STORAGE_ZONE) {
+      throw new Error("Configurações do Bunny.net incompletas. Verifique as variáveis de ambiente.")
+    }
+
+    // Normalizar os caminhos
+    const normalizedSourcePath = sourcePath.replace(/\/+/g, "/").replace(/^\//, "")
+    const normalizedDestPath = destinationPath.replace(/\/+/g, "/").replace(/^\//, "")
+
+    console.log(`Bunny Move: Movendo de ${normalizedSourcePath} para ${normalizedDestPath}`)
+
+    // Primeiro, baixar o arquivo original
+    const fileContent = await downloadBunnyFile(normalizedSourcePath)
+
+    // Determinar o tipo de conteúdo com base na extensão do arquivo
+    const fileName = normalizedSourcePath.split("/").pop() || ""
+    const extension = fileName.split(".").pop()?.toLowerCase() || ""
+    let contentType = "application/octet-stream"
+
+    // Mapear extensões comuns para tipos MIME
+    const mimeTypes: Record<string, string> = {
+      pdf: "application/pdf",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      gif: "image/gif",
+      webp: "image/webp",
+      svg: "image/svg+xml",
+      txt: "text/plain",
+      html: "text/html",
+      css: "text/css",
+      js: "application/javascript",
+      json: "application/json",
+      xml: "application/xml",
+      zip: "application/zip",
+      doc: "application/msword",
+      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      xls: "application/vnd.ms-excel",
+      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ppt: "application/vnd.ms-powerpoint",
+      pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    }
+
+    if (extension && extension in mimeTypes) {
+      contentType = mimeTypes[extension]
+    }
+
+    // Fazer upload do arquivo no novo caminho
+    const newUrl = await uploadFileToBunny(normalizedDestPath, fileContent, contentType)
+    console.log(`Bunny Move: Novo arquivo criado em: ${normalizedDestPath}, URL: ${newUrl}`)
+
+    // Excluir o arquivo original
+    const deleteResult = await deleteBunnyFile(normalizedSourcePath)
+    console.log(`Bunny Move: Arquivo original excluído: ${deleteResult}`)
+
+    // Retornar a URL pública do novo arquivo
+    return newUrl
+  } catch (error) {
+    console.error("Bunny Move: Erro geral:", error)
+    throw error
   }
 }

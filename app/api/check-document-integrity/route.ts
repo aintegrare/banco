@@ -1,13 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { fixBunnyUrl } from "@/lib/bunny"
-import * as pdfjs from "pdfjs-dist"
 
-// Configurar o worker do PDF.js
-const PDFJS_WORKER_SRC = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js"
-if (typeof window === "undefined") {
-  // Estamos no servidor
-  pdfjs.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC
-}
+// Importamos apenas o que precisamos do pdfjs
+// Evitamos importar o pacote completo que depende de APIs do navegador
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf"
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,11 +43,23 @@ export async function GET(request: NextRequest) {
             const response = await fetch(fixedUrl)
             const arrayBuffer = await response.arrayBuffer()
 
+            // Configurar o worker do PDF.js para ambiente Node.js
+            const PDFJS = pdfjsLib
+            if (!PDFJS.GlobalWorkerOptions.workerSrc) {
+              // No ambiente Node.js, usamos o worker fake
+              PDFJS.GlobalWorkerOptions.workerPort = new (PDFJS as any).PDFWorker({
+                name: "pdf-worker",
+              }).port
+            }
+
             // Carregar o PDF
-            const loadingTask = pdfjs.getDocument({
+            const loadingTask = PDFJS.getDocument({
               data: arrayBuffer,
-              cMapUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/cmaps/",
-              cMapPacked: true,
+              // Removemos as opções que podem causar problemas no servidor
+              disableFontFace: true,
+              standardFontDataUrl: undefined,
+              cMapUrl: undefined,
+              cMapPacked: false,
             })
 
             const pdf = await loadingTask.promise
@@ -87,7 +95,13 @@ export async function GET(request: NextRequest) {
               errorMessage = "O documento parece conter texto de demonstração ou placeholder"
             }
           } catch (pdfError) {
+            console.error("Erro ao processar PDF:", pdfError)
             errorMessage = `Erro ao processar o PDF: ${pdfError instanceof Error ? pdfError.message : String(pdfError)}`
+
+            // Ainda retornamos informações básicas sobre o documento
+            textContent = null
+            textLength = 0
+            isComplete = false
           }
         } else {
           // Para outros tipos de arquivo, tentamos obter o conteúdo como texto

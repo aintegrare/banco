@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 
 import { useState, useEffect } from "react"
 import {
@@ -23,6 +23,10 @@ import {
   CheckCircle,
   FolderOpen,
   Pencil,
+  MoveIcon,
+  ChevronLeft,
+  ChevronRight,
+  Home,
 } from "lucide-react"
 import { getBunnyPublicUrl } from "@/lib/bunny"
 
@@ -59,6 +63,9 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
   const [selectedDirectory, setSelectedDirectory] = useState<string>(initialDirectory)
   const [previewFile, setPreviewFile] = useState<BunnyFile | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [currentPath, setCurrentPath] = useState<string[]>([initialDirectory])
+  const [pathHistory, setPathHistory] = useState<string[][]>([])
+  const [forwardHistory, setForwardHistory] = useState<string[][]>([])
 
   // Adicionar o estado para o modal de renomeação
   const [showRenameModal, setShowRenameModal] = useState(false)
@@ -67,6 +74,20 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameError, setRenameError] = useState<string | null>(null)
 
+  // Adicionar estados para o modal de criação de pasta
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false)
+  const [newFolderName, setNewFolderName] = useState("")
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false)
+  const [createFolderError, setCreateFolderError] = useState<string | null>(null)
+
+  // Adicionar estados para o modal de mover arquivo
+  const [showMoveFileModal, setShowMoveFileModal] = useState(false)
+  const [fileToMove, setFileToMove] = useState<BunnyFile | null>(null)
+  const [destinationPath, setDestinationPath] = useState<string>("")
+  const [availableFolders, setAvailableFolders] = useState<string[]>([])
+  const [isMovingFile, setIsMovingFile] = useState(false)
+  const [moveFileError, setMoveFileError] = useState<string | null>(null)
+
   const fetchFiles = async (directory = selectedDirectory) => {
     setIsLoading(true)
     setError(null)
@@ -74,6 +95,7 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
     try {
       console.log(`Iniciando busca de arquivos no diretório: ${directory}...`)
+      console.log(`Caminho atual: ${currentPath.join("/")}`)
       const response = await fetch(`/api/files?directory=${directory}`)
 
       if (!response.ok) {
@@ -84,15 +106,8 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
       const data = await response.json()
       console.log(`Arquivos recebidos: ${data.files?.length || 0}`)
 
-      // Verificar e exibir informações de depuração
-      if (data.files && data.files.length > 0) {
-        const debugSample = data.files.slice(0, 3).map((file: BunnyFile) => ({
-          Nome: file.ObjectName,
-          Caminho: file.Path,
-          URL: file.PublicUrl || getBunnyPublicUrl(file.Path),
-        }))
-        setDebugInfo(JSON.stringify(debugSample, null, 2))
-      }
+      // Não precisamos mais exibir informações de depuração
+      setDebugInfo(null)
 
       // Garantir que todos os arquivos tenham URLs públicas corretas
       const filesWithPublicUrls = (data.files || []).map((file: BunnyFile) => {
@@ -106,6 +121,11 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
       })
 
       setFiles(filesWithPublicUrls)
+
+      // Extrair pastas disponíveis para o modal de mover arquivo
+      const folders = filesWithPublicUrls.filter((file) => file.IsDirectory).map((folder) => folder.Path)
+
+      setAvailableFolders(folders)
     } catch (err) {
       console.error("Erro ao buscar arquivos:", err)
       setError(err instanceof Error ? err.message : "Erro desconhecido ao buscar arquivos")
@@ -115,8 +135,67 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
   }
 
   useEffect(() => {
-    fetchFiles(selectedDirectory)
-  }, [selectedDirectory])
+    fetchFiles(getCurrentPathString())
+  }, [currentPath])
+
+  const getCurrentPathString = () => {
+    return currentPath.join("/")
+  }
+
+  const navigateToFolder = (folderPath: string) => {
+    // Salvar o caminho atual no histórico
+    setPathHistory((prev) => [...prev, currentPath])
+    setForwardHistory([])
+
+    // Extrair o caminho completo da pasta
+    const pathSegments = folderPath.split("/").filter((segment) => segment.length > 0)
+    setCurrentPath(pathSegments)
+    setSelectedDirectory(pathSegments[0] || initialDirectory)
+  }
+
+  const navigateBack = () => {
+    if (pathHistory.length > 0) {
+      // Obter o último caminho do histórico
+      const previousPath = pathHistory[pathHistory.length - 1]
+
+      // Atualizar o histórico para frente
+      setForwardHistory((prev) => [...prev, currentPath])
+
+      // Atualizar o histórico para trás
+      setPathHistory((prev) => prev.slice(0, prev.length - 1))
+
+      // Definir o caminho atual
+      setCurrentPath(previousPath)
+      setSelectedDirectory(previousPath[0] || initialDirectory)
+    }
+  }
+
+  const navigateForward = () => {
+    if (forwardHistory.length > 0) {
+      // Obter o último caminho do histórico para frente
+      const nextPath = forwardHistory[forwardHistory.length - 1]
+
+      // Atualizar o histórico para trás
+      setPathHistory((prev) => [...prev, currentPath])
+
+      // Atualizar o histórico para frente
+      setForwardHistory((prev) => prev.slice(0, prev.length - 1))
+
+      // Definir o caminho atual
+      setCurrentPath(nextPath)
+      setSelectedDirectory(nextPath[0] || initialDirectory)
+    }
+  }
+
+  const navigateHome = () => {
+    // Salvar o caminho atual no histórico
+    setPathHistory((prev) => [...prev, currentPath])
+    setForwardHistory([])
+
+    // Voltar para o diretório inicial
+    setCurrentPath([initialDirectory])
+    setSelectedDirectory(initialDirectory)
+  }
 
   const handleDelete = async (path: string) => {
     if (!confirm("Tem certeza que deseja excluir este arquivo? Esta ação não pode ser desfeita.")) {
@@ -161,32 +240,110 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     }
   }
 
-  const handleCreateDirectory = async (directory: string) => {
-    setIsCreatingDirectory(true)
-    setError(null)
-    setDirectoryCreated(false)
+  const handleCreateDirectory = async () => {
+    console.log("Abrindo modal para criar pasta no caminho:", getCurrentPathString())
+    setShowCreateFolderModal(true)
+  }
+
+  const submitCreateFolder = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!newFolderName || newFolderName.trim() === "") {
+      setCreateFolderError("O nome da pasta não pode estar vazio")
+      return
+    }
+
+    // Verificar caracteres inválidos
+    if (/[\\/:*?"<>|]/.test(newFolderName)) {
+      setCreateFolderError("O nome da pasta contém caracteres inválidos")
+      return
+    }
+
+    setIsCreatingFolder(true)
+    setCreateFolderError(null)
 
     try {
+      // Construir o caminho completo da nova pasta
+      const currentPathString = getCurrentPathString()
+      const newFolderPath = currentPathString ? `${currentPathString}/${newFolderName}` : newFolderName
+
+      console.log(`Criando pasta: ${newFolderPath}`)
+
       const response = await fetch("/api/create-directory", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ directory }),
+        body: JSON.stringify({ directory: newFolderPath }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || errorData.error || `Erro ao criar diretório: ${response.status}`)
+        throw new Error(data.message || data.error || `Erro ao criar pasta: ${response.status}`)
       }
 
+      console.log("Resposta da API:", data)
+
+      setShowCreateFolderModal(false)
+      setNewFolderName("")
       setDirectoryCreated(true)
-      await fetchFiles(directory)
-    } catch (err) {
-      console.error("Erro ao criar diretório:", err)
-      setError(err instanceof Error ? err.message : "Erro ao criar diretório")
+
+      // Adicionar a nova pasta à lista local imediatamente
+      const newFolder = {
+        ObjectName: newFolderName,
+        Length: 0,
+        LastChanged: new Date().toISOString(),
+        IsDirectory: true,
+        StorageZoneName: "",
+        Path: `${currentPathString}/${newFolderName}/`.replace(/\/+/g, "/"),
+        ObjectType: 1,
+        Guid: `temp-${Date.now()}`,
+        ServerId: 0,
+        UserId: "",
+        DateCreated: new Date().toISOString(),
+        StorageZoneId: 0,
+        PublicUrl: `${process.env.NEXT_PUBLIC_BUNNY_PULLZONE_URL}/${currentPathString}/${newFolderName}/`.replace(
+          /\/+/g,
+          "/",
+        ),
+      }
+
+      setFiles((prev) => [...prev, newFolder])
+
+      // Atualizar a lista de arquivos após um breve delay para dar tempo ao servidor
+      setTimeout(() => {
+        fetchFiles(getCurrentPathString())
+      }, 1000)
+    } catch (error) {
+      console.error("Erro ao criar pasta:", error)
+      setCreateFolderError(error instanceof Error ? error.message : "Erro ao criar pasta")
     } finally {
-      setIsCreatingDirectory(false)
+      setIsCreatingFolder(false)
+    }
+  }
+
+  // Adicionar uma nova função no componente FileList para verificar a pasta
+
+  const checkFolderExists = async (path: string) => {
+    try {
+      const response = await fetch(`/api/check-folder?path=${encodeURIComponent(path)}`)
+      const data = await response.json()
+
+      console.log("Verificação de pasta:", data)
+
+      if (response.ok) {
+        alert(
+          `Pasta ${path}: ${data.exists ? "Existe" : "Não existe"}\n` +
+            `Arquivos: ${data.fileCount || 0}\n` +
+            `Caminho: ${data.path}`,
+        )
+      } else {
+        alert(`Erro ao verificar pasta: ${data.error || data.message || "Erro desconhecido"}`)
+      }
+    } catch (error) {
+      console.error("Erro ao verificar pasta:", error)
+      alert(`Erro ao verificar pasta: ${error instanceof Error ? error.message : "Erro desconhecido"}`)
     }
   }
 
@@ -196,7 +353,7 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     setError(null)
 
     try {
-      const response = await fetch(`/api/check-directory?directory=${selectedDirectory}`)
+      const response = await fetch(`/api/check-directory?directory=${getCurrentPathString()}`)
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
@@ -286,7 +443,7 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
         throw new Error(errorData.message || errorData.error || `Erro ao criar diretório de teste: ${response.status}`)
       }
 
-      await fetchFiles()
+      await fetchFiles(getCurrentPathString())
     } catch (err) {
       console.error("Erro ao criar diretório de teste:", err)
       setError(err instanceof Error ? err.message : "Erro ao criar diretório de teste")
@@ -301,7 +458,9 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
   }
 
   const handlePreviewFile = (file: BunnyFile) => {
-    if (isImage(file.ObjectName)) {
+    if (file.IsDirectory) {
+      navigateToFolder(file.Path)
+    } else if (isImage(file.ObjectName)) {
       setPreviewFile(file)
     } else {
       // Verificar se a URL pública é válida
@@ -316,8 +475,13 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
   }
 
   const switchDirectory = (directory: string) => {
+    // Salvar o caminho atual no histórico
+    setPathHistory((prev) => [...prev, currentPath])
+    setForwardHistory([])
+
+    // Definir o novo caminho
+    setCurrentPath([directory])
     setSelectedDirectory(directory)
-    fetchFiles(directory)
   }
 
   // Filtrar arquivos com base na busca
@@ -406,7 +570,7 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
       // Atualizar a lista de arquivos do servidor após um breve atraso
       setTimeout(() => {
-        fetchFiles(selectedDirectory)
+        fetchFiles(getCurrentPathString())
       }, 1000)
     } catch (error) {
       console.error("Erro ao renomear arquivo:", error)
@@ -414,6 +578,96 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     } finally {
       setIsRenaming(false)
     }
+  }
+
+  // Adicionar função para abrir o modal de mover arquivo
+  const openMoveFileModal = (file: BunnyFile) => {
+    setFileToMove(file)
+    setDestinationPath("")
+    setMoveFileError(null)
+    setShowMoveFileModal(true)
+  }
+
+  // Adicionar função para processar a movimentação de arquivo
+  const handleMoveFile = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!fileToMove || !destinationPath) {
+      setMoveFileError("Selecione um destino para mover o arquivo")
+      return
+    }
+
+    setIsMovingFile(true)
+    setMoveFileError(null)
+
+    try {
+      // Construir o caminho de destino completo
+      const fileName = fileToMove.ObjectName
+      const newPath = `${destinationPath}${destinationPath.endsWith("/") ? "" : "/"}${fileName}`
+
+      console.log(`Movendo arquivo: ${fileToMove.Path} para ${newPath}`)
+
+      const response = await fetch("/api/files/move", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sourcePath: fileToMove.Path,
+          destinationPath: newPath,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || "Erro ao mover arquivo")
+      }
+
+      console.log("Resposta da API:", data)
+
+      // Remover o arquivo da lista atual
+      setFiles((prevFiles) => prevFiles.filter((file) => file.Path !== fileToMove.Path))
+
+      setShowMoveFileModal(false)
+
+      // Atualizar a lista de arquivos
+      await fetchFiles(getCurrentPathString())
+    } catch (error) {
+      console.error("Erro ao mover arquivo:", error)
+      setMoveFileError(error instanceof Error ? error.message : "Erro ao mover arquivo")
+    } finally {
+      setIsMovingFile(false)
+    }
+  }
+
+  // Renderizar o breadcrumb de navegação
+  const renderBreadcrumb = () => {
+    return (
+      <div className="flex items-center text-sm text-gray-600 mb-4 overflow-x-auto">
+        <button onClick={navigateHome} className="p-1 hover:bg-gray-100 rounded-md flex items-center" title="Início">
+          <Home size={16} className="text-[#4b7bb5]" />
+        </button>
+        <span className="mx-1">/</span>
+
+        {currentPath.map((segment, index) => (
+          <React.Fragment key={index}>
+            <button
+              onClick={() => {
+                if (index < currentPath.length - 1) {
+                  navigateToFolder(currentPath.slice(0, index + 1).join("/"))
+                }
+              }}
+              className={`hover:underline ${index === currentPath.length - 1 ? "font-medium text-[#4b7bb5]" : ""}`}
+              disabled={index === currentPath.length - 1}
+            >
+              {segment}
+            </button>
+            {index < currentPath.length - 1 && <span className="mx-1">/</span>}
+          </React.Fragment>
+        ))}
+      </div>
+    )
   }
 
   return (
@@ -459,9 +713,41 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
         </div>
       </div>
 
+      {/* Navegação e breadcrumb */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="flex items-center space-x-2 mr-4">
+          <button
+            onClick={navigateBack}
+            disabled={pathHistory.length === 0}
+            className="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-transparent"
+            title="Voltar"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <button
+            onClick={navigateForward}
+            disabled={forwardHistory.length === 0}
+            className="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-transparent"
+            title="Avançar"
+          >
+            <ChevronRight size={18} />
+          </button>
+          <button
+            onClick={navigateHome}
+            className="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+            title="Início"
+          >
+            <Home size={18} />
+          </button>
+        </div>
+
+        {renderBreadcrumb()}
+      </div>
+
       <div className="flex flex-wrap gap-2 mb-6">
+        {/* No botão "Verificar Diretório", alterar o evento onClick */}
         <button
-          onClick={handleCheckDirectory}
+          onClick={() => checkFolderExists(getCurrentPathString())}
           className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all ${
             isCheckingDirectory
               ? "bg-gray-100 text-gray-500"
@@ -478,7 +764,7 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
         </button>
 
         <button
-          onClick={() => handleCreateDirectory(selectedDirectory)}
+          onClick={handleCreateDirectory}
           className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all ${
             isCreatingDirectory
               ? "bg-gray-100 text-gray-500"
@@ -491,11 +777,11 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
           ) : (
             <FolderPlus className="h-4 w-4 mr-1.5" />
           )}
-          Criar Diretório
+          Criar Pasta
         </button>
 
         <button
-          onClick={() => fetchFiles(selectedDirectory)}
+          onClick={() => fetchFiles(getCurrentPathString())}
           className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all ${
             isLoading
               ? "bg-gray-100 text-gray-500"
@@ -507,18 +793,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
           Atualizar
         </button>
       </div>
-
-      {debugInfo && (
-        <div className="bg-gray-50 p-4 rounded-lg mb-6 text-xs border-l-4 border-[#4b7bb5]">
-          <div className="flex items-start">
-            <Info className="h-4 w-4 mr-2 text-[#4b7bb5] flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-medium text-gray-700 mb-2">Informações de depuração (primeiros 3 arquivos):</p>
-              <pre className="bg-white p-3 rounded-md overflow-auto max-h-40 border border-gray-200">{debugInfo}</pre>
-            </div>
-          </div>
-        </div>
-      )}
 
       {directoryCreated && (
         <div className="bg-green-50 p-4 rounded-lg mb-6 border-l-4 border-green-500 flex items-start animate-fadeIn">
@@ -576,11 +850,11 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
               </p>
               <div className="mt-3">
                 <button
-                  onClick={() => handleCreateDirectory(selectedDirectory)}
+                  onClick={() => handleCreateDirectory()}
                   className="text-red-600 hover:text-red-800 underline font-medium"
                   disabled={isCreatingDirectory}
                 >
-                  Tentar criar o diretório "{selectedDirectory}"
+                  Tentar criar uma nova pasta
                 </button>
               </div>
             </div>
@@ -615,7 +889,7 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
             </button>
 
             <button
-              onClick={() => handleCreateDirectory(selectedDirectory)}
+              onClick={handleCreateDirectory}
               className="flex items-center px-4 py-2 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] transition-colors shadow-sm"
               disabled={isCreatingDirectory}
             >
@@ -627,7 +901,7 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
               ) : (
                 <>
                   <FolderPlus className="h-4 w-4 mr-1.5" />
-                  <span>Criar diretório</span>
+                  <span>Criar pasta</span>
                 </>
               )}
             </button>
@@ -653,7 +927,13 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
                   >
                     <td className="py-3 px-4">
                       <div className="flex items-center">
-                        <div className="p-1.5 bg-gray-100 rounded-md mr-3">{getFileIcon(file.ObjectName)}</div>
+                        <div className="p-1.5 bg-gray-100 rounded-md mr-3">
+                          {file.IsDirectory ? (
+                            <FolderOpen className="h-5 w-5 text-[#4b7bb5]" />
+                          ) : (
+                            getFileIcon(file.ObjectName)
+                          )}
+                        </div>
                         <span
                           className="cursor-pointer hover:text-[#4b7bb5] font-medium transition-colors"
                           onClick={() => handlePreviewFile(file)}
@@ -662,22 +942,24 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-gray-500">{formatFileSize(file.Length)}</td>
+                    <td className="py-3 px-4 text-gray-500">{file.IsDirectory ? "-" : formatFileSize(file.Length)}</td>
                     <td className="py-3 px-4 text-gray-500">{formatDate(file.LastChanged)}</td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex justify-end space-x-2">
-                        <a
-                          href={file.PublicUrl || getBunnyPublicUrl(file.Path)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
-                          title="Abrir arquivo"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
+                        {!file.IsDirectory && (
+                          <a
+                            href={file.PublicUrl || getBunnyPublicUrl(file.Path)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+                            title="Abrir arquivo"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        )}
                         <button
                           className="p-1.5 text-orange-500 hover:text-orange-700 hover:bg-orange-50 rounded-md transition-colors"
-                          title="Renomear arquivo"
+                          title="Renomear"
                           onClick={(e) => {
                             e.stopPropagation()
                             openRenameModal(file)
@@ -685,9 +967,21 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
+                        {!file.IsDirectory && (
+                          <button
+                            className="p-1.5 text-purple-500 hover:text-purple-700 hover:bg-purple-50 rounded-md transition-colors"
+                            title="Mover arquivo"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openMoveFileModal(file)
+                            }}
+                          >
+                            <MoveIcon className="h-4 w-4" />
+                          </button>
+                        )}
                         <button
                           className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
-                          title="Excluir arquivo"
+                          title="Excluir"
                           onClick={() => handleDelete(file.Path)}
                           disabled={deletingFile === file.Path}
                         >
@@ -713,8 +1007,12 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
           <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
             <div className="p-4 border-b flex justify-between items-center">
               <h3 className="font-medium flex items-center">
-                {getFileIcon(fileToRename.ObjectName)}
-                <span className="ml-2">Renomear arquivo</span>
+                {fileToRename.IsDirectory ? (
+                  <FolderOpen className="h-5 w-5 mr-2 text-[#4b7bb5]" />
+                ) : (
+                  getFileIcon(fileToRename.ObjectName)
+                )}
+                <span className="ml-2">Renomear {fileToRename.IsDirectory ? "pasta" : "arquivo"}</span>
               </h3>
               <button
                 onClick={() => setShowRenameModal(false)}
@@ -764,6 +1062,143 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
                     </>
                   ) : (
                     "Renomear"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de criação de pasta */}
+      {showCreateFolderModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="font-medium flex items-center">
+                <FolderPlus className="h-5 w-5 mr-2 text-[#4b7bb5]" />
+                <span className="ml-2">Criar nova pasta</span>
+              </h3>
+              <button
+                onClick={() => setShowCreateFolderModal(false)}
+                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={submitCreateFolder}>
+              <div className="p-6">
+                <div>
+                  <label htmlFor="newFolderName" className="block text-sm font-medium text-gray-700 mb-1">
+                    Nome da pasta:
+                  </label>
+                  <input
+                    type="text"
+                    id="newFolderName"
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5]"
+                    autoFocus
+                    placeholder="Nova pasta"
+                  />
+                  {createFolderError && <p className="mt-2 text-sm text-red-600">{createFolderError}</p>}
+                </div>
+                <p className="mt-4 text-sm text-gray-500">
+                  A pasta será criada no diretório atual: <span className="font-medium">{getCurrentPathString()}</span>
+                </p>
+              </div>
+              <div className="p-4 bg-gray-50 flex justify-end space-x-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateFolderModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingFolder}
+                  className="px-4 py-2 bg-[#4b7bb5] border border-transparent rounded-md text-sm font-medium text-white hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4b7bb5] disabled:opacity-50 transition-colors"
+                >
+                  {isCreatingFolder ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1.5 inline animate-spin" />
+                      Criando...
+                    </>
+                  ) : (
+                    "Criar pasta"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de mover arquivo */}
+      {showMoveFileModal && fileToMove && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="font-medium flex items-center">
+                <MoveIcon className="h-5 w-5 mr-2 text-purple-500" />
+                <span className="ml-2">Mover arquivo</span>
+              </h3>
+              <button
+                onClick={() => setShowMoveFileModal(false)}
+                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleMoveFile}>
+              <div className="p-6">
+                <div className="mb-4">
+                  <p className="text-sm text-gray-500 mb-2">Arquivo:</p>
+                  <p className="font-medium text-gray-700 bg-gray-50 p-2 rounded-md">{fileToMove.ObjectName}</p>
+                </div>
+                <div>
+                  <label htmlFor="destinationPath" className="block text-sm font-medium text-gray-700 mb-1">
+                    Destino:
+                  </label>
+                  <select
+                    id="destinationPath"
+                    value={destinationPath}
+                    onChange={(e) => setDestinationPath(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5]"
+                  >
+                    <option value="">Selecione uma pasta</option>
+                    <option value="documents">Documentos (raiz)</option>
+                    <option value="images">Imagens (raiz)</option>
+                    {availableFolders.map((folder) => (
+                      <option key={folder} value={folder}>
+                        {folder}
+                      </option>
+                    ))}
+                  </select>
+                  {moveFileError && <p className="mt-2 text-sm text-red-600">{moveFileError}</p>}
+                </div>
+              </div>
+              <div className="p-4 bg-gray-50 flex justify-end space-x-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowMoveFileModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isMovingFile || !destinationPath}
+                  className="px-4 py-2 bg-[#4b7bb5] border border-transparent rounded-md text-sm font-medium text-white hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4b7bb5] disabled:opacity-50 transition-colors"
+                >
+                  {isMovingFile ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1.5 inline animate-spin" />
+                      Movendo...
+                    </>
+                  ) : (
+                    "Mover arquivo"
                   )}
                 </button>
               </div>

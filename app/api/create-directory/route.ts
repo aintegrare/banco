@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getBunnyClient } from "@/lib/bunny"
+import { createBunnyDirectory } from "@/lib/bunny"
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,54 +20,36 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const bunnyClient = getBunnyClient()
-
-    // Verificar se o diretório já existe
     try {
-      console.log(`API Create Directory: Verificando se o diretório ${directory} já existe`)
-      const checkResponse = await bunnyClient.get(`/${directory}/`)
+      console.log(`API Create Directory: Iniciando processo de criação para: ${directory}`)
+      // Usar a função para criar o diretório
+      const success = await createBunnyDirectory(directory)
 
-      if (checkResponse.ok) {
-        console.log(`API Create Directory: Diretório ${directory} já existe`)
+      console.log(`API Create Directory: Resultado da criação: ${success ? "Sucesso" : "Falha"}`)
+
+      if (success) {
+        console.log(`API Create Directory: Diretório ${directory} criado com sucesso`)
         return NextResponse.json({
           success: true,
-          message: `O diretório ${directory} já existe.`,
-          alreadyExists: true,
+          message: `Diretório ${directory} criado com sucesso.`,
+          directory: directory,
         })
-      }
-    } catch (error) {
-      // Se o diretório não existir, continuamos para criá-lo
-      console.log(`API Create Directory: Diretório ${directory} não existe, prosseguindo com a criação`)
-    }
-
-    // Criar o diretório
-    try {
-      console.log(`API Create Directory: Criando diretório ${directory}`)
-      const response = await bunnyClient.put(`/${directory}/`, "")
-
-      if (!response.ok) {
-        console.error(
-          `API Create Directory: Erro ao criar diretório ${directory}: ${response.status} ${response.statusText}`,
-        )
+      } else {
+        console.error(`API Create Directory: Falha ao criar diretório ${directory}`)
         return NextResponse.json(
           {
-            error: `Erro ao criar diretório ${directory}: ${response.status} ${response.statusText}`,
+            error: `Falha ao criar diretório ${directory}`,
           },
-          { status: response.status },
+          { status: 500 },
         )
       }
-
-      console.log(`API Create Directory: Diretório ${directory} criado com sucesso`)
-      return NextResponse.json({
-        success: true,
-        message: `Diretório ${directory} criado com sucesso.`,
-      })
     } catch (error) {
       console.error(`API Create Directory: Erro ao criar diretório ${directory}:`, error)
       return NextResponse.json(
         {
           error: `Erro ao criar diretório ${directory}`,
           message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
         },
         { status: 500 },
       )
@@ -78,6 +60,7 @@ export async function POST(request: NextRequest) {
       {
         error: "Erro ao criar diretório",
         message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 },
     )

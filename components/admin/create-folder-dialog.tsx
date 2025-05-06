@@ -8,9 +8,10 @@ import { X, FolderPlus } from "lucide-react"
 interface CreateFolderDialogProps {
   onClose: () => void
   onCreateFolder: (folderName: string) => void
+  currentPath?: string
 }
 
-export function CreateFolderDialog({ onClose, onCreateFolder }: CreateFolderDialogProps) {
+export function CreateFolderDialog({ onClose, onCreateFolder, currentPath = "" }: CreateFolderDialogProps) {
   const [folderName, setFolderName] = useState("")
   const [error, setError] = useState<string | null>(null)
 
@@ -55,12 +56,18 @@ export function CreateFolderDialog({ onClose, onCreateFolder }: CreateFolderDial
                 setFolderName(e.target.value)
                 setError(null)
               }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5]"
               placeholder="Nova pasta"
               autoFocus
             />
             {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
           </div>
+
+          {currentPath && (
+            <p className="mb-4 text-sm text-gray-500">
+              A pasta será criada em: <span className="font-medium">{currentPath}</span>
+            </p>
+          )}
 
           <div className="flex justify-end space-x-3">
             <button
