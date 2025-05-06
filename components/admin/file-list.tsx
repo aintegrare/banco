@@ -27,14 +27,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Home,
-  LifeBuoy,
   CheckSquare,
   Square,
   ClipboardList,
 } from "lucide-react"
 import { getBunnyPublicUrl } from "@/lib/bunny"
-import { FolderRecovery } from "./folder-recovery"
-// Adicionar o import para os novos componentes no topo do arquivo
 import { FolderTasks } from "./folder-tasks"
 import { FolderTaskBadge } from "./folder-task-badge"
 
@@ -74,38 +71,27 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
   const [currentPath, setCurrentPath] = useState<string[]>([initialDirectory])
   const [pathHistory, setPathHistory] = useState<string[][]>([])
   const [forwardHistory, setForwardHistory] = useState<string[][]>([])
-  const [showRecoveryTool, setShowRecoveryTool] = useState(false)
-
-  // Estados para o modal de renomeação
   const [showRenameModal, setShowRenameModal] = useState(false)
   const [fileToRename, setFileToRename] = useState<BunnyFile | null>(null)
   const [newFileName, setNewFileName] = useState("")
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameError, setRenameError] = useState<string | null>(null)
-
-  // Estados para o modal de criação de pasta
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false)
   const [newFolderName, setNewFolderName] = useState("")
   const [isCreatingFolder, setIsCreatingFolder] = useState(false)
   const [createFolderError, setCreateFolderError] = useState<string | null>(null)
-
-  // Estados para o modal de mover arquivo
   const [showMoveFileModal, setShowMoveFileModal] = useState(false)
   const [fileToMove, setFileToMove] = useState<BunnyFile | null>(null)
   const [destinationPath, setDestinationPath] = useState<string>("")
   const [availableFolders, setAvailableFolders] = useState<string[]>([])
   const [isMovingFile, setIsMovingFile] = useState(false)
   const [moveFileError, setMoveFileError] = useState<string | null>(null)
-
-  // Novos estados para seleção múltipla
   const [selectedFiles, setSelectedFiles] = useState<BunnyFile[]>([])
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [isMovingMultiple, setIsMovingMultiple] = useState(false)
   const [multiMoveDestination, setMultiMoveDestination] = useState<string>("")
   const [showMultiMoveModal, setShowMultiMoveModal] = useState(false)
   const [multiMoveError, setMultiMoveError] = useState<string | null>(null)
-  // Adicionar novos estados para gerenciar as tarefas de pasta
-  // Adicionar após a linha: const [showMultiMoveModal, setShowMultiMoveModal] = useState(false)
   const [showFolderTasks, setShowFolderTasks] = useState(false)
   const [selectedFolderForTasks, setSelectedFolderForTasks] = useState<string>("")
   const [folderTaskCounts, setFolderTaskCounts] = useState<Record<string, number>>({})
@@ -133,10 +119,8 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
       const data = await response.json()
       console.log(`Arquivos recebidos: ${data.files?.length || 0}`)
 
-      // Não precisamos mais exibir informações de depuração
       setDebugInfo(null)
 
-      // Garantir que todos os arquivos tenham URLs públicas corretas
       const filesWithPublicUrls = (data.files || []).map((file: BunnyFile) => {
         if (!file.PublicUrl) {
           return {
@@ -149,7 +133,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
       setFiles(filesWithPublicUrls)
 
-      // Extrair pastas disponíveis para o modal de mover arquivo
       const folders = filesWithPublicUrls.filter((file) => file.IsDirectory).map((folder) => folder.Path)
 
       setAvailableFolders(folders)
@@ -163,7 +146,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
   useEffect(() => {
     fetchFiles(getCurrentPathString())
-    // Limpar seleção ao mudar de diretório
     setSelectedFiles([])
     setIsSelectionMode(false)
   }, [currentPath])
@@ -173,15 +155,12 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
   }
 
   const navigateToFolder = (folderPath: string) => {
-    // Limpar seleção ao navegar
     setSelectedFiles([])
     setIsSelectionMode(false)
 
-    // Salvar o caminho atual no histórico
     setPathHistory((prev) => [...prev, currentPath])
     setForwardHistory([])
 
-    // Extrair o caminho completo da pasta
     const pathSegments = folderPath.split("/").filter((segment) => segment.length > 0)
     setCurrentPath(pathSegments)
     setSelectedDirectory(pathSegments[0] || initialDirectory)
@@ -189,20 +168,15 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
   const navigateBack = () => {
     if (pathHistory.length > 0) {
-      // Limpar seleção ao navegar
       setSelectedFiles([])
       setIsSelectionMode(false)
 
-      // Obter o último caminho do histórico
       const previousPath = pathHistory[pathHistory.length - 1]
 
-      // Atualizar o histórico para frente
       setForwardHistory((prev) => [...prev, currentPath])
 
-      // Atualizar o histórico para trás
       setPathHistory((prev) => prev.slice(0, prev.length - 1))
 
-      // Definir o caminho atual
       setCurrentPath(previousPath)
       setSelectedDirectory(previousPath[0] || initialDirectory)
     }
@@ -210,35 +184,27 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
   const navigateForward = () => {
     if (forwardHistory.length > 0) {
-      // Limpar seleção ao navegar
       setSelectedFiles([])
       setIsSelectionMode(false)
 
-      // Obter o último caminho do histórico para frente
       const nextPath = forwardHistory[forwardHistory.length - 1]
 
-      // Atualizar o histórico para trás
       setPathHistory((prev) => [...prev, currentPath])
 
-      // Atualizar o histórico para frente
       setForwardHistory((prev) => prev.slice(0, prev.length - 1))
 
-      // Definir o caminho atual
       setCurrentPath(nextPath)
       setSelectedDirectory(nextPath[0] || initialDirectory)
     }
   }
 
   const navigateHome = () => {
-    // Limpar seleção ao navegar
     setSelectedFiles([])
     setIsSelectionMode(false)
 
-    // Salvar o caminho atual no histórico
     setPathHistory((prev) => [...prev, currentPath])
     setForwardHistory([])
 
-    // Voltar para o diretório inicial
     setCurrentPath([initialDirectory])
     setSelectedDirectory(initialDirectory)
   }
@@ -253,14 +219,11 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     try {
       console.log(`FileList: Iniciando exclusão do arquivo: ${path}`)
 
-      // Extrair apenas o nome do arquivo e pasta para a API
-      // Remover qualquer prefixo de URL completa se existir
       let cleanPath = path
 
-      // Se o caminho começa com http, extrair apenas a parte após o domínio
       if (path.startsWith("http")) {
         const url = new URL(path)
-        cleanPath = url.pathname.replace(/^\//, "") // Remover a barra inicial
+        cleanPath = url.pathname.replace(/^\//, "")
       }
 
       console.log(`FileList: Caminho limpo para API: ${cleanPath}`)
@@ -275,7 +238,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
         throw new Error(data.message || data.error || `Erro ao excluir arquivo: ${response.status}`)
       }
 
-      // Atualizar a lista após exclusão bem-sucedida
       setFiles((prev) => prev.filter((file) => file.Path !== path))
       console.log(`FileList: Arquivo excluído com sucesso: ${path}`)
     } catch (err) {
@@ -286,8 +248,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     }
   }
 
-  // Modificar a função handleCreateDirectory para adicionar a opção de criar tarefas
-  // Substituir a função handleCreateDirectory existente
   const handleCreateDirectory = async () => {
     console.log("Abrindo modal para criar pasta no caminho:", getCurrentPathString())
     setShowCreateFolderModal(true)
@@ -301,7 +261,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
       return
     }
 
-    // Verificar caracteres inválidos
     if (/[\\/:*?"<>|]/.test(newFolderName)) {
       setCreateFolderError("O nome da pasta contém caracteres inválidos")
       return
@@ -311,7 +270,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     setCreateFolderError(null)
 
     try {
-      // Construir o caminho completo da nova pasta
       const currentPathString = getCurrentPathString()
       const newFolderPath = currentPathString ? `${currentPathString}/${newFolderName}` : newFolderName
 
@@ -337,7 +295,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
       setNewFolderName("")
       setDirectoryCreated(true)
 
-      // Adicionar a nova pasta à lista local imediatamente
       const newFolder = {
         ObjectName: newFolderName,
         Length: 0,
@@ -359,7 +316,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
       setFiles((prev) => [...prev, newFolder])
 
-      // Atualizar a lista de arquivos após um breve delay para dar tempo ao servidor
       setTimeout(() => {
         fetchFiles(getCurrentPathString())
       }, 1000)
@@ -409,7 +365,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
       const data = await response.json()
       setDirectoryInfo(data)
 
-      // Se o diretório existe e tem arquivos, atualizar a lista
       if (data.exists && data.files && data.files.length > 0) {
         setFiles(
           data.files.map((file: BunnyFile) => ({
@@ -479,7 +434,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
       setIsLoading(true)
       setError(null)
 
-      // Criar um arquivo de teste para verificar se a API está funcionando
       const response = await fetch("/api/test-directory", {
         method: "POST",
       })
@@ -505,7 +459,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
   const handlePreviewFile = (file: BunnyFile) => {
     if (isSelectionMode) {
-      // No modo de seleção, clicar em um arquivo o seleciona/deseleciona
       toggleFileSelection(file)
       return
     }
@@ -515,7 +468,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     } else if (isImage(file.ObjectName)) {
       setPreviewFile(file)
     } else {
-      // Verificar se a URL pública é válida
       const url = file.PublicUrl || getBunnyPublicUrl(file.Path)
       console.log(`Preview: Abrindo arquivo ${file.ObjectName} com URL: ${url}`)
       window.open(url, "_blank")
@@ -527,30 +479,24 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
   }
 
   const switchDirectory = (directory: string) => {
-    // Limpar seleção ao mudar de diretório
     setSelectedFiles([])
     setIsSelectionMode(false)
 
-    // Salvar o caminho atual no histórico
     setPathHistory((prev) => [...prev, currentPath])
     setForwardHistory([])
 
-    // Definir o novo caminho
     setCurrentPath([directory])
     setSelectedDirectory(directory)
   }
 
-  // Filtrar arquivos com base na busca
   const filteredFiles = files.filter((file) => {
     return searchQuery ? file.ObjectName.toLowerCase().includes(searchQuery.toLowerCase()) : true
   })
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    // A filtragem já acontece automaticamente via filteredFiles
   }
 
-  // Adicionar a função para abrir o modal de renomeação
   const openRenameModal = (file: BunnyFile) => {
     setFileToRename(file)
     setNewFileName(file.ObjectName)
@@ -558,7 +504,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     setShowRenameModal(true)
   }
 
-  // Adicionar a função para processar a renomeação
   const handleRename = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -572,7 +517,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
       return
     }
 
-    // Verificar caracteres inválidos
     if (/[\\/:*?"<>|]/.test(newFileName)) {
       setRenameError("O nome do arquivo contém caracteres inválidos")
       return
@@ -603,7 +547,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
       console.log("Resposta da API:", data)
 
-      // Atualizar a lista de arquivos localmente
       const lastSlashIndex = fileToRename.Path.lastIndexOf("/")
       const directory = lastSlashIndex >= 0 ? fileToRename.Path.substring(0, lastSlashIndex + 1) : ""
       const newPath = directory + newFileName
@@ -624,7 +567,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
       setShowRenameModal(false)
 
-      // Atualizar a lista de arquivos do servidor após um breve atraso
       setTimeout(() => {
         fetchFiles(getCurrentPathString())
       }, 1000)
@@ -636,7 +578,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     }
   }
 
-  // Adicionar função para abrir o modal de mover arquivo
   const openMoveFileModal = (file: BunnyFile) => {
     setFileToMove(file)
     setDestinationPath("")
@@ -644,7 +585,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     setShowMoveFileModal(true)
   }
 
-  // Adicionar função para processar a movimentação de arquivo
   const handleMoveFile = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -657,7 +597,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     setMoveFileError(null)
 
     try {
-      // Construir o caminho de destino completo
       const fileName = fileToMove.ObjectName
       const newPath = `${destinationPath}${destinationPath.endsWith("/") ? "" : "/"}${fileName}`
 
@@ -682,12 +621,10 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
       console.log("Resposta da API:", data)
 
-      // Remover o arquivo da lista atual
       setFiles((prevFiles) => prevFiles.filter((file) => file.Path !== fileToMove.Path))
 
       setShowMoveFileModal(false)
 
-      // Atualizar a lista de arquivos
       await fetchFiles(getCurrentPathString())
     } catch (error) {
       console.error("Erro ao mover arquivo:", error)
@@ -697,7 +634,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     }
   }
 
-  // Renderizar o breadcrumb de navegação
   const renderBreadcrumb = () => {
     return (
       <div className="flex items-center text-sm text-gray-600 mb-4 overflow-x-auto">
@@ -726,20 +662,11 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     )
   }
 
-  // Função para lidar com a pasta encontrada pela ferramenta de recuperação
-  const handleFolderFound = (folderPath: string) => {
-    navigateToFolder(folderPath)
-    setShowRecoveryTool(false)
-  }
-
-  // Adicionar uma função para abrir o painel de tarefas de uma pasta
-  // Adicionar após a função handleFolderFound
   const openFolderTasks = (folderPath: string) => {
     setSelectedFolderForTasks(folderPath)
     setShowFolderTasks(true)
   }
 
-  // Adicionar uma função para atualizar a contagem de tarefas de uma pasta
   const updateFolderTaskCount = useCallback((folderPath: string, count: number) => {
     setFolderTaskCounts((prev) => ({
       ...prev,
@@ -747,21 +674,17 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     }))
   }, [])
 
-  // Novas funções para seleção múltipla
   const toggleSelectionMode = () => {
     setIsSelectionMode(!isSelectionMode)
     if (!isSelectionMode) {
-      // Entrando no modo de seleção
       setSelectedFiles([])
     }
   }
 
   const toggleFileSelection = (file: BunnyFile) => {
     if (selectedFiles.some((f) => f.Path === file.Path)) {
-      // Remover da seleção
       setSelectedFiles(selectedFiles.filter((f) => f.Path !== file.Path))
     } else {
-      // Adicionar à seleção
       setSelectedFiles([...selectedFiles, file])
     }
   }
@@ -778,7 +701,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     setSelectedFiles([])
   }
 
-  // Função para abrir o modal de mover múltiplos arquivos
   const openMultiMoveModal = () => {
     if (selectedFiles.length === 0) {
       alert("Selecione pelo menos um arquivo para mover")
@@ -790,7 +712,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     setShowMultiMoveModal(true)
   }
 
-  // Função para mover múltiplos arquivos
   const handleMoveMultipleFiles = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -813,18 +734,15 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     })
 
     try {
-      // Mover cada arquivo selecionado
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i]
 
-        // Atualizar progresso
         setMultiMoveProgress({
           current: i,
           total: selectedFiles.length,
           currentFile: file.ObjectName,
         })
 
-        // Construir o caminho de destino
         const fileName = file.ObjectName
         const newPath = `${multiMoveDestination}${multiMoveDestination.endsWith("/") ? "" : "/"}${fileName}`
 
@@ -849,14 +767,12 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
         }
       }
 
-      // Atualizar a lista após mover todos os arquivos
       setFiles((prevFiles) => prevFiles.filter((file) => !selectedFiles.some((f) => f.Path === file.Path)))
 
       setShowMultiMoveModal(false)
       setSelectedFiles([])
       setIsSelectionMode(false)
 
-      // Atualizar a lista de arquivos
       await fetchFiles(getCurrentPathString())
 
       alert(`${selectedFiles.length} arquivo(s) movido(s) com sucesso!`)
@@ -869,7 +785,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     }
   }
 
-  // Função para excluir múltiplos arquivos
   const handleDeleteMultipleFiles = async () => {
     if (selectedFiles.length === 0) {
       alert("Selecione pelo menos um arquivo para excluir")
@@ -883,17 +798,14 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     }
 
     try {
-      // Excluir cada arquivo selecionado
       for (const file of selectedFiles) {
         console.log(`Excluindo arquivo: ${file.Path}`)
 
-        // Extrair apenas o nome do arquivo e pasta para a API
         let cleanPath = file.Path
 
-        // Se o caminho começa com http, extrair apenas a parte após o domínio
         if (file.Path.startsWith("http")) {
           const url = new URL(file.Path)
-          cleanPath = url.pathname.replace(/^\//, "") // Remover a barra inicial
+          cleanPath = url.pathname.replace(/^\//, "")
         }
 
         const response = await fetch(`/api/files/${encodeURIComponent(cleanPath)}`, {
@@ -908,7 +820,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
         }
       }
 
-      // Atualizar a lista após excluir todos os arquivos
       setFiles((prevFiles) => prevFiles.filter((file) => !selectedFiles.some((f) => f.Path === file.Path)))
 
       setSelectedFiles([])
@@ -923,8 +834,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
   return (
     <>
-      {showRecoveryTool && <FolderRecovery onFolderFound={handleFolderFound} />}
-
       <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <h2 className="text-xl font-bold text-[#4072b0] flex items-center">
@@ -969,7 +878,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
           </div>
         </div>
 
-        {/* Navegação e breadcrumb */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="flex items-center space-x-2 mr-4">
             <button
@@ -1000,9 +908,7 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
           {renderBreadcrumb()}
         </div>
 
-        {/* Barra de ações */}
         <div className="flex flex-wrap gap-2 mb-6">
-          {/* Botão de modo de seleção */}
           <button
             onClick={toggleSelectionMode}
             className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all ${
@@ -1024,7 +930,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
             )}
           </button>
 
-          {/* Botões de ação para seleção múltipla */}
           {isSelectionMode && (
             <>
               <button
@@ -1065,7 +970,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
             </>
           )}
 
-          {/* Botões padrão quando não está no modo de seleção */}
           {!isSelectionMode && (
             <>
               <button
@@ -1118,19 +1022,10 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
                 )}
                 Atualizar
               </button>
-
-              <button
-                onClick={() => setShowRecoveryTool(!showRecoveryTool)}
-                className="flex items-center text-sm px-3 py-1.5 rounded-md transition-all bg-amber-500 text-white hover:bg-amber-600"
-              >
-                <LifeBuoy className="h-4 w-4 mr-1.5" />
-                {showRecoveryTool ? "Ocultar Recuperação" : "Recuperar Pasta Perdida"}
-              </button>
             </>
           )}
         </div>
 
-        {/* Contador de seleção */}
         {isSelectionMode && selectedFiles.length > 0 && (
           <div className="bg-blue-50 p-3 rounded-lg mb-4 border border-blue-100 flex items-center">
             <CheckSquare className="h-5 w-5 mr-2 text-[#4b7bb5]" />
@@ -1287,7 +1182,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
                       )}
 
                       <td className="py-3 px-4">
-                        {/* Célula que contém o nome do arquivo */}
                         <div className="flex items-center">
                           <div className="p-1.5 bg-gray-100 rounded-md mr-3">
                             {file.IsDirectory ? (
@@ -1317,7 +1211,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
                       <td className="py-3 px-4 text-gray-500">{formatDate(file.LastChanged)}</td>
 
                       <td className="py-3 px-4 text-right">
-                        {/* Célula de ações */}
                         <div className="flex justify-end space-x-2">
                           {file.IsDirectory && (
                             <button
@@ -1386,7 +1279,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
           </div>
         )}
 
-        {/* Modal de renomeação */}
         {showRenameModal && fileToRename && (
           <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
             <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
@@ -1455,7 +1347,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
           </div>
         )}
 
-        {/* Modal de criação de pasta */}
         {showCreateFolderModal && (
           <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
             <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
@@ -1521,7 +1412,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
           </div>
         )}
 
-        {/* Modal de mover arquivo */}
         {showMoveFileModal && fileToMove && (
           <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
             <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
@@ -1593,7 +1483,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
           </div>
         )}
 
-        {/* Modal de mover múltiplos arquivos */}
         {showMultiMoveModal && (
           <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
             <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
@@ -1650,7 +1539,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
                     {multiMoveError && <p className="mt-2 text-sm text-red-600">{multiMoveError}</p>}
                   </div>
 
-                  {/* Barra de progresso */}
                   {multiMoveProgress && (
                     <div className="mt-4">
                       <div className="flex justify-between text-sm text-gray-600 mb-1">
@@ -1698,7 +1586,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
           </div>
         )}
 
-        {/* Modal de preview de imagem */}
         {previewFile && isImage(previewFile.ObjectName) && (
           <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
             <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
@@ -1738,7 +1625,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
             </div>
           </div>
         )}
-        {/* Modal de tarefas de pasta */}
         {showFolderTasks && selectedFolderForTasks && (
           <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
             <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">

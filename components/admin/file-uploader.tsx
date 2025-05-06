@@ -281,11 +281,11 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
   const successCount = success.length
 
   return (
-    <div className="bg-white rounded-xl shadow-md p-6">
-      <h2 className="text-xl font-bold text-[#4072b0] mb-4">Upload de Arquivos</h2>
+    <div className="bg-white rounded-lg p-4">
+      <h2 className="text-lg font-semibold text-[#4072b0] mb-3">Upload de Arquivos</h2>
 
       <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center ${
+        className={`border-2 border-dashed rounded-lg p-5 text-center ${
           files.length > 0 ? "border-green-400 bg-green-50" : "border-gray-300 hover:border-[#4b7bb5]"
         }`}
         onDragOver={handleDragOver}
@@ -304,7 +304,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
         {files.length === 0 ? (
           <label htmlFor="file-upload" className="cursor-pointer">
             <div className="flex flex-col items-center">
-              <Upload className="h-12 w-12 text-gray-400 mb-2" />
+              <Upload className="h-8 w-8 text-gray-400 mb-2" />
               <p className="text-gray-600 mb-1">Arraste e solte arquivos aqui ou clique para selecionar</p>
               <p className="text-xs text-gray-500">PDF, DOC, DOCX, TXT, JPG, PNG, GIF, WEBP (máx. 30MB por arquivo)</p>
             </div>
@@ -391,7 +391,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
         )}
       </div>
 
-      <div className="flex space-x-2 mt-4">
+      <div className="flex space-x-2 mt-3">
         {files.length > 0 && (
           <button
             onClick={handleUpload}
@@ -471,7 +471,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
       )}
 
       {errorCount > 0 && (
-        <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md flex items-start">
+        <div className="mt-3 p-2 bg-red-50 text-red-700 rounded-md flex items-start">
           <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
           <div>
             <p className="font-medium">
