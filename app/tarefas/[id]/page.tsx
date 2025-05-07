@@ -18,10 +18,12 @@ const SAMPLE_TASKS = [
     projectId: "dr-joel",
     projectName: "Dr. Joel",
     dueDate: "2023-10-25",
+    creator: "João Silva",
     assignee: "Ana Silva",
     priority: "medium",
     comments: 3,
     attachments: 2,
+    color: "#4b7bb5",
   },
   {
     id: 2,
@@ -31,10 +33,12 @@ const SAMPLE_TASKS = [
     projectId: "vanessa-dentista",
     projectName: "Vanessa Dentista",
     dueDate: "2023-10-20",
+    creator: "Maria Oliveira",
     assignee: "Carlos Mendes",
     priority: "high",
     comments: 5,
     attachments: 1,
+    color: "#e11d48",
   },
   // ... outros dados de exemplo
 ]
@@ -83,6 +87,7 @@ export default function TaskDetailPage() {
   const [editedProjectId, setEditedProjectId] = useState("")
   const [editedDueDate, setEditedDueDate] = useState("")
   const [editedAssignee, setEditedAssignee] = useState("")
+  const [editedCreator, setEditedCreator] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
 
@@ -97,13 +102,18 @@ export default function TaskDetailPage() {
         const foundTask = SAMPLE_TASKS.find((t) => t.id === Number(params.id))
 
         if (foundTask) {
+          // Adicionar cor padrão se não existir
+          if (!foundTask.color) {
+            foundTask.color = "#4b7bb5"
+          }
           setTask(foundTask)
           setEditedTitle(foundTask.title)
           setEditedDescription(foundTask.description || "")
           setEditedStatus(foundTask.status)
           setEditedProjectId(foundTask.projectId)
           setEditedDueDate(foundTask.dueDate)
-          setEditedAssignee(foundTask.assignee)
+          setEditedAssignee(foundTask.assignee || "")
+          setEditedCreator(foundTask.creator || "")
         } else {
           // Redirecionar se a tarefa não for encontrada
           router.push("/tarefas")
@@ -139,6 +149,7 @@ export default function TaskDetailPage() {
         projectName: PROJECTS.find((p) => p.id === editedProjectId)?.name || "Projeto",
         dueDate: editedDueDate,
         assignee: editedAssignee,
+        creator: editedCreator,
         updatedAt: new Date().toISOString(),
       }
 
@@ -207,6 +218,12 @@ export default function TaskDetailPage() {
                   className="w-full text-xl font-bold text-gray-800 border-b border-[#4b7bb5] focus:outline-none py-1"
                   placeholder="Título da tarefa"
                 />
+              )}
+              {!isEditing && (
+                <div className="mt-1 flex items-center">
+                  <div className="w-4 h-4 rounded-full mr-2" style={{ backgroundColor: task.color || "#4b7bb5" }}></div>
+                  <span className="text-sm text-gray-500">Cor da tarefa</span>
+                </div>
               )}
             </div>
             <div className="flex items-center space-x-2">
@@ -334,9 +351,19 @@ export default function TaskDetailPage() {
                       <div className="text-sm text-gray-500 mb-1">Responsável</div>
                       <div className="flex items-center">
                         <div className="w-6 h-6 rounded-full bg-[#4b7bb5] flex items-center justify-center text-white text-xs mr-2">
-                          {task.assignee.charAt(0)}
+                          {task.assignee ? task.assignee.charAt(0) : "?"}
                         </div>
-                        <span className="text-gray-800">{task.assignee}</span>
+                        <span className="text-gray-800">{task.assignee || "Não atribuído"}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-sm text-gray-500 mb-1">Criado por</div>
+                      <div className="flex items-center">
+                        <div className="w-6 h-6 rounded-full bg-[#6b91c1] flex items-center justify-center text-white text-xs mr-2">
+                          {task.creator ? task.creator.charAt(0) : "?"}
+                        </div>
+                        <span className="text-gray-800">{task.creator || "Não especificado"}</span>
                       </div>
                     </div>
 
@@ -382,6 +409,17 @@ export default function TaskDetailPage() {
                         onChange={(e) => setEditedAssignee(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
                         placeholder="Nome do responsável"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="text-sm text-gray-500 mb-1">Criado por</div>
+                      <input
+                        type="text"
+                        value={editedCreator}
+                        onChange={(e) => setEditedCreator(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
+                        placeholder="Nome do criador"
                       />
                     </div>
 

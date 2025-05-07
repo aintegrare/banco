@@ -105,7 +105,12 @@ export function TaskCard({ task, onEdit, onDelete, onStatusChange, showProject =
 
   return (
     <>
-      <Card className="w-full shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer">
+      <Card
+        className="w-full shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer"
+        style={{
+          borderLeft: `4px solid ${task.color || "#4b7bb5"}`,
+        }}
+      >
         <CardContent className="p-4">
           <div className="flex justify-between items-start mb-3">
             <Link
@@ -175,11 +180,20 @@ export function TaskCard({ task, onEdit, onDelete, onStatusChange, showProject =
                 </div>
               )}
 
-              <Avatar className="h-6 w-6">
-                <AvatarFallback className="bg-[#4b7bb5] text-white">
-                  {task.assignee ? task.assignee.charAt(0) : "U"}
-                </AvatarFallback>
-              </Avatar>
+              <div className="flex items-center">
+                {task.creator && (
+                  <div className="text-xs text-gray-500 mr-2" title={`Criado por: ${task.creator}`}>
+                    De: {task.creator.split(" ")[0]}
+                  </div>
+                )}
+                {task.assignee && (
+                  <div className="flex items-center" title={`Responsável: ${task.assignee}`}>
+                    <Avatar className="h-6 w-6">
+                      <AvatarFallback className="bg-[#4b7bb5] text-white">{task.assignee.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>

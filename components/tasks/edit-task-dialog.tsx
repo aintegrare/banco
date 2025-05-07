@@ -28,6 +28,18 @@ interface EditTaskDialogProps {
   onSave?: (task: any) => void
 }
 
+const COLOR_OPTIONS = [
+  { id: "#4b7bb5", name: "Azul (Padrão)" },
+  { id: "#e11d48", name: "Vermelho" },
+  { id: "#22c55e", name: "Verde" },
+  { id: "#f97316", name: "Laranja" },
+  { id: "#8b5cf6", name: "Roxo" },
+  { id: "#f59e0b", name: "Amarelo" },
+  { id: "#3d649e", name: "Azul Escuro" },
+  { id: "#6b91c1", name: "Azul Claro" },
+  { id: "#64748b", name: "Cinza" },
+]
+
 export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDialogProps) {
   const [task, setTask] = useState<any>(null)
   const [date, setDate] = useState<Date | undefined>(undefined)
@@ -52,7 +64,14 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
           throw new Error("Falha ao buscar dados da tarefa")
         }
         const taskData = await taskResponse.json()
-        setTask(taskData)
+
+        if (taskData.color) {
+          // Se a tarefa já tem uma cor
+          setTask(taskData)
+        } else {
+          // Se a tarefa não tem cor, adicione a cor padrão
+          setTask({ ...taskData, color: "#4b7bb5" })
+        }
 
         // Definir data se houver
         if (taskData.due_date) {
@@ -97,7 +116,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
     setDate(date)
     if (date) {
       const formattedDate = format(date, "yyyy-MM-dd")
-      setTask((prev: any) => ({ ...prev, due_date: formattedDate }))
+      setTask((prev: any) => ({ ...prev, [name]: formattedDate }))
     } else {
       setTask((prev: any) => ({ ...prev, due_date: null }))
     }
@@ -285,16 +304,53 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
               </div>
             </div>
             <div className="space-y-2">
-              <label htmlFor="assignee" className="text-sm font-medium">
-                Responsável
-              </label>
-              <Input
-                id="assignee"
-                name="assignee"
-                value={task.assignee || ""}
-                onChange={handleChange}
-                className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
-              />
+              <label className="text-sm font-medium">Cor da Tarefa</label>
+              <div className="grid grid-cols-5 gap-2">
+                {COLOR_OPTIONS.map((color) => (
+                  <button
+                    key={color.id}
+                    type="button"
+                    title={color.name}
+                    onClick={() => handleSelectChange("color", color.id)}
+                    className={`w-8 h-8 rounded-full border-2 ${
+                      task.color === color.id ? "border-gray-900" : "border-transparent"
+                    } hover:border-gray-400 transition-colors`}
+                    style={{ backgroundColor: color.id }}
+                  />
+                ))}
+              </div>
+              <div className="text-xs text-gray-500">
+                Cor selecionada:{" "}
+                <span className="font-medium">{COLOR_OPTIONS.find((c) => c.id === task.color)?.name || "Padrão"}</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label htmlFor="creator" className="text-sm font-medium">
+                  Criador da Tarefa
+                </label>
+                <Input
+                  id="creator"
+                  name="creator"
+                  value={task.creator || ""}
+                  onChange={handleChange}
+                  className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
+                  placeholder="Nome do criador"
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="assignee" className="text-sm font-medium">
+                  Responsável
+                </label>
+                <Input
+                  id="assignee"
+                  name="assignee"
+                  value={task.assignee || ""}
+                  onChange={handleChange}
+                  className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
+                  placeholder="Nome do responsável"
+                />
+              </div>
             </div>
 
             {error && <p className="text-red-600 text-sm">{error}</p>}

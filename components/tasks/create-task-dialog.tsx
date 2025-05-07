@@ -20,6 +20,18 @@ const STATUSES = [
   { id: "done", name: "Concluído" },
 ]
 
+const COLOR_OPTIONS = [
+  { id: "#4b7bb5", name: "Azul (Padrão)" },
+  { id: "#e11d48", name: "Vermelho" },
+  { id: "#22c55e", name: "Verde" },
+  { id: "#f97316", name: "Laranja" },
+  { id: "#8b5cf6", name: "Roxo" },
+  { id: "#f59e0b", name: "Amarelo" },
+  { id: "#3d649e", name: "Azul Escuro" },
+  { id: "#6b91c1", name: "Azul Claro" },
+  { id: "#64748b", name: "Cinza" },
+]
+
 interface CreateTaskDialogProps {
   isOpen?: boolean
   onClose: () => void
@@ -38,6 +50,9 @@ export function CreateTaskDialog({
   const [projectId, setProjectId] = useState<string | number | null>(initialProject)
   const [status, setStatus] = useState("todo")
   const [dueDate, setDueDate] = useState("")
+  const [taskColor, setTaskColor] = useState("#4b7bb5")
+  const [creator, setCreator] = useState("")
+  const [assignee, setAssignee] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
@@ -106,7 +121,9 @@ export function CreateTaskDialog({
           status: status,
           project_id: projectId,
           due_date: dueDate || null,
-          // Removida a propriedade assignee_id
+          color: taskColor,
+          creator: creator || null,
+          assignee: assignee || null,
         }),
       })
 
@@ -238,6 +255,59 @@ export function CreateTaskDialog({
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent pl-10"
               />
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <label htmlFor="task-color" className="block text-sm font-medium text-gray-700 mb-1">
+              Cor da Tarefa
+            </label>
+            <div className="grid grid-cols-5 gap-2">
+              {COLOR_OPTIONS.map((color) => (
+                <button
+                  key={color.id}
+                  type="button"
+                  title={color.name}
+                  onClick={() => setTaskColor(color.id)}
+                  className={`w-8 h-8 rounded-full border-2 ${
+                    taskColor === color.id ? "border-gray-900" : "border-transparent"
+                  } hover:border-gray-400 transition-colors`}
+                  style={{ backgroundColor: color.id }}
+                />
+              ))}
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              Cor selecionada:{" "}
+              <span className="font-medium">{COLOR_OPTIONS.find((c) => c.id === taskColor)?.name}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label htmlFor="task-creator" className="block text-sm font-medium text-gray-700 mb-1">
+                Criador da Tarefa
+              </label>
+              <input
+                type="text"
+                id="task-creator"
+                value={creator}
+                onChange={(e) => setCreator(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
+                placeholder="Nome do criador"
+              />
+            </div>
+            <div>
+              <label htmlFor="task-assignee" className="block text-sm font-medium text-gray-700 mb-1">
+                Responsável
+              </label>
+              <input
+                type="text"
+                id="task-assignee"
+                value={assignee}
+                onChange={(e) => setAssignee(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
+                placeholder="Nome do responsável"
+              />
             </div>
           </div>
 

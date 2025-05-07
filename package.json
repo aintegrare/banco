@@ -62,9 +62,9 @@
     "tesseract.js": "latest",
     "pdfjs-dist": "latest",
     "framer-motion": "latest",
-    "react-beautiful-dnd": "latest",
     "@supabase/supabase-js": "latest",
-    "pdf-parse": "latest"
+    "pdf-parse": "latest",
+    "react-beautiful-dnd": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

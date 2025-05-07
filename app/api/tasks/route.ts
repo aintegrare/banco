@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { title, description, status, priority, project_id, due_date } = body
+    const { title, description, status, priority, project_id, due_date, color, creator, assignee } = body
 
     if (!title || !project_id) {
       return NextResponse.json({ error: "Título e ID do projeto são obrigatórios" }, { status: 400 })
@@ -57,7 +57,6 @@ export async function POST(request: Request) {
     }
 
     // Criar objeto com os dados da tarefa
-    // Removida a propriedade assignee_id que estava causando o erro
     const taskData = {
       title,
       description: description || null,
@@ -65,6 +64,9 @@ export async function POST(request: Request) {
       priority: priority || "medium",
       project_id,
       due_date: due_date || null,
+      color: color || "#4b7bb5",
+      creator: creator || null,
+      assignee: assignee || null,
       created_at: new Date().toISOString(),
     }
 
