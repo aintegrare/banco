@@ -1,13 +1,13 @@
 "use client"
 
-import { AlertTriangle, Folder, FileIcon } from "lucide-react"
+import { AlertTriangle } from "lucide-react"
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 
@@ -40,35 +40,31 @@ export function DeleteConfirmationDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
-          <div className="flex items-center p-4 bg-red-50 rounded-md border border-red-100">
-            <div className="mr-3 bg-white p-2 rounded-full">
-              {isFolder ? (
-                <Folder className="h-6 w-6 text-[#4b7bb5]" />
-              ) : (
-                <FileIcon className="h-6 w-6 text-gray-500" />
-              )}
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-900">{itemName}</p>
-              <p className="text-sm text-gray-500">{isFolder ? "Pasta e todo seu conteúdo" : "Arquivo"}</p>
-            </div>
-          </div>
+          <p className="text-sm text-gray-700">
+            Você tem certeza que deseja excluir{" "}
+            <span className="font-medium">
+              {isFolder ? "a pasta" : "o arquivo"} "{itemName}"
+            </span>
+            ?
+          </p>
           {isFolder && (
-            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-100 rounded-md text-sm text-yellow-800">
-              <p className="font-medium">Atenção!</p>
-              <p>
-                Você está prestes a excluir uma pasta. Esta ação excluirá permanentemente todos os arquivos e subpastas
-                contidos nela.
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+              <p className="text-sm text-amber-800 flex items-start">
+                <AlertTriangle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                <span>
+                  <strong>Atenção:</strong> Excluir uma pasta irá remover permanentemente todos os arquivos e subpastas
+                  contidos nela.
+                </span>
               </p>
             </div>
           )}
         </div>
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button variant="destructive" onClick={onConfirm} className="bg-red-600 hover:bg-red-700">
-            {isFolder ? "Excluir pasta e todo conteúdo" : "Excluir arquivo"}
+          <Button variant="destructive" onClick={onConfirm}>
+            {isFolder ? "Excluir pasta" : "Excluir arquivo"}
           </Button>
         </DialogFooter>
       </DialogContent>

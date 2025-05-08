@@ -12,6 +12,7 @@ import {
   FileIcon,
   MoreVertical,
   Star,
+  StarOff,
   Download,
   Trash2,
   Share2,
@@ -20,12 +21,15 @@ import {
   X,
   ExternalLink,
   Loader2,
+  Check,
 } from "lucide-react"
 import { useState } from "react"
 import { RenameWarningDialog } from "./rename-warning-dialog"
 import { ShareLinkDialog } from "./share-link-dialog"
 import { ToastNotification } from "./toast-notification"
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
+import { Button } from "@/components/ui/button"
+import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 
 interface FileItem {
   id: string
@@ -37,6 +41,7 @@ interface FileItem {
   url?: string
   fileType?: string
   project?: string
+  isFavorite?: boolean
 }
 
 interface FileCardProps {
@@ -44,9 +49,22 @@ interface FileCardProps {
   onFolderClick: () => void
   onDelete: () => void
   onRename?: (oldPath: string, newName: string) => void
+  onShare?: () => void
+  onToggleFavorite?: () => void
+  isSelected?: boolean
+  onToggleSelect?: () => void
 }
 
-export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardProps) {
+export function FileCard({
+  file,
+  onFolderClick,
+  onDelete,
+  onRename,
+  onShare,
+  onToggleFavorite,
+  isSelected,
+  onToggleSelect,
+}: FileCardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
@@ -61,7 +79,6 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
     message: "",
     type: "success",
   })
-  // Adicionar estado para o diálogo de confirmação de exclusão
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
 
   // Função para formatar bytes em unidades legíveis
@@ -99,6 +116,11 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
   }
 
   const handleClick = () => {
+    if (onToggleSelect) {
+      onToggleSelect()
+      return
+    }
+
     if (file.type === "folder") {
       onFolderClick()
     } else {
@@ -125,42 +147,14 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
   }
 
   // Função para compartilhar arquivo ou pasta
-  const handleShare = async (e: React.MouseEvent) => {
+  const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation()
     setShowMenu(false)
 
-    try {
-      // Usar a API para gerar um link de compartilhamento
-      const response = await fetch("/api/files/share", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ filePath: file.path }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Erro ao gerar link de compartilhamento")
-      }
-
-      const data = await response.json()
-
-      // Se for um arquivo, já temos a URL direta
-      if (file.type === "file" && file.url) {
-        setShowShareDialog(true)
-      } else {
-        // Para pastas, usar a URL pública gerada pela API
-        // Converter para URL de visualização pública
-        const publicUrl = `${window.location.origin}/shared/${encodeURIComponent(file.path)}`
-        copyToClipboard(publicUrl)
-      }
-    } catch (error) {
-      console.error("Erro ao compartilhar:", error)
-      setToast({
-        visible: true,
-        message: "Erro ao gerar link de compartilhamento",
-        type: "error",
-      })
+    if (onShare) {
+      onShare()
+    } else {
+      setShowShareDialog(true)
     }
   }
 
@@ -262,14 +256,46 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
     onDelete()
   }
 
+  // Função para alternar favorito
+  const handleToggleFavorite = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowMenu(false)
+
+    if (onToggleFavorite) {
+      onToggleFavorite()
+    }
+  }
+
   return (
     <>
       <div
-        className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-all cursor-pointer relative group"
+        className={`bg-white rounded-lg border ${
+          isSelected ? "border-[#4b7bb5] bg-blue-50" : "border-gray-200"
+        } overflow-hidden hover:shadow-md transition-all cursor-pointer relative group`}
         onClick={handleClick}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
+        {/* Indicador de seleção */}
+        {onToggleSelect && (
+          <div className="absolute top-2 left-2 z-10">
+            <div
+              className={`w-5 h-5 rounded-full border ${
+                isSelected ? "bg-[#4b7bb5] border-[#4b7bb5] text-white" : "bg-white border-gray-300"
+              } flex items-center justify-center`}
+            >
+              {isSelected && <Check className="h-3 w-3" />}
+            </div>
+          </div>
+        )}
+
+        {/* Indicador de favorito */}
+        {file.isFavorite && (
+          <div className="absolute top-2 right-2 z-10">
+            <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+          </div>
+        )}
+
         <div className="p-4 flex flex-col items-center">
           {/* Mostrar thumbnail para imagens */}
           {isImage() && file.url ? (
@@ -303,13 +329,10 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
           <p className="text-xs text-gray-500 mt-1">
             {file.type === "folder" ? "Pasta" : file.size ? formatBytes(file.size) : ""}
           </p>
-          {file.project && (
-            <span className="mt-2 px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">{file.project}</span>
-          )}
         </div>
 
         {/* Overlay de ações para hover */}
-        {isHovered && (
+        {isHovered && !onToggleSelect && (
           <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
             {file.type === "file" && (
               <>
@@ -337,38 +360,56 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
                 </a>
                 {/* Botão de compartilhamento */}
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setShowShareDialog(true)
-                  }}
+                  onClick={handleShare}
                   className="p-2 bg-white rounded-full text-gray-700 hover:text-purple-600 transition-colors"
                   title="Compartilhar"
                 >
                   <Share2 size={18} />
                 </button>
+                {/* Botão de favorito */}
+                <button
+                  onClick={handleToggleFavorite}
+                  className="p-2 bg-white rounded-full text-gray-700 hover:text-amber-500 transition-colors"
+                  title={file.isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                >
+                  {file.isFavorite ? <StarOff size={18} /> : <Star size={18} />}
+                </button>
               </>
             )}
-            {/* Remover o botão de exclusão do overlay para evitar exclusões acidentais */}
           </div>
         )}
 
         {/* Menu button */}
-        <button
-          className="absolute top-2 right-2 p-1.5 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity bg-white shadow-sm"
-          onClick={toggleMenu}
-        >
-          <MoreVertical size={16} />
-        </button>
+        {!onToggleSelect && (
+          <button
+            className="absolute bottom-2 right-2 p-1.5 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity bg-white shadow-sm"
+            onClick={toggleMenu}
+          >
+            <MoreVertical size={16} />
+          </button>
+        )}
 
         {/* Dropdown menu */}
         {showMenu && (
           <div
-            className="absolute top-10 right-2 bg-white rounded-md shadow-lg z-10 border border-gray-200 py-1 w-40 animate-fadeIn"
+            className="absolute bottom-10 right-2 bg-white rounded-md shadow-lg z-10 border border-gray-200 py-1 w-40 animate-fadeIn"
             onClick={(e) => e.stopPropagation()}
           >
-            <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center">
-              <Star size={16} className="mr-2 text-amber-400" />
-              <span>Favoritar</span>
+            <button
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+              onClick={handleToggleFavorite}
+            >
+              {file.isFavorite ? (
+                <>
+                  <StarOff size={16} className="mr-2 text-amber-500" />
+                  <span>Remover favorito</span>
+                </>
+              ) : (
+                <>
+                  <Star size={16} className="mr-2 text-amber-500" />
+                  <span>Favoritar</span>
+                </>
+              )}
             </button>
             {file.type === "file" && (
               <>
@@ -428,7 +469,7 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
               <Pencil size={16} className="mr-2 text-orange-500" />
               <span>Renomear</span>
             </button>
-            <div className="border-t border-gray-100 my-1"></div>
+            <DropdownMenuSeparator />
             {/* Modificar o botão de exclusão para mostrar o diálogo de confirmação */}
             <button
               className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
@@ -473,13 +514,13 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
                 <span className="font-medium">{file.size ? formatBytes(file.size) : ""}</span> • {file.modified}
               </div>
               <div className="flex gap-2">
-                <button
-                  onClick={() => setShowShareDialog(true)}
+                <Button
+                  onClick={handleShare}
                   className="flex items-center px-3 py-1.5 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] transition-colors"
                 >
                   <Share2 className="h-4 w-4 mr-1.5" />
                   <span>Compartilhar</span>
-                </button>
+                </Button>
                 <a
                   href={file.url}
                   download

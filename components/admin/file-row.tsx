@@ -12,15 +12,25 @@ import {
   FileIcon,
   MoreVertical,
   Star,
+  StarOff,
   Download,
   Trash2,
   Share2,
   Pencil,
   Eye,
+  ExternalLink,
 } from "lucide-react"
 import { useState } from "react"
 import { ShareLinkDialog } from "./share-link-dialog"
 import { ToastNotification } from "./toast-notification"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
 
 interface FileItem {
   id: string
@@ -32,19 +42,32 @@ interface FileItem {
   url?: string
   fileType?: string
   project?: string
+  isFavorite?: boolean
 }
 
 interface FileRowProps {
   file: FileItem
   onFolderClick: () => void
   onDelete: () => void
+  onShare?: () => void
+  onToggleFavorite?: () => void
+  isSelected?: boolean
+  onToggleSelect?: () => void
+  showCheckbox?: boolean
 }
 
-export function FileRow({ file, onFolderClick, onDelete }: FileRowProps) {
+export function FileRow({
+  file,
+  onFolderClick,
+  onDelete,
+  onShare,
+  onToggleFavorite,
+  isSelected,
+  onToggleSelect,
+  showCheckbox,
+}: FileRowProps) {
   const [showMenu, setShowMenu] = useState(false)
-  // Adicionar estado para o diálogo de compartilhamento
   const [showShareDialog, setShowShareDialog] = useState(false)
-  // Adicionar estado para notificações
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: "success" | "error" }>({
     visible: false,
     message: "",
@@ -96,6 +119,11 @@ export function FileRow({ file, onFolderClick, onDelete }: FileRowProps) {
   }
 
   const handleClick = () => {
+    if (onToggleSelect) {
+      onToggleSelect()
+      return
+    }
+
     if (file.type === "folder") {
       onFolderClick()
     } else {
@@ -116,12 +144,10 @@ export function FileRow({ file, onFolderClick, onDelete }: FileRowProps) {
     e.stopPropagation()
     setShowMenu(false)
 
-    // Se for um arquivo, mostrar o diálogo de compartilhamento
-    if (file.url) {
-      setShowShareDialog(true)
+    if (onShare) {
+      onShare()
     } else {
-      // Se for uma pasta, copiar o link para a área de transferência
-      copyToClipboard(window.location.origin + "/admin/arquivos?path=" + encodeURIComponent(file.path))
+      setShowShareDialog(true)
     }
   }
 
@@ -149,12 +175,36 @@ export function FileRow({ file, onFolderClick, onDelete }: FileRowProps) {
     }
   }
 
+  // Função para alternar favorito
+  const handleToggleFavorite = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowMenu(false)
+
+    if (onToggleFavorite) {
+      onToggleFavorite()
+    }
+  }
+
   return (
     <>
-      <tr className="hover:bg-gray-50 cursor-pointer" onClick={handleClick}>
+      <tr className={`hover:bg-gray-50 cursor-pointer ${isSelected ? "bg-blue-50" : ""}`} onClick={handleClick}>
+        {showCheckbox && (
+          <td className="px-3 py-4 whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={onToggleSelect}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded border-gray-300 text-[#4b7bb5] focus:ring-[#4b7bb5]"
+            />
+          </td>
+        )}
         <td className="px-6 py-4 whitespace-nowrap">
           <div className="flex items-center">
-            <div className="flex-shrink-0">{getFileIcon()}</div>
+            <div className="flex-shrink-0 relative">
+              {getFileIcon()}
+              {file.isFavorite && <Star className="absolute -top-1 -right-1 h-3 w-3 text-amber-500 fill-amber-500" />}
+            </div>
             <div className="ml-4">
               <div className="text-sm font-medium text-gray-900">{file.name}</div>
             </div>
@@ -169,84 +219,99 @@ export function FileRow({ file, onFolderClick, onDelete }: FileRowProps) {
           </div>
         </td>
         <td className="px-6 py-4 whitespace-nowrap">
-          {file.project ? (
-            <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-              {file.project}
-            </span>
-          ) : (
-            <span className="text-sm text-gray-500">—</span>
-          )}
+          <div className="text-sm text-gray-500">
+            {file.type === "folder" ? "Pasta" : file.fileType?.toUpperCase() || "—"}
+          </div>
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
           {/* Botões de ação rápida */}
           <div className="flex items-center justify-end space-x-1">
             {file.type === "file" && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowShareDialog(true)
-                }}
-                className="p-1.5 text-gray-400 hover:text-purple-500 hover:bg-purple-50 rounded-full transition-colors"
-                title="Compartilhar"
-              >
-                <Share2 size={16} />
-              </button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    window.open(file.url, "_blank")
+                  }}
+                  className="h-8 w-8"
+                >
+                  <ExternalLink size={16} className="text-blue-500" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={handleShare} className="h-8 w-8">
+                  <Share2 size={16} className="text-purple-500" />
+                </Button>
+              </>
             )}
-            <button
-              className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100"
-              onClick={toggleMenu}
-            >
-              <MoreVertical size={16} />
-            </button>
-          </div>
-
-          {/* Dropdown menu */}
-          {showMenu && (
-            <div
-              className="absolute top-10 right-4 bg-white rounded-md shadow-lg z-10 border border-gray-200 py-1 w-40"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
-                <Star size={16} className="mr-2" />
-                <span>Favoritar</span>
-              </button>
-              {file.type === "file" && (
-                <>
-                  <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
-                    <Eye size={16} className="mr-2" />
-                    <span>Visualizar</span>
-                  </button>
-                  <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
-                    <Download size={16} className="mr-2" />
-                    <span>Download</span>
-                  </button>
-                </>
+            <Button variant="ghost" size="icon" onClick={handleToggleFavorite} className="h-8 w-8">
+              {file.isFavorite ? (
+                <StarOff size={16} className="text-amber-500" />
+              ) : (
+                <Star size={16} className="text-amber-500" />
               )}
-              {/* Botão de compartilhamento no menu */}
-              <button
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                onClick={handleShare}
-              >
-                <Share2 size={16} className="mr-2" />
-                <span>Compartilhar</span>
-              </button>
-              <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
-                <Pencil size={16} className="mr-2" />
-                <span>Renomear</span>
-              </button>
-              <button
-                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowMenu(false)
-                  onDelete()
-                }}
-              >
-                <Trash2 size={16} className="mr-2" />
-                <span>Excluir</span>
-              </button>
-            </div>
-          )}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical size={16} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {file.type === "file" && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        window.open(file.url, "_blank")
+                      }}
+                    >
+                      <Eye size={16} className="mr-2" />
+                      <span>Visualizar</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <a href={file.url} download onClick={(e) => e.stopPropagation()}>
+                        <Download size={16} className="mr-2" />
+                        <span>Download</span>
+                      </a>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuItem onClick={handleShare}>
+                  <Share2 size={16} className="mr-2" />
+                  <span>Compartilhar</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleToggleFavorite}>
+                  {file.isFavorite ? (
+                    <>
+                      <StarOff size={16} className="mr-2" />
+                      <span>Remover favorito</span>
+                    </>
+                  ) : (
+                    <>
+                      <Star size={16} className="mr-2" />
+                      <span>Favoritar</span>
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Pencil size={16} className="mr-2" />
+                  <span>Renomear</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete()
+                  }}
+                  className="text-red-600"
+                >
+                  <Trash2 size={16} className="mr-2" />
+                  <span>Excluir</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </td>
       </tr>
 
@@ -255,7 +320,7 @@ export function FileRow({ file, onFolderClick, onDelete }: FileRowProps) {
         <ShareLinkDialog
           isOpen={showShareDialog}
           onClose={() => setShowShareDialog(false)}
-          fileUrl={file.url || window.location.origin + "/admin/arquivos?path=" + encodeURIComponent(file.path)}
+          fileUrl={file.url || `${window.location.origin}/shared/${encodeURIComponent(file.path)}`}
           fileName={file.name}
         />
       )}

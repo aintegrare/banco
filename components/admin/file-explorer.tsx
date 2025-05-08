@@ -2,14 +2,12 @@
 
 import type React from "react"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import {
   Folder,
   FolderOpen,
   ChevronRight,
   Home,
-  Grid3X3,
-  List,
   Search,
   Upload,
   RefreshCw,
@@ -21,6 +19,27 @@ import {
   AlertCircle,
   X,
   FolderPlus,
+  Download,
+  Clock,
+  Star,
+  StarOff,
+  Trash2,
+  FileText,
+  ImageIcon,
+  Film,
+  Music,
+  Archive,
+  FileIcon,
+  MoreVertical,
+  Share2,
+  ExternalLink,
+  HelpCircle,
+  Bookmark,
+  Layers,
+  LayoutGrid,
+  LayoutList,
+  Maximize2,
+  Minimize2,
 } from "lucide-react"
 import { FileCard } from "./file-card"
 import { FileRow } from "./file-row"
@@ -33,8 +52,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuLabel,
+  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu"
 import { FileUploader } from "./file-uploader"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+import { Skeleton } from "@/components/ui/skeleton"
+import { ShareLinkDialog } from "./share-link-dialog"
+import { ToastNotification } from "./toast-notification"
+import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
 
 interface FileItem {
   id: string
@@ -46,6 +76,7 @@ interface FileItem {
   url?: string
   fileType?: string
   project?: string
+  isFavorite?: boolean
 }
 
 export function FileExplorer() {
@@ -54,7 +85,7 @@ export function FileExplorer() {
   const [error, setError] = useState<string | null>(null)
   const [currentPath, setCurrentPath] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState("")
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [viewMode, setViewMode] = useState<"grid" | "list" | "details">("grid")
   const [showUploader, setShowUploader] = useState(false)
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false)
   const [newFolderName, setNewFolderName] = useState("")
@@ -62,6 +93,24 @@ export function FileExplorer() {
   const [sortBy, setSortBy] = useState<"name" | "date" | "size">("name")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [selectedFileType, setSelectedFileType] = useState<string | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<FileItem[]>([])
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<FileItem | null>(null)
+  const [showShareDialog, setShowShareDialog] = useState(false)
+  const [itemToShare, setItemToShare] = useState<FileItem | null>(null)
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: "success" | "error" }>({
+    visible: false,
+    message: "",
+    type: "success",
+  })
+  const [favorites, setFavorites] = useState<string[]>([])
+  const [activeTab, setActiveTab] = useState<"all" | "recent" | "favorites" | "shared">("all")
+  const [recentFiles, setRecentFiles] = useState<FileItem[]>([])
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
+  const [storageUsage, setStorageUsage] = useState({ used: 0, total: 1024 * 1024 * 1024 * 10 }) // 10GB default
+  const fileExplorerRef = useRef<HTMLDivElement>(null)
 
   // Função para buscar arquivos e pastas
   const fetchFiles = useCallback(async () => {
@@ -89,55 +138,88 @@ export function FileExplorer() {
         url: file.PublicUrl,
         fileType: file.IsDirectory ? undefined : file.ObjectName.split(".").pop(),
         project: null, // Adicionar projeto se necessário
+        isFavorite: favorites.includes(file.Path),
       }))
 
       setFiles(fileItems)
+
+      // Atualizar arquivos recentes
+      const newRecentFiles = fileItems
+        .filter((file) => file.type === "file")
+        .sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime())
+        .slice(0, 10)
+
+      setRecentFiles(newRecentFiles)
+
+      // Simular cálculo de uso de armazenamento
+      const totalSize = fileItems.reduce((acc, file) => acc + (file.size || 0), 0)
+      setStorageUsage((prev) => ({ ...prev, used: totalSize }))
     } catch (err) {
       console.error("Erro ao buscar arquivos:", err)
       setError(err instanceof Error ? err.message : "Erro desconhecido ao buscar arquivos")
     } finally {
       setIsLoading(false)
     }
-  }, [currentPath])
+  }, [currentPath, favorites])
 
   // Carregar arquivos quando o componente montar ou o caminho mudar
   useEffect(() => {
     fetchFiles()
   }, [fetchFiles])
 
+  // Carregar favoritos do localStorage
+  useEffect(() => {
+    const savedFavorites = localStorage.getItem("fileFavorites")
+    if (savedFavorites) {
+      setFavorites(JSON.parse(savedFavorites))
+    }
+  }, [])
+
   // Navegar para uma pasta
   const navigateToFolder = (folderPath: string) => {
     const pathSegments = folderPath.split("/").filter((segment) => segment.length > 0)
     setCurrentPath(pathSegments)
+    setSelectedFiles([])
+    setIsSelectionMode(false)
   }
 
   // Navegar para a pasta pai
   const navigateUp = () => {
     if (currentPath.length > 0) {
       setCurrentPath(currentPath.slice(0, -1))
+      setSelectedFiles([])
+      setIsSelectionMode(false)
     }
   }
 
   // Navegar para a pasta raiz
   const navigateHome = () => {
     setCurrentPath([])
+    setSelectedFiles([])
+    setIsSelectionMode(false)
   }
 
   // Navegar para um segmento específico do caminho
   const navigateToPathSegment = (index: number) => {
     setCurrentPath(currentPath.slice(0, index + 1))
+    setSelectedFiles([])
+    setIsSelectionMode(false)
   }
 
   // Excluir um arquivo ou pasta
-  const handleDelete = async (path: string) => {
-    if (!confirm("Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.")) {
-      return
-    }
+  const handleDelete = (file: FileItem) => {
+    setItemToDelete(file)
+    setShowDeleteConfirmation(true)
+  }
+
+  // Confirmar exclusão
+  const confirmDelete = async () => {
+    if (!itemToDelete) return
 
     try {
-      let cleanPath = path
-      if (path.startsWith("http")) {
-        const url = new URL(path)
+      let cleanPath = itemToDelete.path
+      if (cleanPath.startsWith("http")) {
+        const url = new URL(cleanPath)
         cleanPath = url.pathname.replace(/^\//, "")
       }
 
@@ -151,10 +233,29 @@ export function FileExplorer() {
       }
 
       // Remover o arquivo da lista
-      setFiles((prev) => prev.filter((file) => file.path !== path))
+      setFiles((prev) => prev.filter((file) => file.path !== itemToDelete.path))
+
+      // Mostrar toast de sucesso
+      setToast({
+        visible: true,
+        message: `${itemToDelete.type === "folder" ? "Pasta" : "Arquivo"} excluído com sucesso!`,
+        type: "success",
+      })
+
+      // Esconder o toast após 3 segundos
+      setTimeout(() => {
+        setToast((prev) => ({ ...prev, visible: false }))
+      }, 3000)
     } catch (err) {
       console.error("Erro ao excluir:", err)
-      alert(err instanceof Error ? err.message : "Erro ao excluir")
+      setToast({
+        visible: true,
+        message: err instanceof Error ? err.message : "Erro ao excluir",
+        type: "error",
+      })
+    } finally {
+      setShowDeleteConfirmation(false)
+      setItemToDelete(null)
     }
   }
 
@@ -184,9 +285,25 @@ export function FileExplorer() {
       setTimeout(() => {
         fetchFiles()
       }, 500)
+
+      // Mostrar toast de sucesso
+      setToast({
+        visible: true,
+        message: "Item renomeado com sucesso!",
+        type: "success",
+      })
+
+      // Esconder o toast após 3 segundos
+      setTimeout(() => {
+        setToast((prev) => ({ ...prev, visible: false }))
+      }, 3000)
     } catch (err) {
       console.error("Erro ao renomear:", err)
-      alert(err instanceof Error ? err.message : "Erro ao renomear")
+      setToast({
+        visible: true,
+        message: err instanceof Error ? err.message : "Erro ao renomear",
+        type: "error",
+      })
     }
   }
 
@@ -199,7 +316,11 @@ export function FileExplorer() {
     }
 
     if (/[\\/:*?"<>|]/.test(newFolderName)) {
-      alert("O nome da pasta contém caracteres inválidos")
+      setToast({
+        visible: true,
+        message: "O nome da pasta contém caracteres inválidos",
+        type: "error",
+      })
       return
     }
 
@@ -240,26 +361,154 @@ export function FileExplorer() {
       setTimeout(() => {
         fetchFiles()
       }, 500)
+
+      // Mostrar toast de sucesso
+      setToast({
+        visible: true,
+        message: "Pasta criada com sucesso!",
+        type: "success",
+      })
+
+      // Esconder o toast após 3 segundos
+      setTimeout(() => {
+        setToast((prev) => ({ ...prev, visible: false }))
+      }, 3000)
     } catch (err) {
       console.error("Erro ao criar pasta:", err)
-      alert(err instanceof Error ? err.message : "Erro ao criar pasta")
+      setToast({
+        visible: true,
+        message: err instanceof Error ? err.message : "Erro ao criar pasta",
+        type: "error",
+      })
     } finally {
       setIsCreatingFolder(false)
     }
   }
 
-  // Filtrar arquivos com base na pesquisa e no tipo selecionado
-  const filteredFiles = files.filter((file) => {
-    const matchesSearch = searchQuery ? file.name.toLowerCase().includes(searchQuery.toLowerCase()) : true
+  // Compartilhar arquivo ou pasta
+  const handleShare = (file: FileItem) => {
+    setItemToShare(file)
+    setShowShareDialog(true)
+  }
 
-    const matchesType = selectedFileType
-      ? file.type === "folder"
-        ? selectedFileType === "folder"
-        : file.fileType === selectedFileType
-      : true
+  // Alternar favorito
+  const toggleFavorite = (file: FileItem) => {
+    const newFavorites = favorites.includes(file.path)
+      ? favorites.filter((path) => path !== file.path)
+      : [...favorites, file.path]
 
-    return matchesSearch && matchesType
-  })
+    setFavorites(newFavorites)
+    localStorage.setItem("fileFavorites", JSON.stringify(newFavorites))
+
+    // Atualizar o estado do arquivo
+    setFiles((prev) =>
+      prev.map((item) => {
+        if (item.path === file.path) {
+          return { ...item, isFavorite: !item.isFavorite }
+        }
+        return item
+      }),
+    )
+
+    // Mostrar toast
+    setToast({
+      visible: true,
+      message: favorites.includes(file.path) ? "Removido dos favoritos" : "Adicionado aos favoritos",
+      type: "success",
+    })
+
+    // Esconder o toast após 3 segundos
+    setTimeout(() => {
+      setToast((prev) => ({ ...prev, visible: false }))
+    }, 3000)
+  }
+
+  // Alternar modo de seleção
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode)
+    if (isSelectionMode) {
+      setSelectedFiles([])
+    }
+  }
+
+  // Selecionar/deselecionar arquivo
+  const toggleFileSelection = (file: FileItem) => {
+    if (selectedFiles.some((f) => f.id === file.id)) {
+      setSelectedFiles(selectedFiles.filter((f) => f.id !== file.id))
+    } else {
+      setSelectedFiles([...selectedFiles, file])
+    }
+  }
+
+  // Selecionar todos os arquivos
+  const selectAllFiles = () => {
+    if (selectedFiles.length === filteredFiles.length) {
+      setSelectedFiles([])
+    } else {
+      setSelectedFiles([...filteredFiles])
+    }
+  }
+
+  // Excluir arquivos selecionados
+  const deleteSelectedFiles = () => {
+    if (selectedFiles.length === 0) return
+
+    // Mostrar confirmação para cada arquivo
+    setItemToDelete({
+      ...selectedFiles[0],
+      name: `${selectedFiles.length} itens selecionados`,
+    })
+    setShowDeleteConfirmation(true)
+  }
+
+  // Alternar modo de tela cheia
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      fileExplorerRef.current?.requestFullscreen()
+      setIsFullscreen(true)
+    } else {
+      document.exitFullscreen()
+      setIsFullscreen(false)
+    }
+  }
+
+  // Filtrar arquivos com base na pesquisa, tipo e aba ativa
+  const getFilteredFiles = () => {
+    let filtered = files
+
+    // Filtrar por pesquisa
+    if (searchQuery) {
+      filtered = filtered.filter((file) => file.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    }
+
+    // Filtrar por tipo de arquivo
+    if (selectedFileType) {
+      filtered = filtered.filter((file) => {
+        if (selectedFileType === "folder") return file.type === "folder"
+        if (file.type === "file") {
+          return file.fileType === selectedFileType
+        }
+        return false
+      })
+    }
+
+    // Filtrar por aba ativa
+    if (activeTab === "favorites") {
+      filtered = filtered.filter((file) => favorites.includes(file.path))
+    } else if (activeTab === "recent") {
+      // Mostrar apenas os 20 arquivos mais recentes
+      const recentOnly = filtered
+        .filter((file) => file.type === "file")
+        .sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime())
+        .slice(0, 20)
+
+      filtered = recentOnly
+    }
+
+    return filtered
+  }
+
+  const filteredFiles = getFilteredFiles()
 
   // Ordenar arquivos
   const sortedFiles = [...filteredFiles].sort((a, b) => {
@@ -287,6 +536,17 @@ export function FileExplorer() {
   const fileTypes = Array.from(
     new Set(files.filter((file) => file.type === "file").map((file) => file.fileType || "outros")),
   )
+
+  // Formatar bytes em unidades legíveis
+  const formatBytes = (bytes = 0) => {
+    if (bytes === 0) return "0 Bytes"
+
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  }
 
   // Renderizar breadcrumbs
   const renderBreadcrumbs = () => {
@@ -319,259 +579,771 @@ export function FileExplorer() {
     )
   }
 
-  return (
-    <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-sm">
-      <div className="flex flex-col space-y-4">
-        {/* Cabeçalho */}
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold text-[#4072b0] flex items-center">
-            <FolderOpen className="mr-2 h-6 w-6 text-[#4b7bb5]" />
-            Gerenciador de Arquivos
-          </h2>
+  // Renderizar estatísticas de armazenamento
+  const renderStorageStats = () => {
+    const usedPercentage = (storageUsage.used / storageUsage.total) * 100
 
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowUploader(true)}
-              className="bg-white border-[#4b7bb5] text-[#4b7bb5] hover:bg-[#f0f4f9]"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Upload
-            </Button>
-
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => setShowCreateFolderDialog(true)}
-              className="bg-[#4b7bb5] hover:bg-[#3d649e]"
-            >
-              <FolderPlus className="h-4 w-4 mr-2" />
-              Nova Pasta
-            </Button>
-          </div>
+    return (
+      <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="text-sm font-medium text-gray-700">Armazenamento</h3>
+          <span className="text-xs text-gray-500">
+            {formatBytes(storageUsage.used)} de {formatBytes(storageUsage.total)}
+          </span>
         </div>
+        <Progress value={usedPercentage} className="h-2" />
+        <p className="mt-2 text-xs text-gray-500">
+          {usedPercentage < 80
+            ? "Espaço suficiente disponível"
+            : usedPercentage < 90
+              ? "Espaço limitado disponível"
+              : "Pouco espaço disponível"}
+        </p>
+      </div>
+    )
+  }
 
-        {/* Barra de navegação */}
-        <div className="flex flex-col md:flex-row justify-between gap-3">
-          <div className="flex-1">{renderBreadcrumbs()}</div>
-
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                type="text"
-                placeholder="Buscar arquivos..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 bg-white border-gray-200"
-              />
-              {searchQuery && (
-                <button
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  onClick={() => setSearchQuery("")}
-                >
-                  <X size={14} />
-                </button>
-              )}
+  return (
+    <div
+      ref={fileExplorerRef}
+      className={`bg-gray-50 rounded-xl border border-gray-200 shadow-sm overflow-hidden transition-all ${
+        isFullscreen ? "fixed inset-0 z-50" : ""
+      }`}
+    >
+      <div className="flex flex-col h-full">
+        {/* Cabeçalho */}
+        <div className="bg-white border-b border-gray-200 p-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex items-center">
+              <FolderOpen className="mr-2 h-6 w-6 text-[#4b7bb5]" />
+              <h2 className="text-xl font-bold text-[#4072b0]">
+                {activeTab === "all"
+                  ? "Todos os Arquivos"
+                  : activeTab === "recent"
+                    ? "Arquivos Recentes"
+                    : activeTab === "favorites"
+                      ? "Favoritos"
+                      : "Compartilhados"}
+              </h2>
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="bg-white">
-                  <Filter size={16} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  className={!selectedFileType ? "bg-blue-50 text-blue-600" : ""}
-                  onClick={() => setSelectedFileType(null)}
-                >
-                  Todos os arquivos
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className={selectedFileType === "folder" ? "bg-blue-50 text-blue-600" : ""}
-                  onClick={() => setSelectedFileType("folder")}
-                >
-                  <Folder className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-                  Pastas
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {fileTypes.map((type) => (
-                  <DropdownMenuItem
-                    key={type}
-                    className={selectedFileType === type ? "bg-blue-50 text-blue-600" : ""}
-                    onClick={() => setSelectedFileType(type)}
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <div className="relative flex-1 md:max-w-xs">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Buscar arquivos..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 bg-white border-gray-200"
+                />
+                {searchQuery && (
+                  <button
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    onClick={() => setSearchQuery("")}
                   >
-                    {type}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="bg-white">
-                  {sortDirection === "asc" ? <SortAsc size={16} /> : <SortDesc size={16} />}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  className={sortBy === "name" ? "bg-blue-50 text-blue-600" : ""}
-                  onClick={() => {
-                    setSortBy("name")
-                    setSortDirection(sortBy === "name" && sortDirection === "asc" ? "desc" : "asc")
-                  }}
-                >
-                  Nome
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className={sortBy === "date" ? "bg-blue-50 text-blue-600" : ""}
-                  onClick={() => {
-                    setSortBy("date")
-                    setSortDirection(sortBy === "date" && sortDirection === "asc" ? "desc" : "asc")
-                  }}
-                >
-                  Data
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className={sortBy === "size" ? "bg-blue-50 text-blue-600" : ""}
-                  onClick={() => {
-                    setSortBy("size")
-                    setSortDirection(sortBy === "size" && sortDirection === "asc" ? "desc" : "asc")
-                  }}
-                >
-                  Tamanho
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={toggleFullscreen}
+                      className="bg-white hidden md:flex"
+                    >
+                      {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{isFullscreen ? "Sair da tela cheia" : "Tela cheia"}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-              className="bg-white"
-            >
-              {viewMode === "grid" ? <List size={16} /> : <Grid3X3 size={16} />}
-            </Button>
-
-            <Button variant="outline" size="icon" onClick={fetchFiles} disabled={isLoading} className="bg-white">
-              {isLoading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-            </Button>
-
-            {currentPath.length > 0 && (
-              <Button variant="outline" size="icon" onClick={navigateUp} className="bg-white">
-                <ArrowUp size={16} />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowUploader(true)}
+                className="bg-white border-[#4b7bb5] text-[#4b7bb5] hover:bg-[#f0f4f9]"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Upload</span>
               </Button>
-            )}
+
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setShowCreateFolderDialog(true)}
+                className="bg-[#4b7bb5] hover:bg-[#3d649e]"
+              >
+                <FolderPlus className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Nova Pasta</span>
+              </Button>
+            </div>
           </div>
         </div>
+
+        {/* Abas e navegação */}
+        <div className="bg-white border-b border-gray-200 px-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+            <Tabs
+              defaultValue="all"
+              value={activeTab}
+              onValueChange={(value) => setActiveTab(value as "all" | "recent" | "favorites" | "shared")}
+              className="w-full"
+            >
+              <TabsList className="mb-4 md:mb-0">
+                <TabsTrigger value="all" className="data-[state=active]:bg-[#4b7bb5] data-[state=active]:text-white">
+                  Todos
+                </TabsTrigger>
+                <TabsTrigger value="recent" className="data-[state=active]:bg-[#4b7bb5] data-[state=active]:text-white">
+                  Recentes
+                </TabsTrigger>
+                <TabsTrigger
+                  value="favorites"
+                  className="data-[state=active]:bg-[#4b7bb5] data-[state=active]:text-white"
+                >
+                  Favoritos
+                </TabsTrigger>
+                <TabsTrigger value="shared" className="data-[state=active]:bg-[#4b7bb5] data-[state=active]:text-white">
+                  Compartilhados
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <div className="flex items-center gap-2 mb-4 md:mb-0 w-full md:w-auto">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="bg-white">
+                    <Filter size={16} className="mr-2" />
+                    <span className="hidden sm:inline">Filtrar</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel>Tipo de arquivo</DropdownMenuLabel>
+                  <DropdownMenuItem
+                    className={!selectedFileType ? "bg-blue-50 text-blue-600" : ""}
+                    onClick={() => setSelectedFileType(null)}
+                  >
+                    Todos os arquivos
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className={selectedFileType === "folder" ? "bg-blue-50 text-blue-600" : ""}
+                    onClick={() => setSelectedFileType("folder")}
+                  >
+                    <Folder className="h-4 w-4 mr-2 text-[#4b7bb5]" />
+                    Pastas
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {fileTypes.map((type) => (
+                    <DropdownMenuItem
+                      key={type}
+                      className={selectedFileType === type ? "bg-blue-50 text-blue-600" : ""}
+                      onClick={() => setSelectedFileType(type)}
+                    >
+                      {type}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="bg-white">
+                    {sortDirection === "asc" ? (
+                      <SortAsc size={16} className="mr-2" />
+                    ) : (
+                      <SortDesc size={16} className="mr-2" />
+                    )}
+                    <span className="hidden sm:inline">Ordenar</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
+                  <DropdownMenuItem
+                    className={sortBy === "name" ? "bg-blue-50 text-blue-600" : ""}
+                    onClick={() => {
+                      setSortBy("name")
+                      setSortDirection(sortBy === "name" && sortDirection === "asc" ? "desc" : "asc")
+                    }}
+                  >
+                    Nome
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className={sortBy === "date" ? "bg-blue-50 text-blue-600" : ""}
+                    onClick={() => {
+                      setSortBy("date")
+                      setSortDirection(sortBy === "date" && sortDirection === "asc" ? "desc" : "asc")
+                    }}
+                  >
+                    Data
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className={sortBy === "size" ? "bg-blue-50 text-blue-600" : ""}
+                    onClick={() => {
+                      setSortBy("size")
+                      setSortDirection(sortBy === "size" && sortDirection === "asc" ? "desc" : "asc")
+                    }}
+                  >
+                    Tamanho
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="bg-white">
+                    {viewMode === "grid" ? (
+                      <LayoutGrid size={16} className="mr-2" />
+                    ) : viewMode === "list" ? (
+                      <LayoutList size={16} className="mr-2" />
+                    ) : (
+                      <Layers size={16} className="mr-2" />
+                    )}
+                    <span className="hidden sm:inline">Visualização</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    className={viewMode === "grid" ? "bg-blue-50 text-blue-600" : ""}
+                    onClick={() => setViewMode("grid")}
+                  >
+                    <LayoutGrid className="h-4 w-4 mr-2" />
+                    Grade
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className={viewMode === "list" ? "bg-blue-50 text-blue-600" : ""}
+                    onClick={() => setViewMode("list")}
+                  >
+                    <LayoutList className="h-4 w-4 mr-2" />
+                    Lista
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className={viewMode === "details" ? "bg-blue-50 text-blue-600" : ""}
+                    onClick={() => setViewMode("details")}
+                  >
+                    <Layers className="h-4 w-4 mr-2" />
+                    Detalhes
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleSelectionMode}
+                className={`bg-white ${isSelectionMode ? "border-[#4b7bb5] text-[#4b7bb5]" : ""}`}
+              >
+                {isSelectionMode ? (
+                  <>
+                    <X className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Cancelar</span>
+                  </>
+                ) : (
+                  <>
+                    <Bookmark className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Selecionar</span>
+                  </>
+                )}
+              </Button>
+
+              <Button variant="outline" size="sm" onClick={fetchFiles} disabled={isLoading} className="bg-white">
+                {isLoading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+              </Button>
+
+              {currentPath.length > 0 && (
+                <Button variant="outline" size="sm" onClick={navigateUp} className="bg-white">
+                  <ArrowUp size={16} />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Barra de seleção */}
+        {isSelectionMode && selectedFiles.length > 0 && (
+          <div className="bg-blue-50 p-3 border-b border-blue-100 flex items-center justify-between">
+            <div className="flex items-center">
+              <Bookmark className="h-5 w-5 mr-2 text-[#4b7bb5]" />
+              <span className="font-medium text-[#4b7bb5]">{selectedFiles.length} item(s) selecionado(s)</span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={selectAllFiles}
+                className="bg-white border-[#4b7bb5] text-[#4b7bb5]"
+              >
+                {selectedFiles.length === filteredFiles.length ? "Desmarcar Todos" : "Selecionar Todos"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={deleteSelectedFiles}
+                className="bg-white border-red-500 text-red-500 hover:bg-red-50"
+                disabled={selectedFiles.length === 0}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir Selecionados
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Navegação de pastas */}
+        <div className="p-4 bg-gray-50">{renderBreadcrumbs()}</div>
 
         {/* Conteúdo principal */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[400px]">
-          {error ? (
-            <div className="flex items-center justify-center h-64 text-red-500">
-              <AlertCircle className="h-5 w-5 mr-2" />
-              <span>{error}</span>
-            </div>
-          ) : isLoading ? (
-            <div className="flex flex-col items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 text-[#4b7bb5] animate-spin mb-4" />
-              <p className="text-gray-500">Carregando arquivos...</p>
-            </div>
-          ) : sortedFiles.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-              <FolderOpen className="h-16 w-16 text-gray-300 mb-4" />
-              <p className="text-lg font-medium text-gray-600 mb-2">Pasta vazia</p>
-              <p className="text-sm text-gray-500 mb-4">
-                {searchQuery
-                  ? `Nenhum resultado encontrado para "${searchQuery}"`
-                  : "Esta pasta não contém nenhum arquivo ou subpasta"}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowUploader(true)}
-                  className="border-[#4b7bb5] text-[#4b7bb5]"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => setShowCreateFolderDialog(true)}
-                  className="bg-[#4b7bb5]"
-                >
-                  <FolderPlus className="h-4 w-4 mr-2" />
-                  Nova Pasta
-                </Button>
+        <div className="flex-1 overflow-auto p-4 bg-gray-50">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Área principal de arquivos */}
+            <div className="md:col-span-3">
+              <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[400px]">
+                {error ? (
+                  <div className="flex items-center justify-center h-64 text-red-500">
+                    <AlertCircle className="h-5 w-5 mr-2" />
+                    <span>{error}</span>
+                  </div>
+                ) : isLoading ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-8 w-48" />
+                      <Skeleton className="h-8 w-24" />
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <Skeleton key={i} className="h-32 w-full rounded-md" />
+                      ))}
+                    </div>
+                  </div>
+                ) : sortedFiles.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                    <FolderOpen className="h-16 w-16 text-gray-300 mb-4" />
+                    <p className="text-lg font-medium text-gray-600 mb-2">
+                      {activeTab === "all"
+                        ? "Pasta vazia"
+                        : activeTab === "recent"
+                          ? "Nenhum arquivo recente"
+                          : activeTab === "favorites"
+                            ? "Nenhum favorito"
+                            : "Nenhum arquivo compartilhado"}
+                    </p>
+                    <p className="text-sm text-gray-500 mb-4">
+                      {searchQuery
+                        ? `Nenhum resultado encontrado para "${searchQuery}"`
+                        : activeTab === "all"
+                          ? "Esta pasta não contém nenhum arquivo ou subpasta"
+                          : activeTab === "recent"
+                            ? "Você não tem arquivos recentes"
+                            : activeTab === "favorites"
+                              ? "Você não tem favoritos"
+                              : "Você não tem arquivos compartilhados"}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowUploader(true)}
+                        className="border-[#4b7bb5] text-[#4b7bb5]"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => setShowCreateFolderDialog(true)}
+                        className="bg-[#4b7bb5]"
+                      >
+                        <FolderPlus className="h-4 w-4 mr-2" />
+                        Nova Pasta
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    {viewMode === "grid" ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                        {sortedFiles.map((file) => (
+                          <FileCard
+                            key={file.id}
+                            file={file}
+                            onFolderClick={() => navigateToFolder(file.path)}
+                            onDelete={() => handleDelete(file)}
+                            onRename={handleRename}
+                            onShare={() => handleShare(file)}
+                            onToggleFavorite={() => toggleFavorite(file)}
+                            isSelected={selectedFiles.some((f) => f.id === file.id)}
+                            onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
+                          />
+                        ))}
+                      </div>
+                    ) : viewMode === "list" ? (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              {isSelectionMode && (
+                                <th
+                                  scope="col"
+                                  className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedFiles.length > 0 && selectedFiles.length === filteredFiles.length}
+                                    onChange={selectAllFiles}
+                                    className="rounded border-gray-300 text-[#4b7bb5] focus:ring-[#4b7bb5]"
+                                  />
+                                </th>
+                              )}
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Nome
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Data
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Tamanho
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Tipo
+                              </th>
+                              <th scope="col" className="relative px-6 py-3">
+                                <span className="sr-only">Ações</span>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {sortedFiles.map((file) => (
+                              <FileRow
+                                key={file.id}
+                                file={file}
+                                onFolderClick={() => navigateToFolder(file.path)}
+                                onDelete={() => handleDelete(file)}
+                                onShare={() => handleShare(file)}
+                                onToggleFavorite={() => toggleFavorite(file)}
+                                isSelected={selectedFiles.some((f) => f.id === file.id)}
+                                onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
+                                showCheckbox={isSelectionMode}
+                              />
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {sortedFiles.map((file) => (
+                          <Card
+                            key={file.id}
+                            className={`hover:bg-gray-50 transition-colors ${
+                              selectedFiles.some((f) => f.id === file.id) ? "bg-blue-50 border-blue-200" : ""
+                            }`}
+                          >
+                            <CardHeader className="p-4 pb-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  {isSelectionMode && (
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedFiles.some((f) => f.id === file.id)}
+                                      onChange={() => toggleFileSelection(file)}
+                                      className="rounded border-gray-300 text-[#4b7bb5] focus:ring-[#4b7bb5]"
+                                    />
+                                  )}
+                                  <div className="p-2 bg-gray-100 rounded-md">
+                                    {file.type === "folder" ? (
+                                      <Folder className="h-5 w-5 text-[#4b7bb5]" />
+                                    ) : file.fileType === "pdf" ? (
+                                      <FileText className="h-5 w-5 text-red-500" />
+                                    ) : ["jpg", "jpeg", "png", "gif", "webp"].includes(file.fileType || "") ? (
+                                      <ImageIcon className="h-5 w-5 text-green-500" />
+                                    ) : ["mp4", "avi", "mov", "webm"].includes(file.fileType || "") ? (
+                                      <Film className="h-5 w-5 text-purple-500" />
+                                    ) : ["mp3", "wav", "ogg"].includes(file.fileType || "") ? (
+                                      <Music className="h-5 w-5 text-blue-500" />
+                                    ) : ["zip", "rar", "7z", "tar", "gz"].includes(file.fileType || "") ? (
+                                      <Archive className="h-5 w-5 text-amber-500" />
+                                    ) : (
+                                      <FileIcon className="h-5 w-5 text-gray-500" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <CardTitle className="text-base font-medium">
+                                      <button
+                                        onClick={file.type === "folder" ? () => navigateToFolder(file.path) : undefined}
+                                        className={
+                                          file.type === "folder" ? "hover:text-[#4b7bb5] transition-colors" : ""
+                                        }
+                                      >
+                                        {file.name}
+                                      </button>
+                                    </CardTitle>
+                                    <CardDescription className="text-xs">
+                                      {file.type === "folder" ? "Pasta" : file.fileType?.toUpperCase()}
+                                    </CardDescription>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {file.isFavorite && (
+                                    <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200">
+                                      <Star className="h-3 w-3 mr-1 fill-amber-500 text-amber-500" />
+                                      Favorito
+                                    </Badge>
+                                  )}
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon">
+                                        <MoreVertical size={16} />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuGroup>
+                                        {file.type === "file" && (
+                                          <>
+                                            <DropdownMenuItem onClick={() => window.open(file.url, "_blank")}>
+                                              <ExternalLink className="h-4 w-4 mr-2" />
+                                              Abrir
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleShare(file)}>
+                                              <Share2 className="h-4 w-4 mr-2" />
+                                              Compartilhar
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem asChild>
+                                              <a href={file.url} download>
+                                                <Download className="h-4 w-4 mr-2" />
+                                                Download
+                                              </a>
+                                            </DropdownMenuItem>
+                                          </>
+                                        )}
+                                        <DropdownMenuItem onClick={() => toggleFavorite(file)}>
+                                          {file.isFavorite ? (
+                                            <>
+                                              <StarOff className="h-4 w-4 mr-2" />
+                                              Remover dos favoritos
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Star className="h-4 w-4 mr-2" />
+                                              Adicionar aos favoritos
+                                            </>
+                                          )}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => handleDelete(file)} className="text-red-600">
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Excluir
+                                        </DropdownMenuItem>
+                                      </DropdownMenuGroup>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="p-4 pt-0">
+                              <div className="flex justify-between text-xs text-gray-500">
+                                <div className="flex items-center">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  {new Date(file.modified).toLocaleDateString("pt-BR", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                  })}
+                                </div>
+                                {file.type === "file" && file.size && <div>{formatBytes(file.size)}</div>}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
-          ) : (
-            <div>
-              {viewMode === "grid" ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                  {sortedFiles.map((file) => (
-                    <FileCard
-                      key={file.id}
-                      file={file}
-                      onFolderClick={() => navigateToFolder(file.path)}
-                      onDelete={() => handleDelete(file.path)}
-                      onRename={handleRename}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Nome
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Data
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Tamanho
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Projeto
-                        </th>
-                        <th scope="col" className="relative px-6 py-3">
-                          <span className="sr-only">Ações</span>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {sortedFiles.map((file) => (
-                        <FileRow
-                          key={file.id}
-                          file={file}
-                          onFolderClick={() => navigateToFolder(file.path)}
-                          onDelete={() => handleDelete(file.path)}
-                        />
+
+            {/* Sidebar com informações e estatísticas */}
+            <div className="space-y-4">
+              {/* Estatísticas de armazenamento */}
+              {renderStorageStats()}
+
+              {/* Arquivos recentes */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center">
+                    <Clock className="h-4 w-4 mr-2 text-[#4b7bb5]" />
+                    Arquivos Recentes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3">
+                  {recentFiles.length === 0 ? (
+                    <p className="text-xs text-gray-500 text-center py-2">Nenhum arquivo recente</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {recentFiles.slice(0, 5).map((file) => (
+                        <li key={file.id} className="text-sm">
+                          <button
+                            onClick={() => window.open(file.url, "_blank")}
+                            className="flex items-center hover:bg-gray-50 p-1.5 rounded-md w-full text-left"
+                          >
+                            {file.fileType === "pdf" ? (
+                              <FileText className="h-4 w-4 mr-2 text-red-500" />
+                            ) : ["jpg", "jpeg", "png", "gif", "webp"].includes(file.fileType || "") ? (
+                              <ImageIcon className="h-4 w-4 mr-2 text-green-500" />
+                            ) : ["mp4", "avi", "mov", "webm"].includes(file.fileType || "") ? (
+                              <Film className="h-4 w-4 mr-2 text-purple-500" />
+                            ) : ["mp3", "wav", "ogg"].includes(file.fileType || "") ? (
+                              <Music className="h-4 w-4 mr-2 text-blue-500" />
+                            ) : ["zip", "rar", "7z", "tar", "gz"].includes(file.fileType || "") ? (
+                              <Archive className="h-4 w-4 mr-2 text-amber-500" />
+                            ) : (
+                              <FileIcon className="h-4 w-4 mr-2 text-gray-500" />
+                            )}
+                            <span className="truncate flex-1">{file.name}</span>
+                          </button>
+                        </li>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                    </ul>
+                  )}
+                </CardContent>
+                <CardFooter className="pt-0 pb-3 px-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs text-[#4b7bb5]"
+                    onClick={() => setActiveTab("recent")}
+                  >
+                    Ver todos
+                  </Button>
+                </CardFooter>
+              </Card>
+
+              {/* Favoritos */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center">
+                    <Star className="h-4 w-4 mr-2 text-amber-500" />
+                    Favoritos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3">
+                  {favorites.length === 0 ? (
+                    <p className="text-xs text-gray-500 text-center py-2">Nenhum favorito</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {files
+                        .filter((file) => favorites.includes(file.path))
+                        .slice(0, 5)
+                        .map((file) => (
+                          <li key={file.id} className="text-sm">
+                            <button
+                              onClick={
+                                file.type === "folder"
+                                  ? () => navigateToFolder(file.path)
+                                  : () => window.open(file.url, "_blank")
+                              }
+                              className="flex items-center hover:bg-gray-50 p-1.5 rounded-md w-full text-left"
+                            >
+                              {file.type === "folder" ? (
+                                <Folder className="h-4 w-4 mr-2 text-[#4b7bb5]" />
+                              ) : file.fileType === "pdf" ? (
+                                <FileText className="h-4 w-4 mr-2 text-red-500" />
+                              ) : ["jpg", "jpeg", "png", "gif", "webp"].includes(file.fileType || "") ? (
+                                <ImageIcon className="h-4 w-4 mr-2 text-green-500" />
+                              ) : ["mp4", "avi", "mov", "webm"].includes(file.fileType || "") ? (
+                                <Film className="h-4 w-4 mr-2 text-purple-500" />
+                              ) : ["mp3", "wav", "ogg"].includes(file.fileType || "") ? (
+                                <Music className="h-4 w-4 mr-2 text-blue-500" />
+                              ) : ["zip", "rar", "7z", "tar", "gz"].includes(file.fileType || "") ? (
+                                <Archive className="h-4 w-4 mr-2 text-amber-500" />
+                              ) : (
+                                <FileIcon className="h-4 w-4 mr-2 text-gray-500" />
+                              )}
+                              <span className="truncate flex-1">{file.name}</span>
+                            </button>
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                </CardContent>
+                <CardFooter className="pt-0 pb-3 px-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs text-[#4b7bb5]"
+                    onClick={() => setActiveTab("favorites")}
+                  >
+                    Ver todos
+                  </Button>
+                </CardFooter>
+              </Card>
+
+              {/* Ajuda rápida */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center">
+                    <HelpCircle className="h-4 w-4 mr-2 text-[#4b7bb5]" />
+                    Ajuda Rápida
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3">
+                  <ul className="space-y-2 text-xs text-gray-600">
+                    <li className="flex items-start">
+                      <Upload className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                      <span>
+                        Clique em <strong>Upload</strong> para enviar arquivos
+                      </span>
+                    </li>
+                    <li className="flex items-start">
+                      <FolderPlus className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                      <span>
+                        Clique em <strong>Nova Pasta</strong> para criar pastas
+                      </span>
+                    </li>
+                    <li className="flex items-start">
+                      <Star className="h-3 w-3 mr-2 mt-0.5 text-amber-500" />
+                      <span>
+                        Adicione <strong>favoritos</strong> para acesso rápido
+                      </span>
+                    </li>
+                    <li className="flex items-start">
+                      <Share2 className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                      <span>
+                        Use <strong>Compartilhar</strong> para gerar links
+                      </span>
+                    </li>
+                  </ul>
+                </CardContent>
+                <CardFooter className="pt-0 pb-3 px-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs text-[#4b7bb5]"
+                    onClick={() => setShowHelp(true)}
+                  >
+                    Ver mais dicas
+                  </Button>
+                </CardFooter>
+              </Card>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -638,6 +1410,131 @@ export function FileExplorer() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Diálogo de confirmação de exclusão */}
+      {showDeleteConfirmation && itemToDelete && (
+        <DeleteConfirmationDialog
+          isOpen={showDeleteConfirmation}
+          onClose={() => setShowDeleteConfirmation(false)}
+          onConfirm={confirmDelete}
+          itemName={itemToDelete.name}
+          isFolder={itemToDelete.type === "folder"}
+        />
+      )}
+
+      {/* Diálogo de compartilhamento */}
+      {showShareDialog && itemToShare && (
+        <ShareLinkDialog
+          isOpen={showShareDialog}
+          onClose={() => setShowShareDialog(false)}
+          fileUrl={itemToShare.url || `${window.location.origin}/shared/${encodeURIComponent(itemToShare.path)}`}
+          fileName={itemToShare.name}
+        />
+      )}
+
+      {/* Diálogo de ajuda */}
+      <Dialog open={showHelp} onOpenChange={setShowHelp}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Dicas e Atalhos</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Navegação</CardTitle>
+              </CardHeader>
+              <CardContent className="p-3">
+                <ul className="space-y-2 text-xs text-gray-600">
+                  <li className="flex items-start">
+                    <Home className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                    <span>Clique no ícone de casa para voltar à pasta raiz</span>
+                  </li>
+                  <li className="flex items-start">
+                    <ArrowUp className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                    <span>Clique na seta para cima para subir um nível</span>
+                  </li>
+                  <li className="flex items-start">
+                    <ChevronRight className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                    <span>Clique em qualquer parte do caminho para navegar</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Visualização</CardTitle>
+              </CardHeader>
+              <CardContent className="p-3">
+                <ul className="space-y-2 text-xs text-gray-600">
+                  <li className="flex items-start">
+                    <LayoutGrid className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                    <span>Visualização em grade para ver miniaturas</span>
+                  </li>
+                  <li className="flex items-start">
+                    <LayoutList className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                    <span>Visualização em lista para ver mais detalhes</span>
+                  </li>
+                  <li className="flex items-start">
+                    <Layers className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                    <span>Visualização detalhada para informações completas</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Gerenciamento</CardTitle>
+              </CardHeader>
+              <CardContent className="p-3">
+                <ul className="space-y-2 text-xs text-gray-600">
+                  <li className="flex items-start">
+                    <Upload className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                    <span>Faça upload de múltiplos arquivos de uma vez</span>
+                  </li>
+                  <li className="flex items-start">
+                    <FolderPlus className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                    <span>Crie pastas para organizar seus arquivos</span>
+                  </li>
+                  <li className="flex items-start">
+                    <Bookmark className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                    <span>Use o modo de seleção para operações em lote</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Compartilhamento</CardTitle>
+              </CardHeader>
+              <CardContent className="p-3">
+                <ul className="space-y-2 text-xs text-gray-600">
+                  <li className="flex items-start">
+                    <Share2 className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                    <span>Compartilhe arquivos e pastas com links públicos</span>
+                  </li>
+                  <li className="flex items-start">
+                    <Download className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                    <span>Baixe arquivos diretamente para seu dispositivo</span>
+                  </li>
+                  <li className="flex items-start">
+                    <Star className="h-3 w-3 mr-2 mt-0.5 text-amber-500" />
+                    <span>Favorite itens para acesso rápido</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Toast de notificação */}
+      {toast.visible && (
+        <ToastNotification
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
+        />
+      )}
     </div>
   )
 }
