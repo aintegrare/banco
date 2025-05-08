@@ -30,29 +30,31 @@ import { ToastNotification } from "./toast-notification"
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+// Adicionar importação para o badge de tarefas
+import { FolderTaskBadge } from "./folder-task-badge"
 
-interface FileItem {
-  id: string
-  name: string
-  type: "folder" | "file"
-  size?: number
-  modified: string
-  path: string
-  url?: string
-  fileType?: string
-  project?: string
-  isFavorite?: boolean
-}
-
+// Modificar a interface FileCardProps para incluir a contagem de tarefas
 interface FileCardProps {
-  file: FileItem
+  file: {
+    id: string
+    name: string
+    type: "folder" | "file"
+    size?: number
+    modified: string
+    path: string
+    url?: string
+    fileType?: string
+    isFavorite?: boolean
+  }
   onFolderClick: () => void
   onDelete: () => void
-  onRename?: (oldPath: string, newName: string) => void
+  onRename: (oldPath: string, newName: string) => void
   onShare?: () => void
   onToggleFavorite?: () => void
   isSelected?: boolean
   onToggleSelect?: () => void
+  taskCount?: number
+  onOpenTasks?: () => void
 }
 
 export function FileCard({
@@ -64,6 +66,8 @@ export function FileCard({
   onToggleFavorite,
   isSelected,
   onToggleSelect,
+  taskCount,
+  onOpenTasks,
 }: FileCardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
@@ -325,6 +329,20 @@ export function FileCard({
           )}
           <h3 className="mt-2 text-sm font-medium text-gray-700 text-center truncate w-full group-hover:text-[#4b7bb5] transition-colors">
             {file.name}
+            {/* Adicionar o badge de tarefas no componente */}
+            {/* Localizar a div que contém o nome do arquivo (geralmente após o ícone) */}
+            {/* Adicionar após o nome do arquivo, dentro da mesma div */}
+            {file.type === "folder" && taskCount && taskCount > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenTasks?.()
+                }}
+                className="ml-1"
+              >
+                <FolderTaskBadge count={taskCount} />
+              </button>
+            )}
           </h3>
           <p className="text-xs text-gray-500 mt-1">
             {file.type === "folder" ? "Pasta" : file.size ? formatBytes(file.size) : ""}

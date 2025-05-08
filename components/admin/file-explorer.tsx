@@ -1,5 +1,7 @@
 "use client"
 
+import { DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+
 import type React from "react"
 
 import { useState, useEffect, useCallback, useRef } from "react"
@@ -40,6 +42,7 @@ import {
   LayoutList,
   Maximize2,
   Minimize2,
+  ClipboardList,
 } from "lucide-react"
 import { FileCard } from "./file-card"
 import { FileRow } from "./file-row"
@@ -50,7 +53,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
   DropdownMenuGroup,
@@ -65,6 +67,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ShareLinkDialog } from "./share-link-dialog"
 import { ToastNotification } from "./toast-notification"
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
+
+// Adicionar importações para os componentes de tarefas
+import { FolderTasks } from "./folder-tasks"
+import { fetchFolderTaskCounts } from "@/lib/folder-tasks-manager"
 
 interface FileItem {
   id: string
@@ -111,6 +117,11 @@ export function FileExplorer() {
   const [showHelp, setShowHelp] = useState(false)
   const [storageUsage, setStorageUsage] = useState({ used: 0, total: 1024 * 1024 * 1024 * 10 }) // 10GB default
   const fileExplorerRef = useRef<HTMLDivElement>(null)
+
+  // Adicionar estados para gerenciar tarefas dentro da função FileExplorer
+  const [taskCounts, setTaskCounts] = useState<Record<string, number>>({})
+  const [showTasksPanel, setShowTasksPanel] = useState(false)
+  const [selectedFolderForTasks, setSelectedFolderForTasks] = useState<string | null>(null)
 
   // Função para buscar arquivos e pastas
   const fetchFiles = useCallback(async () => {
@@ -162,10 +173,34 @@ export function FileExplorer() {
     }
   }, [currentPath, favorites])
 
+  // Adicionar função para buscar contagens de tarefas após a declaração de fetchFiles
+  // Adicionar após a função fetchFiles
+  const fetchTaskCounts = useCallback(async () => {
+    try {
+      // Obter apenas os caminhos das pastas
+      const folderPaths = files.filter((file) => file.type === "folder").map((folder) => folder.path)
+
+      if (folderPaths.length === 0) return
+
+      const counts = await fetchFolderTaskCounts(folderPaths)
+      setTaskCounts(counts)
+    } catch (error) {
+      console.error("Erro ao buscar contagens de tarefas:", error)
+    }
+  }, [files])
+
   // Carregar arquivos quando o componente montar ou o caminho mudar
   useEffect(() => {
     fetchFiles()
   }, [fetchFiles])
+
+  // Adicionar useEffect para buscar contagens de tarefas quando os arquivos mudarem
+  // Adicionar após o useEffect que chama fetchFiles
+  useEffect(() => {
+    if (!isLoading && files.length > 0) {
+      fetchTaskCounts()
+    }
+  }, [fetchTaskCounts, isLoading, files])
 
   // Carregar favoritos do localStorage
   useEffect(() => {
@@ -472,6 +507,22 @@ export function FileExplorer() {
     }
   }
 
+  // Adicionar função para abrir o painel de tarefas
+  // Adicionar antes da função getFilteredFiles
+  const openTasksPanel = (folderPath: string) => {
+    setSelectedFolderForTasks(folderPath)
+    setShowTasksPanel(true)
+  }
+
+  // Adicionar função para atualizar a contagem de tarefas
+  // Adicionar antes da função getFilteredFiles
+  const handleTaskCountChange = (folderPath: string, count: number) => {
+    setTaskCounts((prev) => ({
+      ...prev,
+      [folderPath]: count,
+    }))
+  }
+
   // Filtrar arquivos com base na pesquisa, tipo e aba ativa
   const getFilteredFiles = () => {
     let filtered = files
@@ -579,7 +630,8 @@ export function FileExplorer() {
     )
   }
 
-  // Renderizar estatísticas de armazenamento
+  // Modificar a função renderStorageStats para incluir o botão de tarefas
+  // Substituir a função renderStorageStats existente
   const renderStorageStats = () => {
     const usedPercentage = (storageUsage.used / storageUsage.total) * 100
 
@@ -980,6 +1032,8 @@ export function FileExplorer() {
                             onToggleFavorite={() => toggleFavorite(file)}
                             isSelected={selectedFiles.some((f) => f.id === file.id)}
                             onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
+                            taskCount={file.type === "folder" ? taskCounts[file.path] : undefined}
+                            onOpenTasks={file.type === "folder" ? () => openTasksPanel(file.path) : undefined}
                           />
                         ))}
                       </div>
@@ -1042,6 +1096,8 @@ export function FileExplorer() {
                                 isSelected={selectedFiles.some((f) => f.id === file.id)}
                                 onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
                                 showCheckbox={isSelectionMode}
+                                taskCount={file.type === "folder" ? taskCounts[file.path] : undefined}
+                                onOpenTasks={file.type === "folder" ? () => openTasksPanel(file.path) : undefined}
                               />
                             ))}
                           </tbody>
@@ -1342,6 +1398,30 @@ export function FileExplorer() {
                   </Button>
                 </CardFooter>
               </Card>
+
+              {/* Tarefas da pasta atual */}
+              {currentPath.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      <ClipboardList className="h-4 w-4 mr-2 text-[#4b7bb5]" />
+                      Tarefas da Pasta Atual
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3">
+                    {currentPath.length > 0 ? (
+                      <FolderTasks
+                        folderPath={currentPath.join("/")}
+                        onTaskCountChange={(count) => handleTaskCountChange(currentPath.join("/"), count)}
+                      />
+                    ) : (
+                      <p className="text-xs text-gray-500 text-center py-2">
+                        Selecione uma pasta para ver suas tarefas
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </div>
@@ -1524,6 +1604,21 @@ export function FileExplorer() {
               </CardContent>
             </Card>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de tarefas */}
+      <Dialog open={showTasksPanel} onOpenChange={setShowTasksPanel}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Tarefas da Pasta: {selectedFolderForTasks?.split("/").pop() || ""}</DialogTitle>
+          </DialogHeader>
+          {selectedFolderForTasks && (
+            <FolderTasks
+              folderPath={selectedFolderForTasks}
+              onTaskCountChange={(count) => handleTaskCountChange(selectedFolderForTasks, count)}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

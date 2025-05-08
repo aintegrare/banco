@@ -31,22 +31,22 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
+// Adicionar importação para o badge de tarefas
+import { FolderTaskBadge } from "./folder-task-badge"
 
-interface FileItem {
-  id: string
-  name: string
-  type: "folder" | "file"
-  size?: number
-  modified: string
-  path: string
-  url?: string
-  fileType?: string
-  project?: string
-  isFavorite?: boolean
-}
-
+// Modificar a interface FileRowProps para incluir a contagem de tarefas
 interface FileRowProps {
-  file: FileItem
+  file: {
+    id: string
+    name: string
+    type: "folder" | "file"
+    size?: number
+    modified: string
+    path: string
+    url?: string
+    fileType?: string
+    isFavorite?: boolean
+  }
   onFolderClick: () => void
   onDelete: () => void
   onShare?: () => void
@@ -54,6 +54,8 @@ interface FileRowProps {
   isSelected?: boolean
   onToggleSelect?: () => void
   showCheckbox?: boolean
+  taskCount?: number
+  onOpenTasks?: () => void
 }
 
 export function FileRow({
@@ -65,6 +67,8 @@ export function FileRow({
   isSelected,
   onToggleSelect,
   showCheckbox,
+  taskCount,
+  onOpenTasks,
 }: FileRowProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showShareDialog, setShowShareDialog] = useState(false)
@@ -206,7 +210,20 @@ export function FileRow({
               {file.isFavorite && <Star className="absolute -top-1 -right-1 h-3 w-3 text-amber-500 fill-amber-500" />}
             </div>
             <div className="ml-4">
-              <div className="text-sm font-medium text-gray-900">{file.name}</div>
+              <div className="text-sm font-medium text-gray-900">
+                {file.name}
+                {file.type === "folder" && taskCount && taskCount > 0 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onOpenTasks?.()
+                    }}
+                    className="ml-1"
+                  >
+                    <FolderTaskBadge count={taskCount} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </td>
