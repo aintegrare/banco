@@ -12,6 +12,60 @@ const BUNNY_PULLZONE_URL = `https://integrare.b-cdn.net`
 console.log(`Bunny Config: URL de Storage: ${BUNNY_STORAGE_URL}`)
 console.log(`Bunny Config: URL da Pull Zone: ${BUNNY_PULLZONE_URL}`)
 
+// Modificar a função uploadFileToBunny para criar pastas automaticamente se não existirem
+// Adicionar esta lógica antes do upload do arquivo
+
+// Verificar se a pasta existe e criar se necessário
+export async function ensureFolderExists(folderPath: string): Promise<boolean> {
+  try {
+    // Dividir o caminho em partes
+    const parts = folderPath.split("/").filter(Boolean)
+    let currentPath = ""
+
+    // Criar cada nível de pasta se não existir
+    for (const part of parts) {
+      currentPath = currentPath ? `${currentPath}/${part}` : part
+
+      // Verificar se a pasta existe
+      const checkResponse = await fetch(
+        `${process.env.BUNNY_STORAGE_REGION}/${process.env.BUNNY_STORAGE_ZONE}/${currentPath}/`,
+        {
+          method: "GET",
+          headers: {
+            AccessKey: process.env.BUNNY_API_KEY || "",
+          },
+        },
+      )
+
+      // Se a pasta não existir (404), criar
+      if (checkResponse.status === 404) {
+        const createResponse = await fetch(
+          `${process.env.BUNNY_STORAGE_REGION}/${process.env.BUNNY_STORAGE_ZONE}/${currentPath}/`,
+          {
+            method: "PUT",
+            headers: {
+              AccessKey: process.env.BUNNY_API_KEY || "",
+            },
+          },
+        )
+
+        if (!createResponse.ok) {
+          console.error(`Erro ao criar pasta ${currentPath}:`, await createResponse.text())
+          return false
+        }
+      } else if (!checkResponse.ok) {
+        console.error(`Erro ao verificar pasta ${currentPath}:`, await checkResponse.text())
+        return false
+      }
+    }
+
+    return true
+  } catch (error) {
+    console.error("Erro ao garantir existência da pasta:", error)
+    return false
+  }
+}
+
 // Função para fazer upload de um arquivo para o Bunny.net Storage
 export async function uploadFileToBunny(
   filePath: string,
@@ -25,6 +79,15 @@ export async function uploadFileToBunny(
 
     // Normalizar o caminho do arquivo
     const normalizedPath = filePath.replace(/\/+/g, "/").replace(/\/^\//, "")
+
+    // Modificar a função uploadFileToBunny para usar ensureFolderExists
+    // Antes da linha com o fetch para upload, adicionar:
+
+    // Garantir que a pasta existe
+    const folderOnly = filePath.substring(0, filePath.lastIndexOf("/"))
+    if (folderOnly) {
+      await ensureFolderExists(folderOnly)
+    }
 
     const url = `${BUNNY_STORAGE_URL}/${normalizedPath}`
     console.log(`Bunny Upload: Tentando fazer upload para: ${url}`)

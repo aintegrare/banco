@@ -1,6 +1,12 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { BlogPostCard } from "@/components/blog/blog-post-card"
+import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
+import { PlusCircle } from "lucide-react"
+import { BlogCategories } from "@/components/blog/blog-categories"
+import { BlogFeaturedPost } from "@/components/blog/blog-featured-post"
+import { BlogSearch } from "@/components/blog/blog-search"
 
 export const metadata: Metadata = {
   title: "Blog | Integrare",
@@ -119,26 +125,106 @@ const featuredPost = blogPosts.find((post) => post.featured)
 // Filtrar os posts que não estão em destaque
 const regularPosts = blogPosts.filter((post) => !post.featured)
 
-// Categorias populares
-const popularCategories = [
-  { name: "Marketing Digital", count: 12 },
-  { name: "SEO", count: 8 },
-  { name: "Redes Sociais", count: 15 },
-  { name: "E-mail Marketing", count: 6 },
-]
-
 export default function BlogPage() {
   return (
-    <div className="min-h-screen bg-[#f2f1ef] p-8">
-      <h1 className="text-3xl font-bold mb-6 text-[#4b7bb5]">Blog da Integrare</h1>
-      <p className="mb-6">Conteúdos sobre marketing, negócios e tecnologia</p>
+    <div className="min-h-screen bg-[#f2f1ef]">
+      <PageHeader
+        title="Blog da Integrare"
+        description="Conteúdos sobre marketing, negócios e tecnologia"
+        actions={
+          <Link href="/blog/admin/novo">
+            <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Novo Post
+            </Button>
+          </Link>
+        }
+      />
 
-      <Link href="/blog/admin">
-        <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">Acessar Administração</Button>
-      </Link>
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Coluna principal */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Post em destaque */}
+            {featuredPost && <BlogFeaturedPost post={featuredPost} />}
 
-      <div className="mt-8 p-6 bg-white rounded-lg shadow">
-        <p>Conteúdo da página principal do blog</p>
+            {/* Lista de posts */}
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-[#4072b0]">Posts Recentes</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {regularPosts.map((post) => (
+                  <BlogPostCard key={post.id} post={post} />
+                ))}
+              </div>
+
+              {/* Paginação */}
+              <div className="flex justify-center mt-8">
+                <div className="flex space-x-2">
+                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                    Anterior
+                  </Button>
+                  <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">1</Button>
+                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                    2
+                  </Button>
+                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                    3
+                  </Button>
+                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                    Próxima
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Barra lateral */}
+          <div className="space-y-8">
+            <BlogSearch />
+            <BlogCategories />
+
+            {/* Posts populares */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h3 className="text-xl font-bold text-[#4072b0] mb-4">Posts Populares</h3>
+              <div className="space-y-4">
+                {blogPosts.slice(0, 3).map((post) => (
+                  <div key={post.id} className="flex items-start space-x-3">
+                    <div className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden">
+                      <img
+                        src={post.coverImage || "/placeholder.svg"}
+                        alt={post.title}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <Link
+                        href={`/blog/${post.slug}`}
+                        className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] line-clamp-2"
+                      >
+                        {post.title}
+                      </Link>
+                      <p className="text-xs text-gray-500 mt-1">{post.readTime} de leitura</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Newsletter */}
+            <div className="bg-[#4b7bb5] rounded-lg shadow-sm p-6 text-white">
+              <h3 className="text-xl font-bold mb-2">Inscreva-se na Newsletter</h3>
+              <p className="text-sm mb-4">Receba nossos conteúdos exclusivos diretamente no seu e-mail.</p>
+              <div className="space-y-3">
+                <input
+                  type="email"
+                  placeholder="Seu melhor e-mail"
+                  className="w-full px-3 py-2 rounded-md text-gray-800 text-sm"
+                />
+                <Button className="w-full bg-white text-[#4b7bb5] hover:bg-gray-100">Inscrever-se</Button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

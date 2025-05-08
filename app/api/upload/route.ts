@@ -20,6 +20,8 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get("file") as File | null
 
+    const folder = (formData.get("folder") as string) || ""
+
     if (!file) {
       console.error("API Upload: Nenhum arquivo enviado")
       return NextResponse.json({ error: "Nenhum arquivo enviado" }, { status: 400 })
@@ -64,8 +66,19 @@ export async function POST(request: NextRequest) {
 
     // Determinar a pasta com base no tipo de arquivo
     const isImage = fileType.startsWith("image/")
-    const folder = isImage ? "images" : "documents"
-    const filePath = `${folder}/${fileName}`
+    const baseFolder = isImage ? "images" : "documents"
+    // Combinar a pasta base com a pasta selecionada pelo usuário
+    // const folderPath = folder ? `${baseFolder}/${folder}` : baseFolder
+    // const filePath = `${folderPath}/${fileName}`
+
+    // Determinar o diretório base com base no tipo de arquivo
+    const baseDir = fileType.startsWith("image/") ? "images" : "documents"
+
+    // Combinar o diretório base com a pasta selecionada
+    const targetDir = folder ? `${baseDir}/${folder}` : baseDir
+
+    // Construir o caminho completo para o arquivo
+    const filePath = `${targetDir}/${fileName}`
 
     console.log(`API Upload: Nome original: ${originalFileName}`)
     console.log(`API Upload: Nome com timestamp: ${fileName}`)

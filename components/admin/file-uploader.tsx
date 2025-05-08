@@ -2,8 +2,10 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Upload, File, Loader2, X, CheckCircle, AlertTriangle, ImageIcon, Trash2 } from "lucide-react"
+// Adicionar importação do componente Select
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface FileUploaderProps {
   onUploadSuccess?: () => void
@@ -19,6 +21,33 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
   const [detailedError, setDetailedError] = useState<string | null>(null)
   const [previewUrls, setPreviewUrls] = useState<{ [key: string]: string }>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Adicionar estado para armazenar as pastas e a pasta selecionada
+  const [folders, setFolders] = useState<string[]>([])
+  const [selectedFolder, setSelectedFolder] = useState<string>("") // Pasta raiz por padrão
+
+  // Adicionar função para buscar as pastas disponíveis
+  const fetchFolders = async () => {
+    try {
+      const response = await fetch("/api/files/folders")
+      if (response.ok) {
+        const data = await response.json()
+        setFolders(["", ...data.folders]) // Adiciona a pasta raiz como opção
+      } else {
+        console.error("Erro ao buscar pastas:", await response.text())
+        // Definir pelo menos as pastas padrão
+        setFolders(["", "documents", "images"])
+      }
+    } catch (error) {
+      console.error("Erro ao buscar pastas:", error)
+      // Definir pelo menos as pastas padrão em caso de erro
+      setFolders(["", "documents", "images"])
+    }
+  }
+
+  // Adicionar useEffect para carregar as pastas quando o componente montar
+  useEffect(() => {
+    fetchFolders()
+  }, [])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -157,6 +186,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
         try {
           const formData = new FormData()
           formData.append("file", file)
+          formData.append("folder", selectedFolder) // Adicionar a pasta selecionada
 
           const response = await fetch("/api/upload", {
             method: "POST",
@@ -283,6 +313,27 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
   return (
     <div className="bg-white rounded-lg p-4">
       <h2 className="text-lg font-semibold text-[#4072b0] mb-3">Upload de Arquivos</h2>
+
+      <div className="mb-4">
+        <label htmlFor="folder-select" className="block text-sm font-medium text-gray-700 mb-1">
+          Pasta de destino
+        </label>
+        <Select value={selectedFolder} onValueChange={setSelectedFolder}>
+          <SelectTrigger id="folder-select" className="w-full">
+            <SelectValue placeholder="Pasta raiz" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="root">Pasta raiz</SelectItem>
+            {folders
+              .filter((f) => f !== "")
+              .map((folder) => (
+                <SelectItem key={folder} value={folder}>
+                  {folder}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       <div
         className={`border-2 border-dashed rounded-lg p-5 text-center ${

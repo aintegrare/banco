@@ -22,9 +22,8 @@ export async function POST(request: NextRequest) {
     .insert([
       {
         name: data.name,
-        avatar: data.avatar,
+        avatar_url: data.avatarUrl,
         bio: data.bio,
-        email: data.email,
       },
     ])
     .select()

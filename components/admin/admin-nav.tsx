@@ -11,6 +11,7 @@ import {
   FileSearch,
   Database,
   MessageSquare,
+  FileText,
 } from "lucide-react"
 
 const navItems = [
@@ -18,6 +19,11 @@ const navItems = [
     title: "Dashboard",
     href: "/admin",
     icon: LayoutDashboard,
+  },
+  {
+    title: "Blog",
+    href: "/blog/admin",
+    icon: FileText,
   },
   {
     title: "Documentos",

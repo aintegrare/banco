@@ -1,128 +1,306 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
-import { PlusCircle } from "lucide-react"
-
-// Dados de exemplo para os posts do blog
-const blogPosts = [
-  {
-    id: "1",
-    title: "Como o Marketing Digital Transformou os Negócios em 2023",
-    slug: "como-o-marketing-digital-transformou-os-negocios-em-2023",
-    excerpt:
-      "Descubra as principais tendências de marketing digital que impactaram os negócios no último ano e como se preparar para o futuro.",
-    status: "Publicado",
-    category: "Marketing Digital",
-    publishedAt: "2023-12-15T10:00:00Z",
-    author: {
-      name: "Ana Silva",
-    },
-    views: 1245,
-    comments: 32,
-  },
-  {
-    id: "2",
-    title: "Estratégias de SEO para Pequenas Empresas",
-    slug: "estrategias-de-seo-para-pequenas-empresas",
-    excerpt:
-      "Um guia completo sobre como pequenas empresas podem melhorar seu posicionamento nos mecanismos de busca sem grandes investimentos.",
-    status: "Publicado",
-    category: "SEO",
-    publishedAt: "2023-11-28T14:30:00Z",
-    author: {
-      name: "Carlos Mendes",
-    },
-    views: 876,
-    comments: 18,
-  },
-  {
-    id: "3",
-    title: "O Poder das Redes Sociais para Engajamento de Clientes",
-    slug: "o-poder-das-redes-sociais-para-engajamento-de-clientes",
-    excerpt:
-      "Como utilizar as redes sociais de forma estratégica para aumentar o engajamento e a fidelização de clientes.",
-    status: "Publicado",
-    category: "Redes Sociais",
-    publishedAt: "2023-11-10T09:15:00Z",
-    author: {
-      name: "Juliana Costa",
-    },
-    views: 1032,
-    comments: 27,
-  },
-  {
-    id: "4",
-    title: "Análise de Dados: Como Tomar Decisões Baseadas em Informações",
-    slug: "analise-de-dados-como-tomar-decisoes-baseadas-em-informacoes",
-    excerpt:
-      "A importância da análise de dados para tomada de decisões estratégicas e como implementar uma cultura data-driven na sua empresa.",
-    status: "Publicado",
-    category: "Análise de Dados",
-    publishedAt: "2023-10-25T16:45:00Z",
-    author: {
-      name: "Ricardo Oliveira",
-    },
-    views: 654,
-    comments: 12,
-  },
-  {
-    id: "5",
-    title: "E-mail Marketing: Estratégias que Realmente Funcionam",
-    slug: "email-marketing-estrategias-que-realmente-funcionam",
-    excerpt:
-      "Dicas práticas para criar campanhas de e-mail marketing eficientes que geram conversões e fortalecem o relacionamento com clientes.",
-    status: "Rascunho",
-    category: "E-mail Marketing",
-    publishedAt: null,
-    author: {
-      name: "Fernanda Lima",
-    },
-    views: 0,
-    comments: 0,
-  },
-  {
-    id: "6",
-    title: "Tendências de Marketing para 2024",
-    slug: "tendencias-de-marketing-para-2024",
-    excerpt:
-      "As principais tendências de marketing que devem dominar o mercado em 2024 e como se preparar para aproveitar essas oportunidades.",
-    status: "Agendado",
-    category: "Tendências",
-    publishedAt: "2024-01-05T13:40:00Z",
-    author: {
-      name: "Paulo Santos",
-    },
-    views: 0,
-    comments: 0,
-  },
-]
-
-// Estatísticas do blog
-const blogStats = {
-  totalPosts: 42,
-  publishedPosts: 36,
-  draftPosts: 4,
-  scheduledPosts: 2,
-  totalViews: 28750,
-  totalComments: 342,
-  categories: 8,
-  authors: 6,
-}
+import { Input } from "@/components/ui/input"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Filter } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { createClient } from "@/lib/supabase/client"
 
 export default function BlogAdminPage() {
+  const [posts, setPosts] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState("")
+  const [categories, setCategories] = useState([])
+
+  useEffect(() => {
+    fetchPosts()
+    fetchCategories()
+  }, [currentPage, searchQuery, statusFilter, categoryFilter])
+
+  const fetchPosts = async () => {
+    setIsLoading(true)
+    try {
+      const supabase = createClient()
+
+      let query = supabase
+        .from("blog_posts")
+        .select(`
+          *,
+          author:blog_authors(id, name, avatar_url),
+          category:blog_categories(id, name, slug)
+        `)
+        .order("created_at", { ascending: false })
+
+      if (searchQuery) {
+        query = query.or(`title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`)
+      }
+
+      if (statusFilter) {
+        query = query.eq("published", statusFilter === "published")
+      }
+
+      if (categoryFilter) {
+        query = query.eq("category_id", categoryFilter)
+      }
+
+      // Paginação
+      const from = (currentPage - 1) * 10
+      const to = from + 9
+
+      const { data, count, error } = await query.range(from, to)
+
+      if (error) throw error
+
+      setPosts(data || [])
+      setTotalPages(Math.ceil((count || 0) / 10))
+    } catch (error) {
+      console.error("Erro ao buscar posts:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const fetchCategories = async () => {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase.from("blog_categories").select("*").order("name")
+
+      setCategories(data || [])
+    } catch (error) {
+      console.error("Erro ao buscar categorias:", error)
+    }
+  }
+
+  const handleDeletePost = async (id) => {
+    if (!confirm("Tem certeza que deseja excluir este post?")) return
+
+    try {
+      const response = await fetch(`/api/blog/posts/${id}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) throw new Error("Erro ao excluir post")
+
+      // Atualizar a lista de posts
+      fetchPosts()
+    } catch (error) {
+      console.error("Erro ao excluir post:", error)
+      alert("Ocorreu um erro ao excluir o post. Por favor, tente novamente.")
+    }
+  }
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "Não publicado"
+
+    const date = new Date(dateString)
+    return date.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })
+  }
+
   return (
-    <div className="min-h-screen bg-[#f2f1ef] p-8">
-      <h1 className="text-3xl font-bold mb-6 text-[#4b7bb5]">Gerenciar Blog</h1>
-      <p className="mb-6">Crie, edite e gerencie os posts do blog da Integrare</p>
+    <div className="min-h-screen bg-[#f2f1ef]">
+      <PageHeader
+        title="Gerenciar Blog"
+        description="Gerencie os posts, categorias e autores do blog da Integrare"
+        actions={
+          <Link href="/blog/admin/novo">
+            <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Post
+            </Button>
+          </Link>
+        }
+      />
 
-      <Link href="/blog/admin/novo">
-        <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Novo Post
-        </Button>
-      </Link>
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          {/* Filtros e busca */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="relative flex-grow">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Buscar posts..."
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
 
-      <div className="mt-8 p-6 bg-white rounded-lg shadow">
-        <p>Conteúdo da página de administração do blog</p>
+            <div className="flex gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <div className="flex items-center">
+                    <Filter className="mr-2 h-4 w-4" />
+                    <SelectValue placeholder="Status" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os status</SelectItem>
+                  <SelectItem value="published">Publicados</SelectItem>
+                  <SelectItem value="draft">Rascunhos</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <div className="flex items-center">
+                    <Filter className="mr-2 h-4 w-4" />
+                    <SelectValue placeholder="Categoria" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as categorias</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id.toString()}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Tabela de posts */}
+          {isLoading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4b7bb5] mx-auto"></div>
+              <p className="mt-4 text-[#4b7bb5]">Carregando posts...</p>
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500 mb-4">Nenhum post encontrado</p>
+              <Link href="/blog/admin/novo">
+                <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Criar Novo Post
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Título</TableHead>
+                    <TableHead>Autor</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {posts.map((post) => (
+                    <TableRow key={post.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center">
+                          <div className="w-10 h-10 rounded overflow-hidden mr-3 flex-shrink-0">
+                            <img
+                              src={post.featured_image || "/placeholder.svg"}
+                              alt={post.title}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <span className="line-clamp-1">{post.title}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{post.author?.name || "Sem autor"}</TableCell>
+                      <TableCell>{post.category?.name || "Sem categoria"}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={post.published ? "default" : "outline"}
+                          className={post.published ? "bg-green-500" : ""}
+                        >
+                          {post.published ? "Publicado" : "Rascunho"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(post.published_at)}</TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/blog/${post.slug}`} target="_blank">
+                                <Eye className="mr-2 h-4 w-4" />
+                                <span>Visualizar</span>
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/blog/admin/editar/${post.id}`}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                <span>Editar</span>
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeletePost(post.id)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Excluir</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {/* Paginação */}
+          {totalPages > 1 && (
+            <div className="mt-6">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink isActive={currentPage === page} onClick={() => setCurrentPage(page)}>
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

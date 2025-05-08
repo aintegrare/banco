@@ -23,7 +23,6 @@ export async function POST(request: NextRequest) {
       {
         name: data.name,
         slug: data.slug,
-        description: data.description,
       },
     ])
     .select()

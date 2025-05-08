@@ -1,242 +1,307 @@
+"use client"
+
+import type React from "react"
+
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
-import { CalendarIcon, Upload, Save, ArrowLeft, Trash2 } from "lucide-react"
+import { BlogEditor } from "@/components/blog/blog-editor"
+import { ArrowLeft, Save } from "lucide-react"
 import Link from "next/link"
 
-// Dados de exemplo para o post
-const post = {
-  id: "1",
-  title: "Como o Marketing Digital Transformou os Negócios em 2023",
-  slug: "como-o-marketing-digital-transformou-os-negocios-em-2023",
-  excerpt:
-    "Descubra as principais tendências de marketing digital que impactaram os negócios no último ano e como se preparar para o futuro.",
-  content:
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
-  status: "Publicado",
-  category: "Marketing Digital",
-  publishedAt: "2023-12-15T10:00:00Z",
-  author: {
-    name: "Ana Silva",
-  },
-  featured: true,
-  allowComments: true,
-  tags: ["marketing", "digital", "tendências", "negócios"],
-  views: 1245,
-  comments: 32,
-}
+// Categorias de exemplo
+const categories = [
+  { id: "1", name: "Marketing Digital" },
+  { id: "2", name: "SEO" },
+  { id: "3", name: "Redes Sociais" },
+  { id: "4", name: "E-mail Marketing" },
+  { id: "5", name: "Análise de Dados" },
+  { id: "6", name: "Tendências" },
+  { id: "7", name: "Estratégia" },
+  { id: "8", name: "Branding" },
+]
 
-export default function EditarBlogPostPage({ params }: { params: { id: string } }) {
+// Autores de exemplo
+const authors = [
+  { id: "1", name: "Ana Silva" },
+  { id: "2", name: "Carlos Mendes" },
+  { id: "3", name: "Juliana Costa" },
+  { id: "4", name: "Ricardo Oliveira" },
+  { id: "5", name: "Fernanda Lima" },
+  { id: "6", name: "Paulo Santos" },
+]
+
+// Dados de exemplo para os posts do blog
+const blogPosts = [
+  {
+    id: "1",
+    title: "Como o Marketing Digital Transformou os Negócios em 2023",
+    slug: "como-o-marketing-digital-transformou-os-negocios-em-2023",
+    excerpt:
+      "Descubra as principais tendências de marketing digital que impactaram os negócios no último ano e como se preparar para o futuro.",
+    content: `
+      <p>O marketing digital continua a evoluir rapidamente, transformando a maneira como as empresas se conectam com seus clientes. Em 2023, vimos mudanças significativas que redefiniram estratégias e abriram novas oportunidades para negócios de todos os tamanhos.</p>
+      
+      <h2>Inteligência Artificial no Marketing</h2>
+      <p>A IA deixou de ser uma tecnologia futurista para se tornar uma ferramenta essencial no arsenal de marketing. Empresas estão utilizando IA para personalizar experiências, analisar dados de clientes e automatizar tarefas repetitivas, permitindo que as equipes de marketing se concentrem em estratégias criativas e inovadoras.</p>
+    `,
+    coverImage: "/digital-marketing-concept.png",
+    authorId: "1",
+    categoryId: "1",
+    status: "published",
+    publishedAt: "2023-12-15T10:00:00Z",
+    featured: true,
+    metaTitle: "Marketing Digital em 2023: Transformações nos Negócios",
+    metaDescription:
+      "Descubra como o marketing digital transformou os negócios em 2023 e quais tendências continuarão a impactar o mercado.",
+    tags: "marketing digital, tendências, negócios, 2023",
+  },
+]
+
+export default function EditBlogPostPage({ params }: { params: { id: string } }) {
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(true)
+  const [post, setPost] = useState<any>(null)
+  const [isFeatured, setIsFeatured] = useState(false)
+  const [content, setContent] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    // Simulação de carregamento de dados
+    const foundPost = blogPosts.find((p) => p.id === params.id)
+
+    if (foundPost) {
+      setPost(foundPost)
+      setContent(foundPost.content)
+      setIsFeatured(foundPost.featured)
+    }
+
+    setIsLoading(false)
+  }, [params.id])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+
+    // Simulação de envio para API
+    setTimeout(() => {
+      setIsSubmitting(false)
+      router.push("/blog/admin")
+    }, 1500)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#f2f1ef] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4b7bb5] mx-auto"></div>
+          <p className="mt-4 text-[#4b7bb5]">Carregando post...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!post) {
+    return (
+      <div className="min-h-screen bg-[#f2f1ef] flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-[#4072b0] mb-4">Post não encontrado</h2>
+          <p className="text-gray-600 mb-6">O post que você está procurando não existe ou foi removido.</p>
+          <Link href="/blog/admin">
+            <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">Voltar para Administração</Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[#f2f1ef]">
       <PageHeader
         title="Editar Post"
-        description="Edite o post do blog da Integrare"
+        description="Edite as informações do post do blog"
         actions={
-          <div className="flex space-x-2">
+          <div className="flex space-x-3">
             <Link href="/blog/admin">
               <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar
+                Cancelar
               </Button>
             </Link>
-            <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">
+            <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]" onClick={handleSubmit} disabled={isSubmitting}>
               <Save className="mr-2 h-4 w-4" />
-              Salvar Alterações
+              {isSubmitting ? "Salvando..." : "Salvar Alterações"}
             </Button>
           </div>
         }
       />
 
       <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Título</Label>
-                    <Input
-                      id="title"
-                      placeholder="Digite o título do post"
-                      className="text-lg"
-                      defaultValue={post.title}
-                    />
-                  </div>
+        <form onSubmit={handleSubmit} className="space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Coluna principal */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
+                <div>
+                  <Label htmlFor="title">Título do Post</Label>
+                  <Input
+                    id="title"
+                    placeholder="Digite o título do post"
+                    className="mt-1"
+                    defaultValue={post.title}
+                    required
+                  />
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="excerpt">Resumo</Label>
-                    <Textarea
-                      id="excerpt"
-                      placeholder="Digite um breve resumo do post"
-                      className="min-h-[100px]"
-                      defaultValue={post.excerpt}
-                    />
-                  </div>
+                <div>
+                  <Label htmlFor="excerpt">Resumo</Label>
+                  <Textarea
+                    id="excerpt"
+                    placeholder="Digite um breve resumo do post"
+                    className="mt-1 h-24"
+                    defaultValue={post.excerpt}
+                    required
+                  />
+                </div>
 
-                  <div className="space-y-2">
-                    <Label>Conteúdo</Label>
-                    <Tabs defaultValue="editor" className="w-full">
-                      <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="editor">Editor</TabsTrigger>
-                        <TabsTrigger value="preview">Pré-visualização</TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="editor" className="mt-2">
-                        <Textarea
-                          placeholder="Escreva o conteúdo do seu post aqui..."
-                          className="min-h-[400px]"
-                          defaultValue={post.content}
-                        />
-                      </TabsContent>
-                      <TabsContent value="preview" className="mt-2">
-                        <div className="border rounded-md p-4 min-h-[400px] bg-white">
-                          <div className="prose max-w-none">
-                            <p>{post.content}</p>
-                          </div>
-                        </div>
-                      </TabsContent>
-                    </Tabs>
+                <div>
+                  <Label>Conteúdo</Label>
+                  <div className="mt-1 border rounded-md">
+                    <BlogEditor value={content} onChange={setContent} />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
 
-          <div className="space-y-6">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Status</Label>
-                    <Select
-                      defaultValue={
-                        post.status === "Publicado" ? "published" : post.status === "Rascunho" ? "draft" : "scheduled"
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="draft">Rascunho</SelectItem>
-                        <SelectItem value="published">Publicado</SelectItem>
-                        <SelectItem value="scheduled">Agendado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Data de Publicação</Label>
-                    <div className="flex">
-                      <Button variant="outline" className="w-full justify-start text-left font-normal border-[#4b7bb5]">
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        <span>{new Date(post.publishedAt).toLocaleDateString("pt-BR")}</span>
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Categoria</Label>
-                    <Select defaultValue={post.category.toLowerCase().replace(/\s+/g, "-")}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a categoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="marketing-digital">Marketing Digital</SelectItem>
-                        <SelectItem value="seo">SEO</SelectItem>
-                        <SelectItem value="redes-sociais">Redes Sociais</SelectItem>
-                        <SelectItem value="email-marketing">E-mail Marketing</SelectItem>
-                        <SelectItem value="analise-dados">Análise de Dados</SelectItem>
-                        <SelectItem value="tendencias">Tendências</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Autor</Label>
-                    <Select defaultValue={post.author.name.toLowerCase().replace(/\s+/g, "-")}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o autor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ana-silva">Ana Silva</SelectItem>
-                        <SelectItem value="carlos-mendes">Carlos Mendes</SelectItem>
-                        <SelectItem value="juliana-costa">Juliana Costa</SelectItem>
-                        <SelectItem value="ricardo-oliveira">Ricardo Oliveira</SelectItem>
-                        <SelectItem value="fernanda-lima">Fernanda Lima</SelectItem>
-                        <SelectItem value="paulo-santos">Paulo Santos</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Imagem de Capa</Label>
-                    <div className="border-2 border-dashed border-gray-300 rounded-md p-6 text-center">
-                      <div className="mb-4">
-                        <img
-                          src="/digital-marketing-concept.png"
-                          alt="Imagem de capa atual"
-                          className="h-32 mx-auto object-cover rounded-md"
-                        />
-                      </div>
-                      <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-500">Arraste uma nova imagem ou clique para fazer upload</p>
-                      <p className="text-xs text-gray-400 mt-1">PNG, JPG ou GIF até 2MB</p>
-                      <Button variant="outline" size="sm" className="mt-4">
-                        Alterar Imagem
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="featured" className="cursor-pointer">
-                      Destacar post
-                    </Label>
-                    <Switch id="featured" defaultChecked={post.featured} />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="comments" className="cursor-pointer">
-                      Permitir comentários
-                    </Label>
-                    <Switch id="comments" defaultChecked={post.allowComments} />
-                  </div>
+              <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
+                <h3 className="text-lg font-medium text-[#4072b0]">Imagem de Capa</h3>
+                <div className="mb-4">
+                  <img
+                    src={post.coverImage || "/placeholder.svg"}
+                    alt={post.title}
+                    className="w-full h-48 object-cover rounded-md"
+                  />
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="space-y-4">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
                   <div className="space-y-2">
-                    <Label>Tags</Label>
-                    <Input placeholder="Adicione tags separadas por vírgula" defaultValue={post.tags.join(", ")} />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="slug">URL Personalizada</Label>
-                    <Input id="slug" placeholder="url-personalizada" defaultValue={post.slug} />
-                    <p className="text-xs text-gray-500">
-                      https://integrare.com.br/blog/<span className="text-[#4b7bb5]">{post.slug}</span>
-                    </p>
-                  </div>
-
-                  <div className="pt-4 border-t">
-                    <Button variant="destructive" className="w-full">
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Excluir Post
+                    <div className="text-gray-500">Arraste uma nova imagem ou</div>
+                    <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                      Selecionar Arquivo
                     </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="text-sm text-gray-500">Recomendado: 1200 x 600 pixels, máximo 2MB (JPG, PNG)</div>
+              </div>
+            </div>
+
+            {/* Barra lateral */}
+            <div className="space-y-6">
+              <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
+                <h3 className="text-lg font-medium text-[#4072b0]">Publicação</h3>
+
+                <div>
+                  <Label htmlFor="status">Status</Label>
+                  <Select defaultValue={post.status}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Selecione o status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">Rascunho</SelectItem>
+                      <SelectItem value="published">Publicado</SelectItem>
+                      <SelectItem value="scheduled">Agendado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="publishDate">Data de Publicação</Label>
+                  <Input
+                    id="publishDate"
+                    type="datetime-local"
+                    className="mt-1"
+                    defaultValue={post.publishedAt ? new Date(post.publishedAt).toISOString().slice(0, 16) : ""}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="featured" className="cursor-pointer">
+                    Post em Destaque
+                  </Label>
+                  <Switch id="featured" checked={isFeatured} onCheckedChange={setIsFeatured} />
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
+                <h3 className="text-lg font-medium text-[#4072b0]">Categorização</h3>
+
+                <div>
+                  <Label htmlFor="category">Categoria</Label>
+                  <Select defaultValue={post.categoryId}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Selecione uma categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="tags">Tags</Label>
+                  <Input id="tags" placeholder="Separe as tags por vírgula" className="mt-1" defaultValue={post.tags} />
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
+                <h3 className="text-lg font-medium text-[#4072b0]">Autor</h3>
+
+                <div>
+                  <Label htmlFor="author">Autor do Post</Label>
+                  <Select defaultValue={post.authorId}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Selecione o autor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {authors.map((author) => (
+                        <SelectItem key={author.id} value={author.id}>
+                          {author.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
+                <h3 className="text-lg font-medium text-[#4072b0]">SEO</h3>
+
+                <div>
+                  <Label htmlFor="metaTitle">Título SEO</Label>
+                  <Input id="metaTitle" placeholder="Título para SEO" className="mt-1" defaultValue={post.metaTitle} />
+                </div>
+
+                <div>
+                  <Label htmlFor="metaDescription">Descrição SEO</Label>
+                  <Textarea
+                    id="metaDescription"
+                    placeholder="Descrição para SEO"
+                    className="mt-1"
+                    defaultValue={post.metaDescription}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   )

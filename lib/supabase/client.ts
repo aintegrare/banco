@@ -1,9 +1,9 @@
 "use client"
 
-import { createClient } from "@supabase/supabase-js"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
 // Singleton pattern para evitar múltiplas instâncias
-let supabaseClient: ReturnType<typeof createClient> | null = null
+let supabaseClient: ReturnType<typeof createSupabaseClient> | null = null
 
 export function getSupabaseClient() {
   if (supabaseClient) return supabaseClient
@@ -15,7 +15,7 @@ export function getSupabaseClient() {
     throw new Error("Supabase URL and key must be defined")
   }
 
-  supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+  supabaseClient = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
@@ -24,3 +24,5 @@ export function getSupabaseClient() {
 
   return supabaseClient
 }
+
+export const createClient = getSupabaseClient
