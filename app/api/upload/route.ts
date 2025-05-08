@@ -64,21 +64,19 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now()
     const fileName = `${timestamp}-${originalFileName.replace(/\s+/g, "-")}`
 
-    // Determinar a pasta com base no tipo de arquivo
-    const isImage = fileType.startsWith("image/")
-    const baseFolder = isImage ? "images" : "documents"
-    // Combinar a pasta base com a pasta selecionada pelo usuário
-    // const folderPath = folder ? `${baseFolder}/${folder}` : baseFolder
-    // const filePath = `${folderPath}/${fileName}`
-
     // Determinar o diretório base com base no tipo de arquivo
     const baseDir = fileType.startsWith("image/") ? "images" : "documents"
 
-    // Combinar o diretório base com a pasta selecionada
-    const targetDir = folder ? `${baseDir}/${folder}` : baseDir
-
     // Construir o caminho completo para o arquivo
-    const filePath = `${targetDir}/${fileName}`
+    let filePath = ""
+
+    if (folder) {
+      // Se uma pasta específica foi selecionada, usar essa pasta
+      filePath = `${folder}/${fileName}`
+    } else {
+      // Caso contrário, usar o diretório base
+      filePath = `${baseDir}/${fileName}`
+    }
 
     console.log(`API Upload: Nome original: ${originalFileName}`)
     console.log(`API Upload: Nome com timestamp: ${fileName}`)
@@ -97,6 +95,7 @@ export async function POST(request: NextRequest) {
       console.log(`API Upload: Upload concluído com sucesso. URL: ${fileUrl}`)
 
       // Armazenar metadados do documento
+      const isImage = fileType.startsWith("image/")
       const documentType = isImage ? "image" : fileType.includes("pdf") ? "pdf" : "document"
       const metadata = await addDocumentMetadata({
         title: originalFileName.replace(/\.[^/.]+$/, ""),
