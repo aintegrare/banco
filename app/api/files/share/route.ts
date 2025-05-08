@@ -12,9 +12,16 @@ export async function POST(request: Request) {
     // Gerar URL pública para o arquivo
     const publicUrl = getBunnyPublicUrl(filePath)
 
+    // Para pastas, gerar URL para a página de visualização compartilhada
+    const isFolder = filePath.endsWith("/")
+    const shareUrl = isFolder
+      ? `${process.env.NEXT_PUBLIC_APP_URL || ""}/shared/${encodeURIComponent(filePath)}`
+      : publicUrl
+
     return NextResponse.json({
       success: true,
-      shareUrl: publicUrl,
+      shareUrl,
+      isFolder,
     })
   } catch (error) {
     console.error("Erro ao gerar link de compartilhamento:", error)

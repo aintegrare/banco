@@ -19,6 +19,8 @@ import {
   Eye,
 } from "lucide-react"
 import { useState } from "react"
+import { ShareLinkDialog } from "./share-link-dialog"
+import { ToastNotification } from "./toast-notification"
 
 interface FileItem {
   id: string
@@ -40,6 +42,14 @@ interface FileRowProps {
 
 export function FileRow({ file, onFolderClick, onDelete }: FileRowProps) {
   const [showMenu, setShowMenu] = useState(false)
+  // Adicionar estado para o diálogo de compartilhamento
+  const [showShareDialog, setShowShareDialog] = useState(false)
+  // Adicionar estado para notificações
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: "success" | "error" }>({
+    visible: false,
+    message: "",
+    type: "success",
+  })
 
   // Função para formatar bytes em unidades legíveis
   const formatBytes = (bytes = 0) => {
@@ -101,82 +111,163 @@ export function FileRow({ file, onFolderClick, onDelete }: FileRowProps) {
     setShowMenu(!showMenu)
   }
 
-  return (
-    <tr className="hover:bg-gray-50 cursor-pointer" onClick={handleClick}>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <div className="flex items-center">
-          <div className="flex-shrink-0">{getFileIcon()}</div>
-          <div className="ml-4">
-            <div className="text-sm font-medium text-gray-900">{file.name}</div>
-          </div>
-        </div>
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <div className="text-sm text-gray-500">{formatDate(file.modified)}</div>
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <div className="text-sm text-gray-500">
-          {file.type === "folder" ? "—" : file.size ? formatBytes(file.size) : "—"}
-        </div>
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap">
-        {file.project ? (
-          <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-            {file.project}
-          </span>
-        ) : (
-          <span className="text-sm text-gray-500">—</span>
-        )}
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-        <button className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100" onClick={toggleMenu}>
-          <MoreVertical size={16} />
-        </button>
+  // Função para compartilhar arquivo
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowMenu(false)
 
-        {/* Dropdown menu */}
-        {showMenu && (
-          <div
-            className="absolute top-10 right-4 bg-white rounded-md shadow-lg z-10 border border-gray-200 py-1 w-40"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
-              <Star size={16} className="mr-2" />
-              <span>Favoritar</span>
-            </button>
+    // Se for um arquivo, mostrar o diálogo de compartilhamento
+    if (file.url) {
+      setShowShareDialog(true)
+    } else {
+      // Se for uma pasta, copiar o link para a área de transferência
+      copyToClipboard(window.location.origin + "/admin/arquivos?path=" + encodeURIComponent(file.path))
+    }
+  }
+
+  // Função para copiar para a área de transferência
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setToast({
+        visible: true,
+        message: "Link copiado para a área de transferência!",
+        type: "success",
+      })
+
+      // Esconder o toast após 3 segundos
+      setTimeout(() => {
+        setToast((prev) => ({ ...prev, visible: false }))
+      }, 3000)
+    } catch (err) {
+      console.error("Falha ao copiar texto: ", err)
+      setToast({
+        visible: true,
+        message: "Erro ao copiar link",
+        type: "error",
+      })
+    }
+  }
+
+  return (
+    <>
+      <tr className="hover:bg-gray-50 cursor-pointer" onClick={handleClick}>
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">{getFileIcon()}</div>
+            <div className="ml-4">
+              <div className="text-sm font-medium text-gray-900">{file.name}</div>
+            </div>
+          </div>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="text-sm text-gray-500">{formatDate(file.modified)}</div>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="text-sm text-gray-500">
+            {file.type === "folder" ? "—" : file.size ? formatBytes(file.size) : "—"}
+          </div>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          {file.project ? (
+            <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+              {file.project}
+            </span>
+          ) : (
+            <span className="text-sm text-gray-500">—</span>
+          )}
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
+          {/* Botões de ação rápida */}
+          <div className="flex items-center justify-end space-x-1">
             {file.type === "file" && (
-              <>
-                <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
-                  <Eye size={16} className="mr-2" />
-                  <span>Visualizar</span>
-                </button>
-                <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
-                  <Download size={16} className="mr-2" />
-                  <span>Download</span>
-                </button>
-              </>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowShareDialog(true)
+                }}
+                className="p-1.5 text-gray-400 hover:text-purple-500 hover:bg-purple-50 rounded-full transition-colors"
+                title="Compartilhar"
+              >
+                <Share2 size={16} />
+              </button>
             )}
-            <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
-              <Share2 size={16} className="mr-2" />
-              <span>Compartilhar</span>
-            </button>
-            <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
-              <Pencil size={16} className="mr-2" />
-              <span>Renomear</span>
-            </button>
             <button
-              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
-              onClick={(e) => {
-                e.stopPropagation()
-                setShowMenu(false)
-                onDelete()
-              }}
+              className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100"
+              onClick={toggleMenu}
             >
-              <Trash2 size={16} className="mr-2" />
-              <span>Excluir</span>
+              <MoreVertical size={16} />
             </button>
           </div>
-        )}
-      </td>
-    </tr>
+
+          {/* Dropdown menu */}
+          {showMenu && (
+            <div
+              className="absolute top-10 right-4 bg-white rounded-md shadow-lg z-10 border border-gray-200 py-1 w-40"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                <Star size={16} className="mr-2" />
+                <span>Favoritar</span>
+              </button>
+              {file.type === "file" && (
+                <>
+                  <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                    <Eye size={16} className="mr-2" />
+                    <span>Visualizar</span>
+                  </button>
+                  <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                    <Download size={16} className="mr-2" />
+                    <span>Download</span>
+                  </button>
+                </>
+              )}
+              {/* Botão de compartilhamento no menu */}
+              <button
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                onClick={handleShare}
+              >
+                <Share2 size={16} className="mr-2" />
+                <span>Compartilhar</span>
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                <Pencil size={16} className="mr-2" />
+                <span>Renomear</span>
+              </button>
+              <button
+                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowMenu(false)
+                  onDelete()
+                }}
+              >
+                <Trash2 size={16} className="mr-2" />
+                <span>Excluir</span>
+              </button>
+            </div>
+          )}
+        </td>
+      </tr>
+
+      {/* Diálogo de compartilhamento */}
+      {showShareDialog && (
+        <ShareLinkDialog
+          isOpen={showShareDialog}
+          onClose={() => setShowShareDialog(false)}
+          fileUrl={file.url || window.location.origin + "/admin/arquivos?path=" + encodeURIComponent(file.path)}
+          fileName={file.name}
+        />
+      )}
+
+      {/* Toast de notificação */}
+      {toast.visible && (
+        <ToastNotification
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
+        />
+      )}
+    </>
   )
 }

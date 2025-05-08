@@ -22,8 +22,10 @@ import {
   Loader2,
 } from "lucide-react"
 import { useState } from "react"
-// Adicionar o import do RenameWarningDialog
 import { RenameWarningDialog } from "./rename-warning-dialog"
+import { ShareLinkDialog } from "./share-link-dialog"
+import { ToastNotification } from "./toast-notification"
+import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
 
 interface FileItem {
   id: string
@@ -37,7 +39,6 @@ interface FileItem {
   project?: string
 }
 
-// Atualizar a interface FileCardProps para incluir a função onRename
 interface FileCardProps {
   file: FileItem
   onFolderClick: () => void
@@ -49,14 +50,19 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
   const [showMenu, setShowMenu] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
-
-  // Adicionar estes estados dentro da função FileCard
   const [showRenameModal, setShowRenameModal] = useState(false)
   const [newFileName, setNewFileName] = useState(file.name)
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameError, setRenameError] = useState<string | null>(null)
-  // Adicionar este estado dentro da função FileCard, junto com os outros estados
   const [showRenameWarning, setShowRenameWarning] = useState(false)
+  const [showShareDialog, setShowShareDialog] = useState(false)
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: "success" | "error" }>({
+    visible: false,
+    message: "",
+    type: "success",
+  })
+  // Adicionar estado para o diálogo de confirmação de exclusão
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
 
   // Função para formatar bytes em unidades legíveis
   const formatBytes = (bytes = 0) => {
@@ -118,6 +124,70 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
     return ["jpg", "jpeg", "png", "gif", "webp"].includes(fileType)
   }
 
+  // Função para compartilhar arquivo ou pasta
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowMenu(false)
+
+    try {
+      // Usar a API para gerar um link de compartilhamento
+      const response = await fetch("/api/files/share", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ filePath: file.path }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Erro ao gerar link de compartilhamento")
+      }
+
+      const data = await response.json()
+
+      // Se for um arquivo, já temos a URL direta
+      if (file.type === "file" && file.url) {
+        setShowShareDialog(true)
+      } else {
+        // Para pastas, usar a URL pública gerada pela API
+        // Converter para URL de visualização pública
+        const publicUrl = `${window.location.origin}/shared/${encodeURIComponent(file.path)}`
+        copyToClipboard(publicUrl)
+      }
+    } catch (error) {
+      console.error("Erro ao compartilhar:", error)
+      setToast({
+        visible: true,
+        message: "Erro ao gerar link de compartilhamento",
+        type: "error",
+      })
+    }
+  }
+
+  // Função para copiar para a área de transferência
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setToast({
+        visible: true,
+        message: "Link copiado para a área de transferência!",
+        type: "success",
+      })
+
+      // Esconder o toast após 3 segundos
+      setTimeout(() => {
+        setToast((prev) => ({ ...prev, visible: false }))
+      }, 3000)
+    } catch (err) {
+      console.error("Falha ao copiar texto: ", err)
+      setToast({
+        visible: true,
+        message: "Erro ao copiar link",
+        type: "error",
+      })
+    }
+  }
+
   // Modificar a função handleRename para mostrar o aviso primeiro
   const handleRename = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -148,7 +218,7 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
     await executeRename()
   }
 
-  // Adicionar esta nova função para executar a renomeação após a confirmação
+  // Função para executar a renomeação após a confirmação
   const executeRename = async () => {
     setIsRenaming(true)
     setRenameError(null)
@@ -184,6 +254,12 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
     } finally {
       setIsRenaming(false)
     }
+  }
+
+  // Função para confirmar exclusão
+  const confirmDelete = () => {
+    setShowDeleteConfirmation(false)
+    onDelete()
   }
 
   return (
@@ -233,40 +309,46 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
         </div>
 
         {/* Overlay de ações para hover */}
-        {isHovered && file.type !== "folder" && (
+        {isHovered && (
           <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
-            {isImage() && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowPreview(true)
-                }}
-                className="p-2 bg-white rounded-full text-gray-700 hover:text-[#4b7bb5] transition-colors"
-                title="Visualizar"
-              >
-                <Eye size={18} />
-              </button>
+            {file.type === "file" && (
+              <>
+                {isImage() && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowPreview(true)
+                    }}
+                    className="p-2 bg-white rounded-full text-gray-700 hover:text-[#4b7bb5] transition-colors"
+                    title="Visualizar"
+                  >
+                    <Eye size={18} />
+                  </button>
+                )}
+                <a
+                  href={file.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="p-2 bg-white rounded-full text-gray-700 hover:text-blue-600 transition-colors"
+                  title="Abrir"
+                >
+                  <ExternalLink size={18} />
+                </a>
+                {/* Botão de compartilhamento */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowShareDialog(true)
+                  }}
+                  className="p-2 bg-white rounded-full text-gray-700 hover:text-purple-600 transition-colors"
+                  title="Compartilhar"
+                >
+                  <Share2 size={18} />
+                </button>
+              </>
             )}
-            <a
-              href={file.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="p-2 bg-white rounded-full text-gray-700 hover:text-blue-600 transition-colors"
-              title="Abrir"
-            >
-              <ExternalLink size={18} />
-            </a>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete()
-              }}
-              className="p-2 bg-white rounded-full text-gray-700 hover:text-red-600 transition-colors"
-              title="Excluir"
-            >
-              <Trash2 size={18} />
-            </button>
+            {/* Remover o botão de exclusão do overlay para evitar exclusões acidentais */}
           </div>
         )}
 
@@ -325,7 +407,11 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
                 </button>
               </>
             )}
-            <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+            {/* Botão de compartilhamento no menu */}
+            <button
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+              onClick={handleShare}
+            >
               <Share2 size={16} className="mr-2 text-purple-500" />
               <span>Compartilhar</span>
             </button>
@@ -343,12 +429,13 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
               <span>Renomear</span>
             </button>
             <div className="border-t border-gray-100 my-1"></div>
+            {/* Modificar o botão de exclusão para mostrar o diálogo de confirmação */}
             <button
               className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
               onClick={(e) => {
                 e.stopPropagation()
                 setShowMenu(false)
-                onDelete()
+                setShowDeleteConfirmation(true)
               }}
             >
               <Trash2 size={16} className="mr-2" />
@@ -385,14 +472,23 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
               <div className="text-sm text-gray-600">
                 <span className="font-medium">{file.size ? formatBytes(file.size) : ""}</span> • {file.modified}
               </div>
-              <a
-                href={file.url}
-                download
-                className="flex items-center px-3 py-1.5 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] transition-colors"
-              >
-                <Download className="h-4 w-4 mr-1.5" />
-                <span>Download</span>
-              </a>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowShareDialog(true)}
+                  className="flex items-center px-3 py-1.5 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] transition-colors"
+                >
+                  <Share2 className="h-4 w-4 mr-1.5" />
+                  <span>Compartilhar</span>
+                </button>
+                <a
+                  href={file.url}
+                  download
+                  className="flex items-center px-3 py-1.5 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] transition-colors"
+                >
+                  <Download className="h-4 w-4 mr-1.5" />
+                  <span>Download</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -453,6 +549,8 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
           </div>
         </div>
       )}
+
+      {/* Diálogo de aviso de renomeação */}
       {showRenameWarning && (
         <RenameWarningDialog
           isOpen={showRenameWarning}
@@ -460,6 +558,36 @@ export function FileCard({ file, onFolderClick, onDelete, onRename }: FileCardPr
           onConfirm={executeRename}
           itemName={file.name}
           isFolder={file.type === "folder"}
+        />
+      )}
+
+      {/* Diálogo de compartilhamento */}
+      {showShareDialog && (
+        <ShareLinkDialog
+          isOpen={showShareDialog}
+          onClose={() => setShowShareDialog(false)}
+          fileUrl={file.url || `${window.location.origin}/shared/${encodeURIComponent(file.path)}`}
+          fileName={file.name}
+        />
+      )}
+
+      {/* Diálogo de confirmação de exclusão */}
+      {showDeleteConfirmation && (
+        <DeleteConfirmationDialog
+          isOpen={showDeleteConfirmation}
+          onClose={() => setShowDeleteConfirmation(false)}
+          onConfirm={confirmDelete}
+          itemName={file.name}
+          isFolder={file.type === "folder"}
+        />
+      )}
+
+      {/* Toast de notificação */}
+      {toast.visible && (
+        <ToastNotification
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
         />
       )}
     </>
