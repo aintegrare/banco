@@ -43,6 +43,13 @@ import {
   Maximize2,
   Minimize2,
   ClipboardList,
+  CheckCircle,
+  Circle,
+  Plus,
+  Edit,
+  Save,
+  Calendar,
+  Info,
 } from "lucide-react"
 import { FileCard } from "./file-card"
 import { FileRow } from "./file-row"
@@ -67,9 +74,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ShareLinkDialog } from "./share-link-dialog"
 import { ToastNotification } from "./toast-notification"
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { getSupabaseClient } from "@/lib/supabase/client"
 
 // Adicionar importações para os componentes de tarefas
-import { FolderTasks } from "./folder-tasks"
 import { fetchFolderTaskCounts } from "@/lib/folder-tasks-manager"
 
 interface FileItem {
@@ -83,6 +91,14 @@ interface FileItem {
   fileType?: string
   project?: string
   isFavorite?: boolean
+}
+
+interface FolderTask {
+  id: string
+  folder_path: string
+  description: string | null
+  is_completed: boolean
+  created_at: string
 }
 
 export function FileExplorer() {
@@ -118,10 +134,21 @@ export function FileExplorer() {
   const [storageUsage, setStorageUsage] = useState({ used: 0, total: 1024 * 1024 * 1024 * 10 }) // 10GB default
   const fileExplorerRef = useRef<HTMLDivElement>(null)
 
-  // Adicionar estados para gerenciar tarefas dentro da função FileExplorer
+  // Estados para gerenciar tarefas
   const [taskCounts, setTaskCounts] = useState<Record<string, number>>({})
-  const [showTasksPanel, setShowTasksPanel] = useState(false)
-  const [selectedFolderForTasks, setSelectedFolderForTasks] = useState<string | null>(null)
+  const [tasks, setTasks] = useState<FolderTask[]>([])
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false)
+  const [newTaskDescription, setNewTaskDescription] = useState("")
+  const [isAddingTask, setIsAddingTask] = useState(false)
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [editDescription, setEditDescription] = useState("")
+  const [viewType, setViewType] = useState<"files" | "tasks">("files")
+  const [selectedTask, setSelectedTask] = useState<FolderTask | null>(null)
+  const [showTaskDetails, setShowTaskDetails] = useState(false)
+  const [taskSortBy, setTaskSortBy] = useState<"date" | "status">("date")
+  const [taskSortDirection, setTaskSortDirection] = useState<"asc" | "desc">("desc")
+  const [taskFilter, setTaskFilter] = useState<"all" | "pending" | "completed">("all")
+  const [taskSearchQuery, setTaskSearchQuery] = useState("")
 
   // Função para buscar arquivos e pastas
   const fetchFiles = useCallback(async () => {
@@ -173,8 +200,7 @@ export function FileExplorer() {
     }
   }, [currentPath, favorites])
 
-  // Adicionar função para buscar contagens de tarefas após a declaração de fetchFiles
-  // Adicionar após a função fetchFiles
+  // Função para buscar contagens de tarefas
   const fetchTaskCounts = useCallback(async () => {
     try {
       // Obter apenas os caminhos das pastas
@@ -189,18 +215,48 @@ export function FileExplorer() {
     }
   }, [files])
 
+  // Função para buscar tarefas da pasta atual
+  const fetchTasks = useCallback(async () => {
+    if (!currentPath.length) return
+
+    setIsLoadingTasks(true)
+    try {
+      const folderPath = currentPath.join("/")
+      const supabase = getSupabaseClient()
+      const { data, error } = await supabase
+        .from("folder_tasks")
+        .select("*")
+        .eq("folder_path", folderPath)
+        .order("created_at", { ascending: false })
+
+      if (error) throw error
+
+      setTasks(data || [])
+    } catch (err) {
+      console.error("Erro ao carregar tarefas da pasta:", err)
+    } finally {
+      setIsLoadingTasks(false)
+    }
+  }, [currentPath])
+
   // Carregar arquivos quando o componente montar ou o caminho mudar
   useEffect(() => {
     fetchFiles()
   }, [fetchFiles])
 
-  // Adicionar useEffect para buscar contagens de tarefas quando os arquivos mudarem
-  // Adicionar após o useEffect que chama fetchFiles
+  // Buscar contagens de tarefas quando os arquivos mudarem
   useEffect(() => {
     if (!isLoading && files.length > 0) {
       fetchTaskCounts()
     }
   }, [fetchTaskCounts, isLoading, files])
+
+  // Buscar tarefas quando o caminho mudar ou quando alternar para a aba de tarefas
+  useEffect(() => {
+    if (viewType === "tasks" || currentPath.length > 0) {
+      fetchTasks()
+    }
+  }, [fetchTasks, viewType, currentPath])
 
   // Carregar favoritos do localStorage
   useEffect(() => {
@@ -507,20 +563,205 @@ export function FileExplorer() {
     }
   }
 
-  // Adicionar função para abrir o painel de tarefas
-  // Adicionar antes da função getFilteredFiles
-  const openTasksPanel = (folderPath: string) => {
-    setSelectedFolderForTasks(folderPath)
-    setShowTasksPanel(true)
+  // Adicionar nova tarefa
+  const handleAddTask = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!newTaskDescription || !newTaskDescription.trim()) return
+    if (currentPath.length === 0) return
+
+    setIsAddingTask(true)
+
+    try {
+      const supabase = getSupabaseClient()
+      const folderPath = currentPath.join("/")
+      const newTask = {
+        folder_path: folderPath,
+        description: newTaskDescription.trim(),
+        is_completed: false,
+      }
+
+      const { data, error } = await supabase.from("folder_tasks").insert([newTask]).select()
+
+      if (error) throw error
+
+      if (data && data.length > 0) {
+        setTasks([data[0], ...tasks])
+
+        // Atualizar contagem de tarefas
+        setTaskCounts((prev) => ({
+          ...prev,
+          [folderPath]: (prev[folderPath] || 0) + 1,
+        }))
+      }
+
+      setNewTaskDescription("")
+
+      // Mostrar toast de sucesso
+      setToast({
+        visible: true,
+        message: "Tarefa adicionada com sucesso!",
+        type: "success",
+      })
+
+      // Esconder o toast após 3 segundos
+      setTimeout(() => {
+        setToast((prev) => ({ ...prev, visible: false }))
+      }, 3000)
+    } catch (err) {
+      console.error("Erro ao adicionar tarefa:", err)
+      setToast({
+        visible: true,
+        message: "Erro ao adicionar tarefa",
+        type: "error",
+      })
+    } finally {
+      setIsAddingTask(false)
+    }
   }
 
-  // Adicionar função para atualizar a contagem de tarefas
-  // Adicionar antes da função getFilteredFiles
-  const handleTaskCountChange = (folderPath: string, count: number) => {
-    setTaskCounts((prev) => ({
-      ...prev,
-      [folderPath]: count,
-    }))
+  // Alternar status da tarefa (concluída/pendente)
+  const toggleTaskStatus = async (taskId: string, currentStatus: boolean) => {
+    try {
+      const supabase = getSupabaseClient()
+      const { error } = await supabase.from("folder_tasks").update({ is_completed: !currentStatus }).eq("id", taskId)
+
+      if (error) throw error
+
+      // Atualizar estado local
+      const updatedTasks = tasks.map((task) => {
+        if (task.id === taskId) {
+          return { ...task, is_completed: !currentStatus }
+        }
+        return task
+      })
+
+      setTasks(updatedTasks)
+
+      // Atualizar contagem de tarefas pendentes
+      const folderPath = currentPath.join("/")
+      const pendingCount = updatedTasks.filter((task) => !task.is_completed).length
+
+      setTaskCounts((prev) => ({
+        ...prev,
+        [folderPath]: pendingCount,
+      }))
+    } catch (err) {
+      console.error("Erro ao atualizar status da tarefa:", err)
+      setToast({
+        visible: true,
+        message: "Erro ao atualizar status da tarefa",
+        type: "error",
+      })
+    }
+  }
+
+  // Excluir tarefa
+  const deleteTask = async (taskId: string, isCompleted: boolean) => {
+    try {
+      const supabase = getSupabaseClient()
+      const { error } = await supabase.from("folder_tasks").delete().eq("id", taskId)
+
+      if (error) throw error
+
+      // Atualizar estado local
+      const updatedTasks = tasks.filter((task) => task.id !== taskId)
+      setTasks(updatedTasks)
+
+      // Atualizar contagem de tarefas pendentes se a tarefa excluída estava pendente
+      if (!isCompleted) {
+        const folderPath = currentPath.join("/")
+        const pendingCount = updatedTasks.filter((task) => !task.is_completed).length
+
+        setTaskCounts((prev) => ({
+          ...prev,
+          [folderPath]: pendingCount,
+        }))
+      }
+
+      // Mostrar toast de sucesso
+      setToast({
+        visible: true,
+        message: "Tarefa excluída com sucesso!",
+        type: "success",
+      })
+
+      // Esconder o toast após 3 segundos
+      setTimeout(() => {
+        setToast((prev) => ({ ...prev, visible: false }))
+      }, 3000)
+    } catch (err) {
+      console.error("Erro ao excluir tarefa:", err)
+      setToast({
+        visible: true,
+        message: "Erro ao excluir tarefa",
+        type: "error",
+      })
+    }
+  }
+
+  // Iniciar edição de tarefa
+  const startEditTask = (task: FolderTask) => {
+    setEditingTaskId(task.id)
+    setEditDescription(task.description || "")
+  }
+
+  // Salvar edição de tarefa
+  const saveEditTask = async (taskId: string) => {
+    if (!editDescription || !editDescription.trim()) return
+
+    try {
+      const supabase = getSupabaseClient()
+      const { error } = await supabase
+        .from("folder_tasks")
+        .update({ description: editDescription.trim() })
+        .eq("id", taskId)
+
+      if (error) throw error
+
+      // Atualizar estado local
+      const updatedTasks = tasks.map((task) => {
+        if (task.id === taskId) {
+          return { ...task, description: editDescription.trim() }
+        }
+        return task
+      })
+
+      setTasks(updatedTasks)
+      setEditingTaskId(null)
+      setEditDescription("")
+
+      // Mostrar toast de sucesso
+      setToast({
+        visible: true,
+        message: "Tarefa atualizada com sucesso!",
+        type: "success",
+      })
+
+      // Esconder o toast após 3 segundos
+      setTimeout(() => {
+        setToast((prev) => ({ ...prev, visible: false }))
+      }, 3000)
+    } catch (err) {
+      console.error("Erro ao atualizar tarefa:", err)
+      setToast({
+        visible: true,
+        message: "Erro ao atualizar tarefa",
+        type: "error",
+      })
+    }
+  }
+
+  // Cancelar edição
+  const cancelEdit = () => {
+    setEditingTaskId(null)
+    setEditDescription("")
+  }
+
+  // Abrir detalhes da tarefa
+  const openTaskDetails = (task: FolderTask) => {
+    setSelectedTask(task)
+    setShowTaskDetails(true)
   }
 
   // Filtrar arquivos com base na pesquisa, tipo e aba ativa
@@ -559,7 +800,46 @@ export function FileExplorer() {
     return filtered
   }
 
+  // Filtrar tarefas
+  const getFilteredTasks = () => {
+    let filtered = tasks
+
+    // Filtrar por pesquisa
+    if (taskSearchQuery) {
+      filtered = filtered.filter((task) => task.description?.toLowerCase().includes(taskSearchQuery.toLowerCase()))
+    }
+
+    // Filtrar por status
+    if (taskFilter === "pending") {
+      filtered = filtered.filter((task) => !task.is_completed)
+    } else if (taskFilter === "completed") {
+      filtered = filtered.filter((task) => task.is_completed)
+    }
+
+    return filtered
+  }
+
+  // Ordenar tarefas
+  const getSortedTasks = (filteredTasks: FolderTask[]) => {
+    return [...filteredTasks].sort((a, b) => {
+      if (taskSortBy === "date") {
+        return taskSortDirection === "asc"
+          ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      } else if (taskSortBy === "status") {
+        if (taskSortDirection === "asc") {
+          return a.is_completed === b.is_completed ? 0 : a.is_completed ? 1 : -1
+        } else {
+          return a.is_completed === b.is_completed ? 0 : a.is_completed ? -1 : 1
+        }
+      }
+      return 0
+    })
+  }
+
   const filteredFiles = getFilteredFiles()
+  const filteredTasks = getFilteredTasks()
+  const sortedTasks = getSortedTasks(filteredTasks)
 
   // Ordenar arquivos
   const sortedFiles = [...filteredFiles].sort((a, b) => {
@@ -599,6 +879,18 @@ export function FileExplorer() {
     return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
+  // Formatar data
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
   // Renderizar breadcrumbs
   const renderBreadcrumbs = () => {
     return (
@@ -630,8 +922,7 @@ export function FileExplorer() {
     )
   }
 
-  // Modificar a função renderStorageStats para incluir o botão de tarefas
-  // Substituir a função renderStorageStats existente
+  // Renderizar estatísticas de armazenamento
   const renderStorageStats = () => {
     const usedPercentage = (storageUsage.used / storageUsage.total) * 100
 
@@ -684,15 +975,17 @@ export function FileExplorer() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   type="text"
-                  placeholder="Buscar arquivos..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={viewType === "files" ? "Buscar arquivos..." : "Buscar tarefas..."}
+                  value={viewType === "files" ? searchQuery : taskSearchQuery}
+                  onChange={(e) =>
+                    viewType === "files" ? setSearchQuery(e.target.value) : setTaskSearchQuery(e.target.value)
+                  }
                   className="pl-9 bg-white border-gray-200"
                 />
-                {searchQuery && (
+                {(viewType === "files" ? searchQuery : taskSearchQuery) && (
                   <button
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    onClick={() => setSearchQuery("")}
+                    onClick={() => (viewType === "files" ? setSearchQuery("") : setTaskSearchQuery(""))}
                   >
                     <X size={14} />
                   </button>
@@ -717,25 +1010,39 @@ export function FileExplorer() {
                 </Tooltip>
               </TooltipProvider>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowUploader(true)}
-                className="bg-white border-[#4b7bb5] text-[#4b7bb5] hover:bg-[#f0f4f9]"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Upload</span>
-              </Button>
+              {viewType === "files" ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowUploader(true)}
+                    className="bg-white border-[#4b7bb5] text-[#4b7bb5] hover:bg-[#f0f4f9]"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Upload</span>
+                  </Button>
 
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setShowCreateFolderDialog(true)}
-                className="bg-[#4b7bb5] hover:bg-[#3d649e]"
-              >
-                <FolderPlus className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Nova Pasta</span>
-              </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setShowCreateFolderDialog(true)}
+                    className="bg-[#4b7bb5] hover:bg-[#3d649e]"
+                  >
+                    <FolderPlus className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Nova Pasta</span>
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => document.getElementById("add-task-form")?.scrollIntoView({ behavior: "smooth" })}
+                  className="bg-[#4b7bb5] hover:bg-[#3d649e]"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Nova Tarefa</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -769,140 +1076,208 @@ export function FileExplorer() {
             </Tabs>
 
             <div className="flex items-center gap-2 mb-4 md:mb-0 w-full md:w-auto">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="bg-white">
-                    <Filter size={16} className="mr-2" />
-                    <span className="hidden sm:inline">Filtrar</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuLabel>Tipo de arquivo</DropdownMenuLabel>
-                  <DropdownMenuItem
-                    className={!selectedFileType ? "bg-blue-50 text-blue-600" : ""}
-                    onClick={() => setSelectedFileType(null)}
-                  >
-                    Todos os arquivos
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className={selectedFileType === "folder" ? "bg-blue-50 text-blue-600" : ""}
-                    onClick={() => setSelectedFileType("folder")}
-                  >
-                    <Folder className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-                    Pastas
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  {fileTypes.map((type) => (
-                    <DropdownMenuItem
-                      key={type}
-                      className={selectedFileType === type ? "bg-blue-50 text-blue-600" : ""}
-                      onClick={() => setSelectedFileType(type)}
-                    >
-                      {type}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {viewType === "files" ? (
+                <>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="bg-white">
+                        <Filter size={16} className="mr-2" />
+                        <span className="hidden sm:inline">Filtrar</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuLabel>Tipo de arquivo</DropdownMenuLabel>
+                      <DropdownMenuItem
+                        className={!selectedFileType ? "bg-blue-50 text-blue-600" : ""}
+                        onClick={() => setSelectedFileType(null)}
+                      >
+                        Todos os arquivos
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className={selectedFileType === "folder" ? "bg-blue-50 text-blue-600" : ""}
+                        onClick={() => setSelectedFileType("folder")}
+                      >
+                        <Folder className="h-4 w-4 mr-2 text-[#4b7bb5]" />
+                        Pastas
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      {fileTypes.map((type) => (
+                        <DropdownMenuItem
+                          key={type}
+                          className={selectedFileType === type ? "bg-blue-50 text-blue-600" : ""}
+                          onClick={() => setSelectedFileType(type)}
+                        >
+                          {type}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="bg-white">
-                    {sortDirection === "asc" ? (
-                      <SortAsc size={16} className="mr-2" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="bg-white">
+                        {sortDirection === "asc" ? (
+                          <SortAsc size={16} className="mr-2" />
+                        ) : (
+                          <SortDesc size={16} className="mr-2" />
+                        )}
+                        <span className="hidden sm:inline">Ordenar</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
+                      <DropdownMenuItem
+                        className={sortBy === "name" ? "bg-blue-50 text-blue-600" : ""}
+                        onClick={() => {
+                          setSortBy("name")
+                          setSortDirection(sortBy === "name" && sortDirection === "asc" ? "desc" : "asc")
+                        }}
+                      >
+                        Nome
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className={sortBy === "date" ? "bg-blue-50 text-blue-600" : ""}
+                        onClick={() => {
+                          setSortBy("date")
+                          setSortDirection(sortBy === "date" && sortDirection === "asc" ? "desc" : "asc")
+                        }}
+                      >
+                        Data
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className={sortBy === "size" ? "bg-blue-50 text-blue-600" : ""}
+                        onClick={() => {
+                          setSortBy("size")
+                          setSortDirection(sortBy === "size" && sortDirection === "asc" ? "desc" : "asc")
+                        }}
+                      >
+                        Tamanho
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="bg-white">
+                        {viewMode === "grid" ? (
+                          <LayoutGrid size={16} className="mr-2" />
+                        ) : viewMode === "list" ? (
+                          <LayoutList size={16} className="mr-2" />
+                        ) : (
+                          <Layers size={16} className="mr-2" />
+                        )}
+                        <span className="hidden sm:inline">Visualização</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className={viewMode === "grid" ? "bg-blue-50 text-blue-600" : ""}
+                        onClick={() => setViewMode("grid")}
+                      >
+                        <LayoutGrid className="h-4 w-4 mr-2" />
+                        Grade
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className={viewMode === "list" ? "bg-blue-50 text-blue-600" : ""}
+                        onClick={() => setViewMode("list")}
+                      >
+                        <LayoutList className="h-4 w-4 mr-2" />
+                        Lista
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className={viewMode === "details" ? "bg-blue-50 text-blue-600" : ""}
+                        onClick={() => setViewMode("details")}
+                      >
+                        <Layers className="h-4 w-4 mr-2" />
+                        Detalhes
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleSelectionMode}
+                    className={`bg-white ${isSelectionMode ? "border-[#4b7bb5] text-[#4b7bb5]" : ""}`}
+                  >
+                    {isSelectionMode ? (
+                      <>
+                        <X className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">Cancelar</span>
+                      </>
                     ) : (
-                      <SortDesc size={16} className="mr-2" />
+                      <>
+                        <Bookmark className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">Selecionar</span>
+                      </>
                     )}
-                    <span className="hidden sm:inline">Ordenar</span>
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
-                  <DropdownMenuItem
-                    className={sortBy === "name" ? "bg-blue-50 text-blue-600" : ""}
-                    onClick={() => {
-                      setSortBy("name")
-                      setSortDirection(sortBy === "name" && sortDirection === "asc" ? "desc" : "asc")
-                    }}
-                  >
-                    Nome
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className={sortBy === "date" ? "bg-blue-50 text-blue-600" : ""}
-                    onClick={() => {
-                      setSortBy("date")
-                      setSortDirection(sortBy === "date" && sortDirection === "asc" ? "desc" : "asc")
-                    }}
-                  >
-                    Data
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className={sortBy === "size" ? "bg-blue-50 text-blue-600" : ""}
-                    onClick={() => {
-                      setSortBy("size")
-                      setSortDirection(sortBy === "size" && sortDirection === "asc" ? "desc" : "asc")
-                    }}
-                  >
-                    Tamanho
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </>
+              ) : (
+                <>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="bg-white">
+                        <Filter size={16} className="mr-2" />
+                        <span className="hidden sm:inline">Status</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className={taskFilter === "all" ? "bg-blue-50 text-blue-600" : ""}
+                        onClick={() => setTaskFilter("all")}
+                      >
+                        Todas as tarefas
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className={taskFilter === "pending" ? "bg-blue-50 text-blue-600" : ""}
+                        onClick={() => setTaskFilter("pending")}
+                      >
+                        Pendentes
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className={taskFilter === "completed" ? "bg-blue-50 text-blue-600" : ""}
+                        onClick={() => setTaskFilter("completed")}
+                      >
+                        Concluídas
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="bg-white">
-                    {viewMode === "grid" ? (
-                      <LayoutGrid size={16} className="mr-2" />
-                    ) : viewMode === "list" ? (
-                      <LayoutList size={16} className="mr-2" />
-                    ) : (
-                      <Layers size={16} className="mr-2" />
-                    )}
-                    <span className="hidden sm:inline">Visualização</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    className={viewMode === "grid" ? "bg-blue-50 text-blue-600" : ""}
-                    onClick={() => setViewMode("grid")}
-                  >
-                    <LayoutGrid className="h-4 w-4 mr-2" />
-                    Grade
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className={viewMode === "list" ? "bg-blue-50 text-blue-600" : ""}
-                    onClick={() => setViewMode("list")}
-                  >
-                    <LayoutList className="h-4 w-4 mr-2" />
-                    Lista
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className={viewMode === "details" ? "bg-blue-50 text-blue-600" : ""}
-                    onClick={() => setViewMode("details")}
-                  >
-                    <Layers className="h-4 w-4 mr-2" />
-                    Detalhes
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleSelectionMode}
-                className={`bg-white ${isSelectionMode ? "border-[#4b7bb5] text-[#4b7bb5]" : ""}`}
-              >
-                {isSelectionMode ? (
-                  <>
-                    <X className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Cancelar</span>
-                  </>
-                ) : (
-                  <>
-                    <Bookmark className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Selecionar</span>
-                  </>
-                )}
-              </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="bg-white">
+                        {taskSortDirection === "asc" ? (
+                          <SortAsc size={16} className="mr-2" />
+                        ) : (
+                          <SortDesc size={16} className="mr-2" />
+                        )}
+                        <span className="hidden sm:inline">Ordenar</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className={taskSortBy === "date" ? "bg-blue-50 text-blue-600" : ""}
+                        onClick={() => {
+                          setTaskSortBy("date")
+                          setTaskSortDirection(taskSortBy === "date" && taskSortDirection === "asc" ? "desc" : "asc")
+                        }}
+                      >
+                        Data
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className={taskSortBy === "status" ? "bg-blue-50 text-blue-600" : ""}
+                        onClick={() => {
+                          setTaskSortBy("status")
+                          setTaskSortDirection(taskSortBy === "status" && taskSortDirection === "asc" ? "desc" : "asc")
+                        }}
+                      >
+                        Status
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              )}
 
               <Button variant="outline" size="sm" onClick={fetchFiles} disabled={isLoading} className="bg-white">
                 {isLoading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
@@ -918,7 +1293,7 @@ export function FileExplorer() {
         </div>
 
         {/* Barra de seleção */}
-        {isSelectionMode && selectedFiles.length > 0 && (
+        {viewType === "files" && isSelectionMode && selectedFiles.length > 0 && (
           <div className="bg-blue-50 p-3 border-b border-blue-100 flex items-center justify-between">
             <div className="flex items-center">
               <Bookmark className="h-5 w-5 mr-2 text-[#4b7bb5]" />
@@ -950,287 +1325,495 @@ export function FileExplorer() {
         {/* Navegação de pastas */}
         <div className="p-4 bg-gray-50">{renderBreadcrumbs()}</div>
 
+        {/* Abas para alternar entre arquivos e tarefas */}
+        <div className="px-4 bg-gray-50">
+          <Tabs
+            defaultValue="files"
+            value={viewType}
+            onValueChange={(value) => setViewType(value as "files" | "tasks")}
+            className="w-full"
+          >
+            <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
+              <TabsTrigger value="files" className="data-[state=active]:bg-[#4b7bb5] data-[state=active]:text-white">
+                <Folder className="h-4 w-4 mr-2" />
+                Arquivos
+              </TabsTrigger>
+              <TabsTrigger value="tasks" className="data-[state=active]:bg-[#4b7bb5] data-[state=active]:text-white">
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Tarefas
+                {taskCounts[currentPath.join("/")] ? (
+                  <Badge className="ml-2 bg-[#3d649e]">{taskCounts[currentPath.join("/")]}</Badge>
+                ) : null}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
         {/* Conteúdo principal */}
         <div className="flex-1 overflow-auto p-4 bg-gray-50">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Área principal de arquivos */}
+            {/* Área principal de arquivos ou tarefas */}
             <div className="md:col-span-3">
               <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[400px]">
-                {error ? (
-                  <div className="flex items-center justify-center h-64 text-red-500">
-                    <AlertCircle className="h-5 w-5 mr-2" />
-                    <span>{error}</span>
-                  </div>
-                ) : isLoading ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Skeleton className="h-8 w-48" />
-                      <Skeleton className="h-8 w-24" />
+                {viewType === "files" ? (
+                  // Visualização de arquivos
+                  error ? (
+                    <div className="flex items-center justify-center h-64 text-red-500">
+                      <AlertCircle className="h-5 w-5 mr-2" />
+                      <span>{error}</span>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                      {Array.from({ length: 8 }).map((_, i) => (
-                        <Skeleton key={i} className="h-32 w-full rounded-md" />
-                      ))}
-                    </div>
-                  </div>
-                ) : sortedFiles.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                    <FolderOpen className="h-16 w-16 text-gray-300 mb-4" />
-                    <p className="text-lg font-medium text-gray-600 mb-2">
-                      {activeTab === "all"
-                        ? "Pasta vazia"
-                        : activeTab === "recent"
-                          ? "Nenhum arquivo recente"
-                          : activeTab === "favorites"
-                            ? "Nenhum favorito"
-                            : "Nenhum arquivo compartilhado"}
-                    </p>
-                    <p className="text-sm text-gray-500 mb-4">
-                      {searchQuery
-                        ? `Nenhum resultado encontrado para "${searchQuery}"`
-                        : activeTab === "all"
-                          ? "Esta pasta não contém nenhum arquivo ou subpasta"
-                          : activeTab === "recent"
-                            ? "Você não tem arquivos recentes"
-                            : activeTab === "favorites"
-                              ? "Você não tem favoritos"
-                              : "Você não tem arquivos compartilhados"}
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowUploader(true)}
-                        className="border-[#4b7bb5] text-[#4b7bb5]"
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => setShowCreateFolderDialog(true)}
-                        className="bg-[#4b7bb5]"
-                      >
-                        <FolderPlus className="h-4 w-4 mr-2" />
-                        Nova Pasta
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    {viewMode === "grid" ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                        {sortedFiles.map((file) => (
-                          <FileCard
-                            key={file.id}
-                            file={file}
-                            onFolderClick={() => navigateToFolder(file.path)}
-                            onDelete={() => handleDelete(file)}
-                            onRename={handleRename}
-                            onShare={() => handleShare(file)}
-                            onToggleFavorite={() => toggleFavorite(file)}
-                            isSelected={selectedFiles.some((f) => f.id === file.id)}
-                            onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
-                            taskCount={file.type === "folder" ? taskCounts[file.path] : undefined}
-                            onOpenTasks={file.type === "folder" ? () => openTasksPanel(file.path) : undefined}
-                          />
+                  ) : isLoading ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Skeleton className="h-8 w-48" />
+                        <Skeleton className="h-8 w-24" />
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        {Array.from({ length: 8 }).map((_, i) => (
+                          <Skeleton key={i} className="h-32 w-full rounded-md" />
                         ))}
                       </div>
-                    ) : viewMode === "list" ? (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              {isSelectionMode && (
-                                <th
-                                  scope="col"
-                                  className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedFiles.length > 0 && selectedFiles.length === filteredFiles.length}
-                                    onChange={selectAllFiles}
-                                    className="rounded border-gray-300 text-[#4b7bb5] focus:ring-[#4b7bb5]"
-                                  />
-                                </th>
-                              )}
-                              <th
-                                scope="col"
-                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                              >
-                                Nome
-                              </th>
-                              <th
-                                scope="col"
-                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                              >
-                                Data
-                              </th>
-                              <th
-                                scope="col"
-                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                              >
-                                Tamanho
-                              </th>
-                              <th
-                                scope="col"
-                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                              >
-                                Tipo
-                              </th>
-                              <th scope="col" className="relative px-6 py-3">
-                                <span className="sr-only">Ações</span>
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {sortedFiles.map((file) => (
-                              <FileRow
-                                key={file.id}
-                                file={file}
-                                onFolderClick={() => navigateToFolder(file.path)}
-                                onDelete={() => handleDelete(file)}
-                                onShare={() => handleShare(file)}
-                                onToggleFavorite={() => toggleFavorite(file)}
-                                isSelected={selectedFiles.some((f) => f.id === file.id)}
-                                onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
-                                showCheckbox={isSelectionMode}
-                                taskCount={file.type === "folder" ? taskCounts[file.path] : undefined}
-                                onOpenTasks={file.type === "folder" ? () => openTasksPanel(file.path) : undefined}
-                              />
-                            ))}
-                          </tbody>
-                        </table>
+                    </div>
+                  ) : sortedFiles.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                      <FolderOpen className="h-16 w-16 text-gray-300 mb-4" />
+                      <p className="text-lg font-medium text-gray-600 mb-2">
+                        {activeTab === "all"
+                          ? "Pasta vazia"
+                          : activeTab === "recent"
+                            ? "Nenhum arquivo recente"
+                            : activeTab === "favorites"
+                              ? "Nenhum favorito"
+                              : "Nenhum arquivo compartilhado"}
+                      </p>
+                      <p className="text-sm text-gray-500 mb-4">
+                        {searchQuery
+                          ? `Nenhum resultado encontrado para "${searchQuery}"`
+                          : activeTab === "all"
+                            ? "Esta pasta não contém nenhum arquivo ou subpasta"
+                            : activeTab === "recent"
+                              ? "Você não tem arquivos recentes"
+                              : activeTab === "favorites"
+                                ? "Você não tem favoritos"
+                                : "Você não tem arquivos compartilhados"}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowUploader(true)}
+                          className="border-[#4b7bb5] text-[#4b7bb5]"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => setShowCreateFolderDialog(true)}
+                          className="bg-[#4b7bb5]"
+                        >
+                          <FolderPlus className="h-4 w-4 mr-2" />
+                          Nova Pasta
+                        </Button>
                       </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {sortedFiles.map((file) => (
-                          <Card
-                            key={file.id}
-                            className={`hover:bg-gray-50 transition-colors ${
-                              selectedFiles.some((f) => f.id === file.id) ? "bg-blue-50 border-blue-200" : ""
-                            }`}
-                          >
-                            <CardHeader className="p-4 pb-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  {isSelectionMode && (
+                    </div>
+                  ) : (
+                    <div>
+                      {viewMode === "grid" ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                          {sortedFiles.map((file) => (
+                            <FileCard
+                              key={file.id}
+                              file={file}
+                              onFolderClick={() => navigateToFolder(file.path)}
+                              onDelete={() => handleDelete(file)}
+                              onRename={handleRename}
+                              onShare={() => handleShare(file)}
+                              onToggleFavorite={() => toggleFavorite(file)}
+                              isSelected={selectedFiles.some((f) => f.id === file.id)}
+                              onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
+                              taskCount={file.type === "folder" ? taskCounts[file.path] : undefined}
+                              onOpenTasks={
+                                file.type === "folder"
+                                  ? () => {
+                                      navigateToFolder(file.path)
+                                      setViewType("tasks")
+                                    }
+                                  : undefined
+                              }
+                            />
+                          ))}
+                        </div>
+                      ) : viewMode === "list" ? (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                {isSelectionMode && (
+                                  <th
+                                    scope="col"
+                                    className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                  >
                                     <input
                                       type="checkbox"
-                                      checked={selectedFiles.some((f) => f.id === file.id)}
-                                      onChange={() => toggleFileSelection(file)}
+                                      checked={
+                                        selectedFiles.length > 0 && selectedFiles.length === filteredFiles.length
+                                      }
+                                      onChange={selectAllFiles}
                                       className="rounded border-gray-300 text-[#4b7bb5] focus:ring-[#4b7bb5]"
                                     />
-                                  )}
-                                  <div className="p-2 bg-gray-100 rounded-md">
-                                    {file.type === "folder" ? (
-                                      <Folder className="h-5 w-5 text-[#4b7bb5]" />
-                                    ) : file.fileType === "pdf" ? (
-                                      <FileText className="h-5 w-5 text-red-500" />
-                                    ) : ["jpg", "jpeg", "png", "gif", "webp"].includes(file.fileType || "") ? (
-                                      <ImageIcon className="h-5 w-5 text-green-500" />
-                                    ) : ["mp4", "avi", "mov", "webm"].includes(file.fileType || "") ? (
-                                      <Film className="h-5 w-5 text-purple-500" />
-                                    ) : ["mp3", "wav", "ogg"].includes(file.fileType || "") ? (
-                                      <Music className="h-5 w-5 text-blue-500" />
-                                    ) : ["zip", "rar", "7z", "tar", "gz"].includes(file.fileType || "") ? (
-                                      <Archive className="h-5 w-5 text-amber-500" />
-                                    ) : (
-                                      <FileIcon className="h-5 w-5 text-gray-500" />
-                                    )}
-                                  </div>
-                                  <div>
-                                    <CardTitle className="text-base font-medium">
-                                      <button
-                                        onClick={file.type === "folder" ? () => navigateToFolder(file.path) : undefined}
-                                        className={
-                                          file.type === "folder" ? "hover:text-[#4b7bb5] transition-colors" : ""
+                                  </th>
+                                )}
+                                <th
+                                  scope="col"
+                                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                  Nome
+                                </th>
+                                <th
+                                  scope="col"
+                                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                  Data
+                                </th>
+                                <th
+                                  scope="col"
+                                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                  Tamanho
+                                </th>
+                                <th
+                                  scope="col"
+                                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                  Tipo
+                                </th>
+                                <th scope="col" className="relative px-6 py-3">
+                                  <span className="sr-only">Ações</span>
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {sortedFiles.map((file) => (
+                                <FileRow
+                                  key={file.id}
+                                  file={file}
+                                  onFolderClick={() => navigateToFolder(file.path)}
+                                  onDelete={() => handleDelete(file)}
+                                  onShare={() => handleShare(file)}
+                                  onToggleFavorite={() => toggleFavorite(file)}
+                                  isSelected={selectedFiles.some((f) => f.id === file.id)}
+                                  onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
+                                  showCheckbox={isSelectionMode}
+                                  taskCount={file.type === "folder" ? taskCounts[file.path] : undefined}
+                                  onOpenTasks={
+                                    file.type === "folder"
+                                      ? () => {
+                                          navigateToFolder(file.path)
+                                          setViewType("tasks")
                                         }
-                                      >
-                                        {file.name}
-                                      </button>
-                                    </CardTitle>
-                                    <CardDescription className="text-xs">
-                                      {file.type === "folder" ? "Pasta" : file.fileType?.toUpperCase()}
-                                    </CardDescription>
+                                      : undefined
+                                  }
+                                />
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {sortedFiles.map((file) => (
+                            <Card
+                              key={file.id}
+                              className={`hover:bg-gray-50 transition-colors ${
+                                selectedFiles.some((f) => f.id === file.id) ? "bg-blue-50 border-blue-200" : ""
+                              }`}
+                            >
+                              <CardHeader className="p-4 pb-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    {isSelectionMode && (
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedFiles.some((f) => f.id === file.id)}
+                                        onChange={() => toggleFileSelection(file)}
+                                        className="rounded border-gray-300 text-[#4b7bb5] focus:ring-[#4b7bb5]"
+                                      />
+                                    )}
+                                    <div className="p-2 bg-gray-100 rounded-md">
+                                      {file.type === "folder" ? (
+                                        <Folder className="h-5 w-5 text-[#4b7bb5]" />
+                                      ) : file.fileType === "pdf" ? (
+                                        <FileText className="h-5 w-5 text-red-500" />
+                                      ) : ["jpg", "jpeg", "png", "gif", "webp"].includes(file.fileType || "") ? (
+                                        <ImageIcon className="h-5 w-5 text-green-500" />
+                                      ) : ["mp4", "avi", "mov", "webm"].includes(file.fileType || "") ? (
+                                        <Film className="h-5 w-5 text-purple-500" />
+                                      ) : ["mp3", "wav", "ogg"].includes(file.fileType || "") ? (
+                                        <Music className="h-5 w-5 text-blue-500" />
+                                      ) : ["zip", "rar", "7z", "tar", "gz"].includes(file.fileType || "") ? (
+                                        <Archive className="h-5 w-5 text-amber-500" />
+                                      ) : (
+                                        <FileIcon className="h-5 w-5 text-gray-500" />
+                                      )}
+                                    </div>
+                                    <div>
+                                      <CardTitle className="text-base font-medium">
+                                        <button
+                                          onClick={
+                                            file.type === "folder" ? () => navigateToFolder(file.path) : undefined
+                                          }
+                                          className={
+                                            file.type === "folder" ? "hover:text-[#4b7bb5] transition-colors" : ""
+                                          }
+                                        >
+                                          {file.name}
+                                        </button>
+                                      </CardTitle>
+                                      <CardDescription className="text-xs">
+                                        {file.type === "folder" ? "Pasta" : file.fileType?.toUpperCase()}
+                                      </CardDescription>
+                                    </div>
                                   </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {file.isFavorite && (
-                                    <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200">
-                                      <Star className="h-3 w-3 mr-1 fill-amber-500 text-amber-500" />
-                                      Favorito
-                                    </Badge>
-                                  )}
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon">
-                                        <MoreVertical size={16} />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuGroup>
-                                        {file.type === "file" && (
-                                          <>
-                                            <DropdownMenuItem onClick={() => window.open(file.url, "_blank")}>
-                                              <ExternalLink className="h-4 w-4 mr-2" />
-                                              Abrir
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleShare(file)}>
-                                              <Share2 className="h-4 w-4 mr-2" />
-                                              Compartilhar
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem asChild>
-                                              <a href={file.url} download>
-                                                <Download className="h-4 w-4 mr-2" />
-                                                Download
-                                              </a>
-                                            </DropdownMenuItem>
-                                          </>
-                                        )}
-                                        <DropdownMenuItem onClick={() => toggleFavorite(file)}>
-                                          {file.isFavorite ? (
+                                  <div className="flex items-center gap-2">
+                                    {file.isFavorite && (
+                                      <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200">
+                                        <Star className="h-3 w-3 mr-1 fill-amber-500 text-amber-500" />
+                                        Favorito
+                                      </Badge>
+                                    )}
+                                    {file.type === "folder" && taskCounts[file.path] > 0 && (
+                                      <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
+                                        <ClipboardList className="h-3 w-3 mr-1" />
+                                        {taskCounts[file.path]} tarefa{taskCounts[file.path] !== 1 ? "s" : ""}
+                                      </Badge>
+                                    )}
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon">
+                                          <MoreVertical size={16} />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuGroup>
+                                          {file.type === "file" && (
                                             <>
-                                              <StarOff className="h-4 w-4 mr-2" />
-                                              Remover dos favoritos
-                                            </>
-                                          ) : (
-                                            <>
-                                              <Star className="h-4 w-4 mr-2" />
-                                              Adicionar aos favoritos
+                                              <DropdownMenuItem onClick={() => window.open(file.url, "_blank")}>
+                                                <ExternalLink className="h-4 w-4 mr-2" />
+                                                Abrir
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem onClick={() => handleShare(file)}>
+                                                <Share2 className="h-4 w-4 mr-2" />
+                                                Compartilhar
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem asChild>
+                                                <a href={file.url} download>
+                                                  <Download className="h-4 w-4 mr-2" />
+                                                  Download
+                                                </a>
+                                              </DropdownMenuItem>
                                             </>
                                           )}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => handleDelete(file)} className="text-red-600">
-                                          <Trash2 className="h-4 w-4 mr-2" />
-                                          Excluir
-                                        </DropdownMenuItem>
-                                      </DropdownMenuGroup>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                                          {file.type === "folder" && (
+                                            <DropdownMenuItem
+                                              onClick={() => {
+                                                navigateToFolder(file.path)
+                                                setViewType("tasks")
+                                              }}
+                                            >
+                                              <ClipboardList className="h-4 w-4 mr-2" />
+                                              Ver Tarefas
+                                            </DropdownMenuItem>
+                                          )}
+                                          <DropdownMenuItem onClick={() => toggleFavorite(file)}>
+                                            {file.isFavorite ? (
+                                              <>
+                                                <StarOff className="h-4 w-4 mr-2" />
+                                                Remover dos favoritos
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Star className="h-4 w-4 mr-2" />
+                                                Adicionar aos favoritos
+                                              </>
+                                            )}
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem onClick={() => handleDelete(file)} className="text-red-600">
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Excluir
+                                          </DropdownMenuItem>
+                                        </DropdownMenuGroup>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
                                 </div>
-                              </div>
-                            </CardHeader>
-                            <CardContent className="p-4 pt-0">
-                              <div className="flex justify-between text-xs text-gray-500">
-                                <div className="flex items-center">
-                                  <Clock className="h-3 w-3 mr-1" />
-                                  {new Date(file.modified).toLocaleDateString("pt-BR", {
-                                    day: "2-digit",
-                                    month: "2-digit",
-                                    year: "numeric",
-                                  })}
+                              </CardHeader>
+                              <CardContent className="p-4 pt-0">
+                                <div className="flex justify-between text-xs text-gray-500">
+                                  <div className="flex items-center">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    {new Date(file.modified).toLocaleDateString("pt-BR", {
+                                      day: "2-digit",
+                                      month: "2-digit",
+                                      year: "numeric",
+                                    })}
+                                  </div>
+                                  {file.type === "file" && file.size && <div>{formatBytes(file.size)}</div>}
                                 </div>
-                                {file.type === "file" && file.size && <div>{formatBytes(file.size)}</div>}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                ) : (
+                  // Visualização de tarefas
+                  <>
+                    {currentPath.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                        <ClipboardList className="h-16 w-16 text-gray-300 mb-4" />
+                        <p className="text-lg font-medium text-gray-600 mb-2">Nenhuma pasta selecionada</p>
+                        <p className="text-sm text-gray-500 mb-4">
+                          Selecione uma pasta para visualizar e gerenciar suas tarefas
+                        </p>
+                      </div>
+                    ) : isLoadingTasks ? (
+                      <div className="flex flex-col items-center justify-center h-64">
+                        <Loader2 className="h-8 w-8 text-[#4b7bb5] animate-spin mb-4" />
+                        <p className="text-gray-500">Carregando tarefas...</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {/* Formulário para adicionar nova tarefa */}
+                        <form
+                          onSubmit={handleAddTask}
+                          id="add-task-form"
+                          className="p-4 border border-gray-200 rounded-lg bg-gray-50"
+                        >
+                          <div className="flex flex-col gap-2">
+                            <h3 className="text-sm font-medium text-gray-700 mb-2">Adicionar Nova Tarefa</h3>
+                            <Textarea
+                              value={newTaskDescription}
+                              onChange={(e) => setNewTaskDescription(e.target.value)}
+                              placeholder="Descreva a tarefa..."
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5] min-h-[80px]"
+                              disabled={isAddingTask}
+                            />
+                            <Button
+                              type="submit"
+                              disabled={isAddingTask || !newTaskDescription.trim()}
+                              className="px-3 py-2 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] transition-colors disabled:opacity-50 disabled:hover:bg-[#4b7bb5] flex items-center justify-center w-full md:w-auto md:self-end"
+                            >
+                              {isAddingTask ? (
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              ) : (
+                                <Plus className="h-4 w-4 mr-2" />
+                              )}
+                              <span>{isAddingTask ? "Adicionando..." : "Adicionar Tarefa"}</span>
+                            </Button>
+                          </div>
+                        </form>
+
+                        {/* Lista de tarefas */}
+                        <div className="border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="bg-gray-50 p-3 border-b border-gray-200 flex justify-between items-center">
+                            <h3 className="font-medium text-[#4072b0] flex items-center">
+                              <ClipboardList className="h-5 w-5 mr-2" />
+                              Tarefas da Pasta: {currentPath[currentPath.length - 1]}
+                            </h3>
+                            <span className="text-sm text-gray-500">
+                              {tasks.filter((t) => !t.is_completed).length} pendente
+                              {tasks.filter((t) => !t.is_completed).length !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+
+                          {sortedTasks.length === 0 ? (
+                            <div className="p-6 text-center text-gray-500">
+                              <p>Nenhuma tarefa para esta pasta.</p>
+                              <p className="text-sm mt-1">Adicione tarefas para organizar seu trabalho.</p>
+                            </div>
+                          ) : (
+                            <ul className="divide-y divide-gray-100">
+                              {sortedTasks.map((task) => (
+                                <li key={task.id} className="p-3 hover:bg-gray-50 transition-colors">
+                                  {editingTaskId === task.id ? (
+                                    <div className="flex flex-col gap-2">
+                                      <Textarea
+                                        value={editDescription}
+                                        onChange={(e) => setEditDescription(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5] min-h-[80px]"
+                                        autoFocus
+                                      />
+                                      <div className="flex justify-end gap-2">
+                                        <Button
+                                          type="button"
+                                          onClick={() => saveEditTask(task.id)}
+                                          disabled={!editDescription.trim()}
+                                          className="px-2 py-1 bg-[#4b7bb5] text-white text-xs rounded hover:bg-[#3d649e] transition-colors flex items-center"
+                                        >
+                                          <Save className="h-3 w-3 mr-1" />
+                                          Salvar
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          onClick={cancelEdit}
+                                          className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300 transition-colors flex items-center"
+                                        >
+                                          <X className="h-3 w-3 mr-1" />
+                                          Cancelar
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-start gap-3">
+                                      <button
+                                        onClick={() => toggleTaskStatus(task.id, task.is_completed)}
+                                        className="mt-0.5 flex-shrink-0 text-[#4b7bb5] hover:text-[#3d649e] transition-colors"
+                                        title={task.is_completed ? "Marcar como pendente" : "Marcar como concluída"}
+                                      >
+                                        {task.is_completed ? (
+                                          <CheckCircle className="h-5 w-5" />
+                                        ) : (
+                                          <Circle className="h-5 w-5" />
+                                        )}
+                                      </button>
+                                      <div className="flex-1 min-w-0">
+                                        <button
+                                          onClick={() => openTaskDetails(task)}
+                                          className={`text-sm text-left w-full ${task.is_completed ? "line-through text-gray-400" : "text-gray-700"}`}
+                                        >
+                                          {task.description}
+                                        </button>
+                                        <p className="text-xs text-gray-400 mt-1">{formatDate(task.created_at)}</p>
+                                      </div>
+                                      <div className="flex gap-1">
+                                        <button
+                                          onClick={() => startEditTask(task)}
+                                          className="flex-shrink-0 p-1 text-gray-400 hover:text-[#4b7bb5] transition-colors rounded-full hover:bg-blue-50"
+                                          title="Editar tarefa"
+                                        >
+                                          <Edit className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                          onClick={() => deleteTask(task.id, task.is_completed)}
+                                          className="flex-shrink-0 p-1 text-gray-400 hover:text-red-500 transition-colors rounded-full hover:bg-red-50"
+                                          title="Excluir tarefa"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
                       </div>
                     )}
-                  </div>
+                  </>
                 )}
               </div>
             </div>
@@ -1374,15 +1957,15 @@ export function FileExplorer() {
                       </span>
                     </li>
                     <li className="flex items-start">
-                      <Star className="h-3 w-3 mr-2 mt-0.5 text-amber-500" />
+                      <ClipboardList className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
                       <span>
-                        Adicione <strong>favoritos</strong> para acesso rápido
+                        Alterne para a aba <strong>Tarefas</strong> para gerenciar tarefas
                       </span>
                     </li>
                     <li className="flex items-start">
-                      <Share2 className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                      <Star className="h-3 w-3 mr-2 mt-0.5 text-amber-500" />
                       <span>
-                        Use <strong>Compartilhar</strong> para gerar links
+                        Adicione <strong>favoritos</strong> para acesso rápido
                       </span>
                     </li>
                   </ul>
@@ -1398,30 +1981,6 @@ export function FileExplorer() {
                   </Button>
                 </CardFooter>
               </Card>
-
-              {/* Tarefas da pasta atual */}
-              {currentPath.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium flex items-center">
-                      <ClipboardList className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-                      Tarefas da Pasta Atual
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-3">
-                    {currentPath.length > 0 ? (
-                      <FolderTasks
-                        folderPath={currentPath.join("/")}
-                        onTaskCountChange={(count) => handleTaskCountChange(currentPath.join("/"), count)}
-                      />
-                    ) : (
-                      <p className="text-xs text-gray-500 text-center py-2">
-                        Selecione uma pasta para ver suas tarefas
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
             </div>
           </div>
         </div>
@@ -1512,6 +2071,79 @@ export function FileExplorer() {
         />
       )}
 
+      {/* Diálogo de detalhes da tarefa */}
+      <Dialog open={showTaskDetails} onOpenChange={setShowTaskDetails}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <Info className="h-5 w-5 mr-2 text-[#4b7bb5]" />
+              Detalhes da Tarefa
+            </DialogTitle>
+          </DialogHeader>
+          {selectedTask && (
+            <div className="space-y-4">
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`p-1 rounded-full ${selectedTask.is_completed ? "bg-green-100" : "bg-blue-100"}`}>
+                    {selectedTask.is_completed ? (
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <Circle className="h-5 w-5 text-blue-600" />
+                    )}
+                  </div>
+                  <span className="font-medium">Status: {selectedTask.is_completed ? "Concluída" : "Pendente"}</span>
+                </div>
+                <p className="text-gray-700 whitespace-pre-wrap">{selectedTask.description}</p>
+              </div>
+
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Calendar className="h-4 w-4" />
+                <span>Criada em: {formatDate(selectedTask.created_at)}</span>
+              </div>
+
+              <div className="flex justify-between pt-4">
+                <Button variant="outline" onClick={() => toggleTaskStatus(selectedTask.id, selectedTask.is_completed)}>
+                  {selectedTask.is_completed ? (
+                    <>
+                      <Circle className="h-4 w-4 mr-2" />
+                      Marcar como pendente
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Marcar como concluída
+                    </>
+                  )}
+                </Button>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      startEditTask(selectedTask)
+                      setShowTaskDetails(false)
+                    }}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      deleteTask(selectedTask.id, selectedTask.is_completed)
+                      setShowTaskDetails(false)
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Diálogo de ajuda */}
       <Dialog open={showHelp} onOpenChange={setShowHelp}>
         <DialogContent className="sm:max-w-[600px]">
@@ -1584,41 +2216,26 @@ export function FileExplorer() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Compartilhamento</CardTitle>
+                <CardTitle className="text-sm">Tarefas</CardTitle>
               </CardHeader>
               <CardContent className="p-3">
                 <ul className="space-y-2 text-xs text-gray-600">
                   <li className="flex items-start">
-                    <Share2 className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
-                    <span>Compartilhe arquivos e pastas com links públicos</span>
+                    <ClipboardList className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                    <span>Alterne para a aba Tarefas para gerenciar tarefas da pasta</span>
                   </li>
                   <li className="flex items-start">
-                    <Download className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
-                    <span>Baixe arquivos diretamente para seu dispositivo</span>
+                    <Plus className="h-3 w-3 mr-2 mt-0.5 text-[#4b7bb5]" />
+                    <span>Adicione novas tarefas para organizar seu trabalho</span>
                   </li>
                   <li className="flex items-start">
-                    <Star className="h-3 w-3 mr-2 mt-0.5 text-amber-500" />
-                    <span>Favorite itens para acesso rápido</span>
+                    <CheckCircle className="h-3 w-3 mr-2 mt-0.5 text-green-500" />
+                    <span>Marque tarefas como concluídas quando finalizadas</span>
                   </li>
                 </ul>
               </CardContent>
             </Card>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo de tarefas */}
-      <Dialog open={showTasksPanel} onOpenChange={setShowTasksPanel}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Tarefas da Pasta: {selectedFolderForTasks?.split("/").pop() || ""}</DialogTitle>
-          </DialogHeader>
-          {selectedFolderForTasks && (
-            <FolderTasks
-              folderPath={selectedFolderForTasks}
-              onTaskCountChange={(count) => handleTaskCountChange(selectedFolderForTasks, count)}
-            />
-          )}
         </DialogContent>
       </Dialog>
 
