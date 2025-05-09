@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -18,7 +17,10 @@ import {
   MessageSquare,
   Globe,
   FileImage,
+  LogOut,
 } from "lucide-react"
+import { getSupabaseClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
 
 interface DockItemProps {
   href: string
@@ -26,9 +28,36 @@ interface DockItemProps {
   label: string
   isActive: boolean
   badge?: number | string
+  onClick?: () => void
 }
 
-function DockItem({ href, icon, label, isActive, badge }: DockItemProps) {
+function DockItem({ href, icon, label, isActive, badge, onClick }: DockItemProps) {
+  if (onClick) {
+    return (
+      <button onClick={onClick} className="relative group">
+        <div
+          className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-200 ${
+            isActive ? "bg-[#4b7bb5] text-white" : "text-gray-600 hover:bg-[#4b7bb5]/10 hover:text-[#4b7bb5]"
+          }`}
+        >
+          <div className="text-current relative">
+            {icon}
+            {badge && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                {typeof badge === "number" && badge > 99 ? "99+" : badge}
+              </span>
+            )}
+          </div>
+          <span className="text-xs mt-1 text-current">{label}</span>
+        </div>
+        <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+          {label}
+          {badge && <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5">{badge}</span>}
+        </div>
+      </button>
+    )
+  }
+
   return (
     <Link href={href} className="relative group">
       <div
@@ -69,11 +98,18 @@ function DockItem({ href, icon, label, isActive, badge }: DockItemProps) {
 
 export function AppDock() {
   const pathname = usePathname()
+  const router = useRouter()
+  const supabase = getSupabaseClient()
 
   const isActive = (path: string) => {
     if (path === "/admin" && pathname === "/admin") return true
     if (path === "/admin" && pathname === "/") return true
     return pathname.startsWith(path)
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push("/admin/login")
   }
 
   // Categorias de itens do dock
@@ -97,11 +133,6 @@ export function AppDock() {
     { href: "/admin/site", icon: <Globe size={24} />, label: "Site" },
     { href: "/admin/configuracoes", icon: <Settings size={24} />, label: "Config" },
   ]
-
-  // Determinar quais itens mostrar com base na largura da tela
-  // Em telas menores, mostrar apenas os itens principais
-  // Em telas médias, mostrar itens principais e de marketing
-  // Em telas grandes, mostrar todos os itens
 
   return (
     <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
@@ -145,6 +176,9 @@ export function AppDock() {
             />
           ))}
         </div>
+
+        {/* Botão de logout */}
+        <DockItem href="#" icon={<LogOut size={24} />} label="Sair" isActive={false} onClick={handleLogout} />
 
         {/* Menu de mais opções para telas menores */}
         <div className="md:hidden">

@@ -1,3 +1,5 @@
+"use client"
+
 import {
   LayoutDashboard,
   FileText,
@@ -9,7 +11,11 @@ import {
   FolderKanban,
   Search,
   FileImage,
+  LogOut,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+// Adicione o import do useAuth
+import { useAuth } from "@/components/auth/user-auth-provider"
 
 interface AdminHeaderProps {
   title: string
@@ -18,6 +24,9 @@ interface AdminHeaderProps {
 }
 
 export function AdminHeader({ title, description, icon }: AdminHeaderProps) {
+  // No componente AdminHeader, adicione:
+  const { user, signOut } = useAuth()
+
   const getIcon = () => {
     switch (icon) {
       case "dashboard":
@@ -48,12 +57,21 @@ export function AdminHeader({ title, description, icon }: AdminHeaderProps) {
   return (
     <div className="bg-white border-b border-gray-200 py-6 px-4 sm:px-6 lg:px-8">
       <div className="container mx-auto">
-        <div className="flex items-center">
-          <div className="mr-4 p-2 bg-blue-50 rounded-lg">{getIcon()}</div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-            {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="mr-4 p-2 bg-blue-50 rounded-lg">{getIcon()}</div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+              {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
+            </div>
           </div>
+          {/* Na seção de botões do header, adicione o botão de logout: */}
+          {user && (
+            <Button variant="ghost" onClick={signOut} className="ml-2">
+              <LogOut className="h-5 w-5 mr-1" />
+              <span className="hidden md:inline">Sair</span>
+            </Button>
+          )}
         </div>
       </div>
     </div>

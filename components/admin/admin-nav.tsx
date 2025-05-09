@@ -12,6 +12,7 @@ import {
   Database,
   MessageSquare,
   FileText,
+  UserIcon,
 } from "lucide-react"
 
 const navItems = [
@@ -44,6 +45,11 @@ const navItems = [
     title: "Configurações",
     href: "/admin/configuracoes",
     icon: Settings,
+  },
+  {
+    title: "Usuários",
+    href: "/admin/configuracoes/usuarios",
+    icon: UserIcon,
   },
   {
     title: "Embeddings",
