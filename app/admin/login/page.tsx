@@ -19,6 +19,8 @@ export default function LoginPage() {
     setError("")
 
     try {
+      console.log("Enviando solicitação de login")
+
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
@@ -30,14 +32,19 @@ export default function LoginPage() {
         }),
       })
 
+      console.log("Resposta do login:", response.status)
+
       const data = await response.json()
+      console.log("Dados da resposta:", data)
 
       if (!response.ok) {
         throw new Error(data.error || "Falha ao fazer login")
       }
 
-      router.push("/admin")
+      // Forçar um hard refresh para garantir que o cookie seja processado
+      window.location.href = "/admin"
     } catch (err: any) {
+      console.error("Erro no login:", err)
       setError(err.message || "Erro ao fazer login")
     } finally {
       setLoading(false)
