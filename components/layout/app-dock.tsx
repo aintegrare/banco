@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import {
@@ -19,8 +19,7 @@ import {
   FileImage,
   LogOut,
 } from "lucide-react"
-import { getSupabaseClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 interface DockItemProps {
   href: string
@@ -99,7 +98,7 @@ function DockItem({ href, icon, label, isActive, badge, onClick }: DockItemProps
 export function AppDock() {
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = getSupabaseClient()
+  const supabase = createClientComponentClient()
 
   const isActive = (path: string) => {
     if (path === "/admin" && pathname === "/admin") return true

@@ -4,26 +4,23 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { getSupabaseClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function LoginPage() {
+  const [email, setEmail] = useState("estrategia@designmarketing.com.br")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [message, setMessage] = useState("")
   const router = useRouter()
-  const supabase = getSupabaseClient()
+  const supabase = createClientComponentClient()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError("")
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
-        email: "estrategia@designmarketing.com.br",
+        email,
         password,
       })
 
@@ -32,57 +29,89 @@ export default function LoginPage() {
       } else {
         router.push("/admin")
       }
-    } catch (err) {
-      setError("Erro ao fazer login")
+    } catch (err: any) {
+      setError(err.message || "Erro ao fazer login")
     } finally {
       setLoading(false)
     }
   }
 
-  const createAdmin = async () => {
+  const handleCreateAdmin = async () => {
     setLoading(true)
-    setError("")
-    setMessage("")
 
     try {
-      const response = await fetch("/api/create-admin")
-      const data = await response.json()
+      const response = await fetch("/api/setup/create-admin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: "estrategia@designmarketing.com.br",
+          password: "Jivago14#",
+        }),
+      })
 
-      if (data.success) {
-        setMessage("Usuário admin criado com sucesso! Senha: Jivago14#")
-      } else {
-        setError(data.error || "Erro ao criar usuário admin")
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Erro ao criar usuário")
       }
-    } catch (err) {
-      setError("Erro ao criar usuário admin")
+
+      setPassword("Jivago14#")
+      alert("Usuário administrador criado com sucesso!")
+    } catch (err: any) {
+      setError(err.message || "Erro ao criar usuário")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100">
-      <div className="w-full max-w-md bg-white p-8 rounded shadow-md">
-        <h1 className="text-2xl font-bold text-center text-[#4b7bb5] mb-6">Login Admin</h1>
-
-        {message && <p className="text-sm text-green-500 mb-4">{message}</p>}
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+        <h1 className="text-2xl font-bold text-center text-[#4b7bb5] mb-6">Integrare Admin</h1>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <p className="text-sm mb-2">Email: estrategia@designmarketing.com.br</p>
-            <Input type="password" placeholder="Senha" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <label className="block text-sm font-medium text-gray-700">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+              required
+            />
           </div>
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          <Button type="submit" className="w-full bg-[#4b7bb5]" disabled={loading}>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Senha</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+              required
+            />
+          </div>
+
+          {error && <div className="text-red-500 text-sm">{error}</div>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#4b7bb5] hover:bg-[#3d649e]"
+          >
             {loading ? "Entrando..." : "Entrar"}
-          </Button>
+          </button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <p className="text-sm text-gray-500 mb-2">Primeiro acesso? Crie o usuário admin:</p>
-          <Button onClick={createAdmin} variant="outline" className="w-full" disabled={loading}>
-            Criar Usuário Admin
-          </Button>
+        <div className="mt-6 text-center">
+          <button
+            onClick={handleCreateAdmin}
+            disabled={loading}
+            className="text-sm text-[#4b7bb5] hover:text-[#3d649e]"
+          >
+            Criar Usuário Administrador
+          </button>
         </div>
       </div>
     </div>
