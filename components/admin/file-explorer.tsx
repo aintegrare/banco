@@ -228,15 +228,27 @@ export function FileExplorer() {
     setIsLoadingTasks(true)
     try {
       const folderPath = currentPath.join("/")
+      console.log("Buscando tarefas para a pasta:", folderPath)
+
       const supabase = getSupabaseClient()
+
+      // Normalizar o caminho da pasta para busca
+      const normalizedPath = folderPath.endsWith("/") ? folderPath : `${folderPath}`
+      const pathWithSlash = folderPath.endsWith("/") ? folderPath : `${folderPath}/`
+
+      // Buscar tarefas com path exato e também com / no final
       const { data, error } = await supabase
         .from("folder_tasks")
         .select("*")
-        .eq("folder_path", folderPath)
+        .or(`folder_path.eq.${normalizedPath},folder_path.eq.${pathWithSlash}`)
         .order("created_at", { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error("Erro ao buscar tarefas:", error)
+        throw error
+      }
 
+      console.log("Tarefas encontradas:", data?.length || 0)
       setTasks(data || [])
     } catch (err) {
       console.error("Erro ao carregar tarefas da pasta:", err)
@@ -259,10 +271,11 @@ export function FileExplorer() {
 
   // Buscar tarefas quando o caminho mudar ou quando alternar para a aba de tarefas
   useEffect(() => {
-    if (viewType === "tasks" || currentPath.length > 0) {
+    if (viewType === "tasks") {
+      console.log("Aba de tarefas selecionada, buscando tarefas...")
       fetchTasks()
     }
-  }, [fetchTasks, viewType, currentPath])
+  }, [fetchTasks, viewType])
 
   // Carregar favoritos do localStorage
   useEffect(() => {
@@ -1369,322 +1382,7 @@ export function FileExplorer() {
             {/* Área principal de arquivos ou tarefas */}
             <div className="md:col-span-3">
               <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[400px]">
-                {viewType === "files" ? (
-                  // Visualização de arquivos
-                  error ? (
-                    <div className="flex items-center justify-center h-64 text-red-500">
-                      <AlertCircle className="h-5 w-5 mr-2" />
-                      <span>{error}</span>
-                    </div>
-                  ) : isLoading ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <Skeleton className="h-8 w-48" />
-                        <Skeleton className="h-8 w-24" />
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                          <Skeleton key={i} className="h-32 w-full rounded-md" />
-                        ))}
-                      </div>
-                    </div>
-                  ) : sortedFiles.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                      <FolderOpen className="h-16 w-16 text-gray-300 mb-4" />
-                      <p className="text-lg font-medium text-gray-600 mb-2">
-                        {activeTab === "all"
-                          ? "Pasta vazia"
-                          : activeTab === "recent"
-                            ? "Nenhum arquivo recente"
-                            : activeTab === "favorites"
-                              ? "Nenhum favorito"
-                              : "Nenhum arquivo compartilhado"}
-                      </p>
-                      <p className="text-sm text-gray-500 mb-4">
-                        {searchQuery
-                          ? `Nenhum resultado encontrado para "${searchQuery}"`
-                          : activeTab === "all"
-                            ? "Esta pasta não contém nenhum arquivo ou subpasta"
-                            : activeTab === "recent"
-                              ? "Você não tem arquivos recentes"
-                              : activeTab === "favorites"
-                                ? "Você não tem favoritos"
-                                : "Você não tem arquivos compartilhados"}
-                      </p>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowUploader(true)}
-                          className="border-[#4b7bb5] text-[#4b7bb5]"
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload
-                        </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => setShowCreateFolderDialog(true)}
-                          className="bg-[#4b7bb5]"
-                        >
-                          <FolderPlus className="h-4 w-4 mr-2" />
-                          Nova Pasta
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      {viewMode === "grid" ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                          {sortedFiles.map((file) => (
-                            <FileCard
-                              key={file.id}
-                              file={file}
-                              onFolderClick={() => navigateToFolder(file.path)}
-                              onDelete={() => handleDelete(file)}
-                              onRename={handleRename}
-                              onShare={() => handleShare(file)}
-                              onToggleFavorite={() => toggleFavorite(file)}
-                              isSelected={selectedFiles.some((f) => f.id === file.id)}
-                              onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
-                              taskCount={file.type === "folder" ? taskCounts[file.path]?.pending : undefined}
-                              overdueCount={file.type === "folder" ? taskCounts[file.path]?.overdue : undefined}
-                              onOpenTasks={
-                                file.type === "folder"
-                                  ? () => {
-                                      navigateToFolder(file.path)
-                                      setViewType("tasks")
-                                    }
-                                  : undefined
-                              }
-                            />
-                          ))}
-                        </div>
-                      ) : viewMode === "list" ? (
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                {isSelectionMode && (
-                                  <th
-                                    scope="col"
-                                    className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={
-                                        selectedFiles.length > 0 && selectedFiles.length === filteredFiles.length
-                                      }
-                                      onChange={selectAllFiles}
-                                      className="rounded border-gray-300 text-[#4b7bb5] focus:ring-[#4b7bb5]"
-                                    />
-                                  </th>
-                                )}
-                                <th
-                                  scope="col"
-                                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                  Nome
-                                </th>
-                                <th
-                                  scope="col"
-                                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                  Data
-                                </th>
-                                <th
-                                  scope="col"
-                                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                  Tamanho
-                                </th>
-                                <th
-                                  scope="col"
-                                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                  Tipo
-                                </th>
-                                <th scope="col" className="relative px-6 py-3">
-                                  <span className="sr-only">Ações</span>
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {sortedFiles.map((file) => (
-                                <FileRow
-                                  key={file.id}
-                                  file={file}
-                                  onFolderClick={() => navigateToFolder(file.path)}
-                                  onDelete={() => handleDelete(file)}
-                                  onShare={() => handleShare(file)}
-                                  onToggleFavorite={() => toggleFavorite(file)}
-                                  isSelected={selectedFiles.some((f) => f.id === file.id)}
-                                  onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
-                                  showCheckbox={isSelectionMode}
-                                  taskCount={file.type === "folder" ? taskCounts[file.path]?.pending : undefined}
-                                  overdueCount={file.type === "folder" ? taskCounts[file.path]?.overdue : undefined}
-                                  onOpenTasks={
-                                    file.type === "folder"
-                                      ? () => {
-                                          navigateToFolder(file.path)
-                                          setViewType("tasks")
-                                        }
-                                      : undefined
-                                  }
-                                />
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {sortedFiles.map((file) => (
-                            <Card
-                              key={file.id}
-                              className={`hover:bg-gray-50 transition-colors ${
-                                selectedFiles.some((f) => f.id === file.id) ? "bg-blue-50 border-blue-200" : ""
-                              }`}
-                            >
-                              <CardHeader className="p-4 pb-2">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3">
-                                    {isSelectionMode && (
-                                      <input
-                                        type="checkbox"
-                                        checked={selectedFiles.some((f) => f.id === file.id)}
-                                        onChange={() => toggleFileSelection(file)}
-                                        className="rounded border-gray-300 text-[#4b7bb5] focus:ring-[#4b7bb5]"
-                                      />
-                                    )}
-                                    <div className="p-2 bg-gray-100 rounded-md">
-                                      {file.type === "folder" ? (
-                                        <Folder className="h-5 w-5 text-[#4b7bb5]" />
-                                      ) : file.fileType === "pdf" ? (
-                                        <FileText className="h-5 w-5 text-red-500" />
-                                      ) : ["jpg", "jpeg", "png", "gif", "webp"].includes(file.fileType || "") ? (
-                                        <ImageIcon className="h-5 w-5 text-green-500" />
-                                      ) : ["mp4", "avi", "mov", "webm"].includes(file.fileType || "") ? (
-                                        <Film className="h-5 w-5 text-purple-500" />
-                                      ) : ["mp3", "wav", "ogg"].includes(file.fileType || "") ? (
-                                        <Music className="h-5 w-5 text-blue-500" />
-                                      ) : ["zip", "rar", "7z", "tar", "gz"].includes(file.fileType || "") ? (
-                                        <Archive className="h-5 w-5 text-amber-500" />
-                                      ) : (
-                                        <FileIcon className="h-5 w-5 text-gray-500" />
-                                      )}
-                                    </div>
-                                    <div>
-                                      <CardTitle className="text-base font-medium">
-                                        <button
-                                          onClick={
-                                            file.type === "folder" ? () => navigateToFolder(file.path) : undefined
-                                          }
-                                          className={
-                                            file.type === "folder" ? "hover:text-[#4b7bb5] transition-colors" : ""
-                                          }
-                                        >
-                                          {file.name}
-                                        </button>
-                                      </CardTitle>
-                                      <CardDescription className="text-xs">
-                                        {file.type === "folder" ? "Pasta" : file.fileType?.toUpperCase()}
-                                      </CardDescription>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {file.isFavorite && (
-                                      <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200">
-                                        <Star className="h-3 w-3 mr-1 fill-amber-500 text-amber-500" />
-                                        Favorito
-                                      </Badge>
-                                    )}
-                                    {file.type === "folder" && taskCounts[file.path] > 0 && (
-                                      <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
-                                        <ClipboardList className="h-3 w-3 mr-1" />
-                                        {taskCounts[file.path]} tarefa{taskCounts[file.path] !== 1 ? "s" : ""}
-                                      </Badge>
-                                    )}
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon">
-                                          <MoreVertical size={16} />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                        <DropdownMenuGroup>
-                                          {file.type === "file" && (
-                                            <>
-                                              <DropdownMenuItem onClick={() => window.open(file.url, "_blank")}>
-                                                <ExternalLink className="h-4 w-4 mr-2" />
-                                                Abrir
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem onClick={() => handleShare(file)}>
-                                                <Share2 className="h-4 w-4 mr-2" />
-                                                Compartilhar
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem asChild>
-                                                <a href={file.url} download>
-                                                  <Download className="h-4 w-4 mr-2" />
-                                                  Download
-                                                </a>
-                                              </DropdownMenuItem>
-                                            </>
-                                          )}
-                                          {file.type === "folder" && (
-                                            <DropdownMenuItem
-                                              onClick={() => {
-                                                navigateToFolder(file.path)
-                                                setViewType("tasks")
-                                              }}
-                                            >
-                                              <ClipboardList className="h-4 w-4 mr-2" />
-                                              Ver Tarefas
-                                            </DropdownMenuItem>
-                                          )}
-                                          <DropdownMenuItem onClick={() => toggleFavorite(file)}>
-                                            {file.isFavorite ? (
-                                              <>
-                                                <StarOff className="h-4 w-4 mr-2" />
-                                                Remover dos favoritos
-                                              </>
-                                            ) : (
-                                              <>
-                                                <Star className="h-4 w-4 mr-2" />
-                                                Adicionar aos favoritos
-                                              </>
-                                            )}
-                                          </DropdownMenuItem>
-                                          <DropdownMenuSeparator />
-                                          <DropdownMenuItem onClick={() => handleDelete(file)} className="text-red-600">
-                                            <Trash2 className="h-4 w-4 mr-2" />
-                                            Excluir
-                                          </DropdownMenuItem>
-                                        </DropdownMenuGroup>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </div>
-                                </div>
-                              </CardHeader>
-                              <CardContent className="p-4 pt-0">
-                                <div className="flex justify-between text-xs text-gray-500">
-                                  <div className="flex items-center">
-                                    <Clock className="h-3 w-3 mr-1" />
-                                    {new Date(file.modified).toLocaleDateString("pt-BR", {
-                                      day: "2-digit",
-                                      month: "2-digit",
-                                      year: "numeric",
-                                    })}
-                                  </div>
-                                  {file.type === "file" && file.size && <div>{formatBytes(file.size)}</div>}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
-                ) : (
+                {viewType === "tasks" ? (
                   // Visualização de tarefas
                   <>
                     {currentPath.length === 0 ? (
@@ -1745,7 +1443,7 @@ export function FileExplorer() {
                             </span>
                           </div>
 
-                          {sortedTasks.length === 0 ? (
+                          {tasks.length === 0 ? (
                             <div className="p-6 text-center text-gray-500">
                               <p>Nenhuma tarefa para esta pasta.</p>
                               <p className="text-sm mt-1">Adicione tarefas para organizar seu trabalho.</p>
@@ -1830,6 +1528,315 @@ export function FileExplorer() {
                       </div>
                     )}
                   </>
+                ) : // Visualização de arquivos
+                error ? (
+                  <div className="flex items-center justify-center h-64 text-red-500">
+                    <AlertCircle className="h-5 w-5 mr-2" />
+                    <span>{error}</span>
+                  </div>
+                ) : isLoading ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-8 w-48" />
+                      <Skeleton className="h-8 w-24" />
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <Skeleton key={i} className="h-32 w-full rounded-md" />
+                      ))}
+                    </div>
+                  </div>
+                ) : sortedFiles.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                    <FolderOpen className="h-16 w-16 text-gray-300 mb-4" />
+                    <p className="text-lg font-medium text-gray-600 mb-2">
+                      {activeTab === "all"
+                        ? "Pasta vazia"
+                        : activeTab === "recent"
+                          ? "Nenhum arquivo recente"
+                          : activeTab === "favorites"
+                            ? "Nenhum favorito"
+                            : "Nenhum arquivo compartilhado"}
+                    </p>
+                    <p className="text-sm text-gray-500 mb-4">
+                      {searchQuery
+                        ? `Nenhum resultado encontrado para "${searchQuery}"`
+                        : activeTab === "all"
+                          ? "Esta pasta não contém nenhum arquivo ou subpasta"
+                          : activeTab === "recent"
+                            ? "Você não tem arquivos recentes"
+                            : activeTab === "favorites"
+                              ? "Você não tem favoritos"
+                              : "Você não tem arquivos compartilhados"}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowUploader(true)}
+                        className="border-[#4b7bb5] text-[#4b7bb5]"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => setShowCreateFolderDialog(true)}
+                        className="bg-[#4b7bb5]"
+                      >
+                        <FolderPlus className="h-4 w-4 mr-2" />
+                        Nova Pasta
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    {viewMode === "grid" ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                        {sortedFiles.map((file) => (
+                          <FileCard
+                            key={file.id}
+                            file={file}
+                            onFolderClick={() => navigateToFolder(file.path)}
+                            onDelete={() => handleDelete(file)}
+                            onRename={handleRename}
+                            onShare={() => handleShare(file)}
+                            onToggleFavorite={() => toggleFavorite(file)}
+                            isSelected={selectedFiles.some((f) => f.id === file.id)}
+                            onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
+                            taskCount={file.type === "folder" ? taskCounts[file.path]?.pending : undefined}
+                            overdueCount={file.type === "folder" ? taskCounts[file.path]?.overdue : undefined}
+                            onOpenTasks={
+                              file.type === "folder"
+                                ? () => {
+                                    navigateToFolder(file.path)
+                                    setViewType("tasks")
+                                  }
+                                : undefined
+                            }
+                          />
+                        ))}
+                      </div>
+                    ) : viewMode === "list" ? (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              {isSelectionMode && (
+                                <th
+                                  scope="col"
+                                  className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedFiles.length > 0 && selectedFiles.length === filteredFiles.length}
+                                    onChange={selectAllFiles}
+                                    className="rounded border-gray-300 text-[#4b7bb5] focus:ring-[#4b7bb5]"
+                                  />
+                                </th>
+                              )}
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Nome
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Data
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Tamanho
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Tipo
+                              </th>
+                              <th scope="col" className="relative px-6 py-3">
+                                <span className="sr-only">Ações</span>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {sortedFiles.map((file) => (
+                              <FileRow
+                                key={file.id}
+                                file={file}
+                                onFolderClick={() => navigateToFolder(file.path)}
+                                onDelete={() => handleDelete(file)}
+                                onShare={() => handleShare(file)}
+                                onToggleFavorite={() => toggleFavorite(file)}
+                                isSelected={selectedFiles.some((f) => f.id === file.id)}
+                                onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
+                                showCheckbox={isSelectionMode}
+                                taskCount={file.type === "folder" ? taskCounts[file.path]?.pending : undefined}
+                                overdueCount={file.type === "folder" ? taskCounts[file.path]?.overdue : undefined}
+                                onOpenTasks={
+                                  file.type === "folder"
+                                    ? () => {
+                                        navigateToFolder(file.path)
+                                        setViewType("tasks")
+                                      }
+                                    : undefined
+                                }
+                              />
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {sortedFiles.map((file) => (
+                          <Card
+                            key={file.id}
+                            className={`hover:bg-gray-50 transition-colors ${
+                              selectedFiles.some((f) => f.id === file.id) ? "bg-blue-50 border-blue-200" : ""
+                            }`}
+                          >
+                            <CardHeader className="p-4 pb-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  {isSelectionMode && (
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedFiles.some((f) => f.id === file.id)}
+                                      onChange={() => toggleFileSelection(file)}
+                                      className="rounded border-gray-300 text-[#4b7bb5] focus:ring-[#4b7bb5]"
+                                    />
+                                  )}
+                                  <div className="p-2 bg-gray-100 rounded-md">
+                                    {file.type === "folder" ? (
+                                      <Folder className="h-5 w-5 text-[#4b7bb5]" />
+                                    ) : file.fileType === "pdf" ? (
+                                      <FileText className="h-5 w-5 text-red-500" />
+                                    ) : ["jpg", "jpeg", "png", "gif", "webp"].includes(file.fileType || "") ? (
+                                      <ImageIcon className="h-5 w-5 text-green-500" />
+                                    ) : ["mp4", "avi", "mov", "webm"].includes(file.fileType || "") ? (
+                                      <Film className="h-5 w-5 text-purple-500" />
+                                    ) : ["mp3", "wav", "ogg"].includes(file.fileType || "") ? (
+                                      <Music className="h-5 w-5 text-blue-500" />
+                                    ) : ["zip", "rar", "7z", "tar", "gz"].includes(file.fileType || "") ? (
+                                      <Archive className="h-5 w-5 text-amber-500" />
+                                    ) : (
+                                      <FileIcon className="h-5 w-5 text-gray-500" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <CardTitle className="text-base font-medium">
+                                      <button
+                                        onClick={file.type === "folder" ? () => navigateToFolder(file.path) : undefined}
+                                        className={
+                                          file.type === "folder" ? "hover:text-[#4b7bb5] transition-colors" : ""
+                                        }
+                                      >
+                                        {file.name}
+                                      </button>
+                                    </CardTitle>
+                                    <CardDescription className="text-xs">
+                                      {file.type === "folder" ? "Pasta" : file.fileType?.toUpperCase()}
+                                    </CardDescription>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {file.isFavorite && (
+                                    <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200">
+                                      <Star className="h-3 w-3 mr-1 fill-amber-500 text-amber-500" />
+                                      Favorito
+                                    </Badge>
+                                  )}
+                                  {file.type === "folder" && taskCounts[file.path] > 0 && (
+                                    <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
+                                      <ClipboardList className="h-3 w-3 mr-1" />
+                                      {taskCounts[file.path]} tarefa{taskCounts[file.path] !== 1 ? "s" : ""}
+                                    </Badge>
+                                  )}
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon">
+                                        <MoreVertical size={16} />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuGroup>
+                                        {file.type === "file" && (
+                                          <>
+                                            <DropdownMenuItem onClick={() => window.open(file.url, "_blank")}>
+                                              <ExternalLink className="h-4 w-4 mr-2" />
+                                              Abrir
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleShare(file)}>
+                                              <Share2 className="h-4 w-4 mr-2" />
+                                              Compartilhar
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem asChild>
+                                              <a href={file.url} download>
+                                                <Download className="h-4 w-4 mr-2" />
+                                                Download
+                                              </a>
+                                            </DropdownMenuItem>
+                                          </>
+                                        )}
+                                        {file.type === "folder" && (
+                                          <DropdownMenuItem
+                                            onClick={() => {
+                                              navigateToFolder(file.path)
+                                              setViewType("tasks")
+                                            }}
+                                          >
+                                            <ClipboardList className="h-4 w-4 mr-2" />
+                                            Ver Tarefas
+                                          </DropdownMenuItem>
+                                        )}
+                                        <DropdownMenuItem onClick={() => toggleFavorite(file)}>
+                                          {file.isFavorite ? (
+                                            <>
+                                              <StarOff className="h-4 w-4 mr-2" />
+                                              Remover dos favoritos
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Star className="h-4 w-4 mr-2" />
+                                              Adicionar aos favoritos
+                                            </>
+                                          )}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => handleDelete(file)} className="text-red-600">
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Excluir
+                                        </DropdownMenuItem>
+                                      </DropdownMenuGroup>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="p-4 pt-0">
+                              <div className="flex justify-between text-xs text-gray-500">
+                                <div className="flex items-center">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  {new Date(file.modified).toLocaleDateString("pt-BR", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                  })}
+                                </div>
+                                {file.type === "file" && file.size && <div>{formatBytes(file.size)}</div>}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

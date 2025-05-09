@@ -6,6 +6,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get("projectId")
 
+    console.log("API tasks: Buscando tarefas", projectId ? `para o projeto ${projectId}` : "para todos os projetos")
+
     const supabase = createClient()
 
     let query = supabase.from("tasks").select("*")
@@ -17,13 +19,21 @@ export async function GET(request: Request) {
     const { data, error } = await query.order("created_at", { ascending: false })
 
     if (error) {
-      console.error("Erro ao buscar tarefas:", error)
+      console.error("API tasks: Erro ao buscar tarefas:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json(data || [])
+    console.log(`API tasks: ${data?.length || 0} tarefas encontradas`)
+
+    // Se não houver dados do banco de dados, use o fallback
+    if (!data || data.length === 0) {
+      console.log("API tasks: Usando dados de fallback")
+      return NextResponse.json(fallbackTasks)
+    }
+
+    return NextResponse.json(data)
   } catch (error: any) {
-    console.error("Erro ao processar requisição de tarefas:", error)
+    console.error("API tasks: Erro ao processar requisição de tarefas:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
@@ -83,3 +93,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
+
+// Dados de exemplo para fallback
+const fallbackTasks = [
+  {
+    id: "fallback-1",
+    title: "Revisar conteúdo do site",
+    description: "Verificar textos e imagens da página inicial",
+    status: "todo",
+    priority: "high",
+    project_id: "fallback",
+    created_at: new Date().toISOString(),
+    due_date: new Date().toISOString(),
+  },
+  {
+    id: "fallback-2",
+    title: "Preparar relatório mensal",
+    description: "Compilar métricas de desempenho para o cliente",
+    status: "in-progress",
+    priority: "medium",
+    project_id: "fallback",
+    created_at: new Date().toISOString(),
+    due_date: new Date(Date.now() + 86400000 * 3).toISOString(),
+  },
+]

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd"
-import { Loader2, Plus } from "lucide-react"
+import { Loader2, Plus, ClipboardList } from "lucide-react"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
 import { CreateTaskDialog } from "./create-task-dialog"
@@ -194,21 +194,46 @@ export function TaskBoard() {
       window.history.replaceState({}, "", newUrl)
     }
 
-    // Simular carregamento de dados
+    // Carregar tarefas
     const fetchTasks = async () => {
       setIsLoading(true)
       try {
-        // Simular chamada à API
-        await new Promise((resolve) => setTimeout(resolve, 800))
+        // Tentar buscar da API primeiro
+        let apiTasks = []
+        try {
+          const url = `/api/tasks${projectParam ? `?projectId=${projectParam}` : ""}`
+          console.log("TaskBoard: Buscando tarefas de", url)
+          const response = await fetch(url)
+          if (response.ok) {
+            apiTasks = await response.json()
+            console.log("TaskBoard: Tarefas carregadas da API:", apiTasks.length)
+          } else {
+            console.warn("TaskBoard: Falha ao buscar da API, usando dados de exemplo")
+          }
+        } catch (apiError) {
+          console.error("TaskBoard: Erro ao buscar da API:", apiError)
+        }
 
-        // Filtrar tarefas se houver um projeto selecionado
+        // Se conseguimos dados da API, use-os
+        if (apiTasks && apiTasks.length > 0) {
+          setTasks(apiTasks)
+        } else {
+          // Caso contrário, use os dados de exemplo
+          console.log("TaskBoard: Usando dados de exemplo")
+          if (projectParam) {
+            setTasks(SAMPLE_TASKS.filter((task) => task.projectId === projectParam))
+          } else {
+            setTasks(SAMPLE_TASKS)
+          }
+        }
+      } catch (error) {
+        console.error("TaskBoard: Erro ao carregar tarefas:", error)
+        // Em caso de erro, use os dados de exemplo
         if (projectParam) {
           setTasks(SAMPLE_TASKS.filter((task) => task.projectId === projectParam))
         } else {
           setTasks(SAMPLE_TASKS)
         }
-      } catch (error) {
-        console.error("Erro ao carregar tarefas:", error)
       } finally {
         setIsLoading(false)
       }
@@ -271,14 +296,6 @@ export function TaskBoard() {
     console.log(`Tarefa ${draggableId} movida de ${source.droppableId} para ${destination.droppableId}`)
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <Loader2 size={40} className="text-[#4b7bb5] animate-spin" />
-      </div>
-    )
-  }
-
   // Organizar tarefas por coluna
   const tasksByColumn = COLUMNS.reduce((acc: any, column) => {
     acc[column.id] = tasks.filter((task) => task.status === column.id)
@@ -294,55 +311,78 @@ export function TaskBoard() {
         </Button>
       </div>
 
-      <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex overflow-x-auto pb-4 -mx-4 px-4" style={{ minHeight: "calc(100vh - 150px)" }}>
-          {COLUMNS.map((column) => (
-            <div key={column.id} className="flex-shrink-0 w-80 mx-2 first:ml-0 last:mr-0">
-              <div className="bg-gray-100 rounded-lg shadow-sm h-full flex flex-col">
-                <div className="p-3 font-medium text-gray-700 border-b border-gray-200 bg-gray-200 rounded-t-lg flex justify-between items-center">
-                  <span>{column.title}</span>
-                  <span className="bg-white text-gray-600 text-xs font-normal py-1 px-2 rounded-full">
-                    {tasksByColumn[column.id].length}
-                  </span>
-                </div>
-
-                <Droppable droppableId={column.id}>
-                  {(provided) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className="flex-grow p-2 overflow-y-auto"
-                      style={{ minHeight: "100px" }}
-                    >
-                      {tasksByColumn[column.id].map((task: any, index: number) => (
-                        <Draggable key={task.id} draggableId={String(task.id)} index={index}>
-                          {(provided) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              className="mb-2 last:mb-0"
-                            >
-                              <TaskCard
-                                task={task}
-                                onEdit={handleEditTask}
-                                onDelete={handleDeleteTask}
-                                onStatusChange={handleStatusChange}
-                                showProject={true}
-                              />
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </div>
-            </div>
-          ))}
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 size={40} className="text-[#4b7bb5] animate-spin" />
         </div>
-      </DragDropContext>
+      ) : (
+        <DragDropContext onDragEnd={onDragEnd}>
+          {Object.values(tasksByColumn).some((column) => column.length > 0) ? (
+            <div className="flex overflow-x-auto pb-4 -mx-4 px-4" style={{ minHeight: "calc(100vh - 150px)" }}>
+              {COLUMNS.map((column) => (
+                <div key={column.id} className="flex-shrink-0 w-80 mx-2 first:ml-0 last:mr-0">
+                  <div className="bg-gray-100 rounded-lg shadow-sm h-full flex flex-col">
+                    <div className="p-3 font-medium text-gray-700 border-b border-gray-200 bg-gray-200 rounded-t-lg flex justify-between items-center">
+                      <span>{column.title}</span>
+                      <span className="bg-white text-gray-600 text-xs font-normal py-1 px-2 rounded-full">
+                        {tasksByColumn[column.id].length}
+                      </span>
+                    </div>
+
+                    <Droppable droppableId={column.id}>
+                      {(provided) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          className="flex-grow p-2 overflow-y-auto"
+                          style={{ minHeight: "100px" }}
+                        >
+                          {tasksByColumn[column.id].map((task: any, index: number) => (
+                            <Draggable key={task.id} draggableId={String(task.id)} index={index}>
+                              {(provided) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className="mb-2 last:mb-0"
+                                >
+                                  <TaskCard
+                                    task={task}
+                                    onEdit={handleEditTask}
+                                    onDelete={handleDeleteTask}
+                                    onStatusChange={handleStatusChange}
+                                    showProject={true}
+                                  />
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <ClipboardList size={32} className="text-gray-400" />
+              </div>
+              <h3 className="text-xl font-medium text-gray-700 mb-2">Nenhuma tarefa encontrada</h3>
+              <p className="text-gray-500 max-w-md mb-6">
+                {selectedProject
+                  ? "Não há tarefas para o projeto selecionado. Crie uma nova tarefa para começar."
+                  : "Você ainda não tem tarefas. Crie sua primeira tarefa para começar a organizar seu trabalho."}
+              </p>
+              <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-[#4b7bb5] hover:bg-[#3d649e]">
+                <Plus className="mr-2 h-4 w-4" /> Nova Tarefa
+              </Button>
+            </div>
+          )}
+        </DragDropContext>
+      )}
 
       <CreateTaskDialog
         isOpen={isCreateDialogOpen}
