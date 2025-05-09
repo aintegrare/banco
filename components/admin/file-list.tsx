@@ -29,6 +29,9 @@ import {
   CheckSquare,
   Square,
   ClipboardList,
+  Palette,
+  FileImage,
+  BookOpen,
 } from "lucide-react"
 import { getBunnyPublicUrl } from "@/lib/bunny"
 import { FolderTasks } from "./folder-tasks"
@@ -433,6 +436,14 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
       case "rar":
       case "7z":
         return <Archive className="h-5 w-5 text-yellow-500" />
+      case "psd":
+      case "psb":
+        return <Palette className="h-5 w-5 text-purple-600" />
+      case "ai":
+        return <FileImage className="h-5 w-5 text-orange-500" />
+      case "indd":
+      case "idml":
+        return <BookOpen className="h-5 w-5 text-pink-500" />
       default:
         return <File className="h-5 w-5 text-gray-500" />
     }

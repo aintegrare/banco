@@ -28,12 +28,12 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files)
 
-      // Verificar tamanho dos arquivos (30MB = 30 * 1024 * 1024 bytes)
+      // Verificar tamanho dos arquivos (100MB = 100 * 1024 * 1024 bytes)
       const validFiles = selectedFiles.filter((file) => {
-        if (file.size > 30 * 1024 * 1024) {
+        if (file.size > 100 * 1024 * 1024) {
           setErrors((prev) => ({
             ...prev,
-            [file.name]: "O arquivo excede o tamanho máximo de 30MB.",
+            [file.name]: "O arquivo excede o tamanho máximo de 100MB.",
           }))
           return false
         }
@@ -73,12 +73,12 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFiles = Array.from(e.dataTransfer.files)
 
-      // Verificar tamanho dos arquivos (30MB = 30 * 1024 * 1024 bytes)
+      // Verificar tamanho dos arquivos (100MB = 100 * 1024 * 1024 bytes)
       const validFiles = droppedFiles.filter((file) => {
-        if (file.size > 30 * 1024 * 1024) {
+        if (file.size > 100 * 1024 * 1024) {
           setErrors((prev) => ({
             ...prev,
-            [file.name]: "O arquivo excede o tamanho máximo de 30MB.",
+            [file.name]: "O arquivo excede o tamanho máximo de 100MB.",
           }))
           return false
         }
@@ -276,7 +276,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
 
   // Determinar o tipo de arquivo aceito
   const getAcceptedFileTypes = () => {
-    return ".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.webp"
+    return ".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.webp,.psd,.psb,.ai,.indd,.idml"
   }
 
   // Calcular o total de arquivos com erro
@@ -342,7 +342,9 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
             <div className="flex flex-col items-center">
               <Upload className="h-8 w-8 text-gray-400 mb-2" />
               <p className="text-gray-600 mb-1">Arraste e solte arquivos aqui ou clique para selecionar</p>
-              <p className="text-xs text-gray-500">PDF, DOC, DOCX, TXT, JPG, PNG, GIF, WEBP (máx. 30MB por arquivo)</p>
+              <p className="text-xs text-gray-500">
+                PDF, DOC, DOCX, TXT, JPG, PNG, GIF, WEBP, PSD, PSB, AI, INDD, IDML (máx. 100MB por arquivo)
+              </p>
             </div>
           </label>
         ) : (
