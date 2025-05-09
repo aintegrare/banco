@@ -46,6 +46,20 @@ export default function FerramentasPage() {
               Acessar Ferramenta
             </Link>
           </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <h3 className="text-lg font-semibold text-[#4072b0] mb-2">Diagnóstico de Tarefas</h3>
+            <p className="text-gray-600 mb-4">
+              Verifique e corrija problemas de acesso às tarefas no banco de dados, incluindo estrutura da tabela e
+              permissões.
+            </p>
+            <Link
+              href="/admin/ferramentas/diagnostico-tarefas"
+              className="inline-flex items-center px-4 py-2 bg-[#4072b0] text-white rounded-md hover:bg-[#3d649e]"
+            >
+              Acessar Ferramenta
+            </Link>
+          </div>
         </div>
       </div>
     </div>

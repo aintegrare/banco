@@ -101,6 +101,11 @@ interface FolderTask {
   created_at: string
 }
 
+interface TaskCount {
+  pending: number
+  overdue: number
+}
+
 export function FileExplorer() {
   const [files, setFiles] = useState<FileItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -135,7 +140,7 @@ export function FileExplorer() {
   const fileExplorerRef = useRef<HTMLDivElement>(null)
 
   // Estados para gerenciar tarefas
-  const [taskCounts, setTaskCounts] = useState<Record<string, number>>({})
+  const [taskCounts, setTaskCounts] = useState<Record<string, TaskCount>>({})
   const [tasks, setTasks] = useState<FolderTask[]>([])
   const [isLoadingTasks, setIsLoadingTasks] = useState(false)
   const [newTaskDescription, setNewTaskDescription] = useState("")
@@ -149,6 +154,7 @@ export function FileExplorer() {
   const [taskSortDirection, setTaskSortDirection] = useState<"asc" | "desc">("desc")
   const [taskFilter, setTaskFilter] = useState<"all" | "pending" | "completed">("all")
   const [taskSearchQuery, setTaskSearchQuery] = useState("")
+  const [showTasks, setShowTasks] = useState<boolean>(false)
 
   // Função para buscar arquivos e pastas
   const fetchFiles = useCallback(async () => {
@@ -946,6 +952,10 @@ export function FileExplorer() {
     )
   }
 
+  const toggleTasksPanel = useCallback(() => {
+    setShowTasks((prev) => !prev)
+  }, [])
+
   return (
     <div
       ref={fileExplorerRef}
@@ -1341,9 +1351,13 @@ export function FileExplorer() {
               <TabsTrigger value="tasks" className="data-[state=active]:bg-[#4b7bb5] data-[state=active]:text-white">
                 <ClipboardList className="h-4 w-4 mr-2" />
                 Tarefas
-                {taskCounts[currentPath.join("/")] ? (
-                  <Badge className="ml-2 bg-[#3d649e]">{taskCounts[currentPath.join("/")]}</Badge>
-                ) : null}
+                {taskCounts[currentPath.join("/")]?.pending > 0 && (
+                  <Badge
+                    className={`ml-2 ${taskCounts[currentPath.join("/")]?.overdue > 0 ? "bg-red-500" : "bg-[#3d649e]"}`}
+                  >
+                    {taskCounts[currentPath.join("/")]?.pending}
+                  </Badge>
+                )}
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -1433,7 +1447,8 @@ export function FileExplorer() {
                               onToggleFavorite={() => toggleFavorite(file)}
                               isSelected={selectedFiles.some((f) => f.id === file.id)}
                               onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
-                              taskCount={file.type === "folder" ? taskCounts[file.path] : undefined}
+                              taskCount={file.type === "folder" ? taskCounts[file.path]?.pending : undefined}
+                              overdueCount={file.type === "folder" ? taskCounts[file.path]?.overdue : undefined}
                               onOpenTasks={
                                 file.type === "folder"
                                   ? () => {
@@ -1506,7 +1521,8 @@ export function FileExplorer() {
                                   isSelected={selectedFiles.some((f) => f.id === file.id)}
                                   onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
                                   showCheckbox={isSelectionMode}
-                                  taskCount={file.type === "folder" ? taskCounts[file.path] : undefined}
+                                  taskCount={file.type === "folder" ? taskCounts[file.path]?.pending : undefined}
+                                  overdueCount={file.type === "folder" ? taskCounts[file.path]?.overdue : undefined}
                                   onOpenTasks={
                                     file.type === "folder"
                                       ? () => {
@@ -1984,6 +2000,16 @@ export function FileExplorer() {
             </div>
           </div>
         </div>
+        {showTasks && currentPath && (
+          <div className="mt-4">
+            {/*<FolderTasks
+              folderPath={currentPath}
+              onTaskCountChange={(count) => {
+                // Atualizar a contagem de tarefas se necessário
+              }}
+            />*/}
+          </div>
+        )}
       </div>
 
       {/* Modal de upload */}

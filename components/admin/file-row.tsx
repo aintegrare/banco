@@ -1,5 +1,7 @@
 "use client"
 
+import { DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+
 import type React from "react"
 
 import {
@@ -28,7 +30,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 // Adicionar importação para o badge de tarefas
@@ -55,6 +56,7 @@ interface FileRowProps {
   onToggleSelect?: () => void
   showCheckbox?: boolean
   taskCount?: number
+  overdueCount?: number
   onOpenTasks?: () => void
 }
 
@@ -68,6 +70,7 @@ export function FileRow({
   onToggleSelect,
   showCheckbox,
   taskCount,
+  overdueCount,
   onOpenTasks,
 }: FileRowProps) {
   const [showMenu, setShowMenu] = useState(false)
@@ -220,7 +223,7 @@ export function FileRow({
                     }}
                     className="ml-1"
                   >
-                    <FolderTaskBadge count={taskCount} />
+                    <FolderTaskBadge count={taskCount} overdueCount={overdueCount} />
                   </button>
                 )}
               </div>

@@ -54,6 +54,7 @@ interface FileCardProps {
   isSelected?: boolean
   onToggleSelect?: () => void
   taskCount?: number
+  overdueCount?: number
   onOpenTasks?: () => void
 }
 
@@ -67,6 +68,7 @@ export function FileCard({
   isSelected,
   onToggleSelect,
   taskCount,
+  overdueCount,
   onOpenTasks,
 }: FileCardProps) {
   const [showMenu, setShowMenu] = useState(false)
@@ -333,15 +335,9 @@ export function FileCard({
             {/* Localizar a div que contém o nome do arquivo (geralmente após o ícone) */}
             {/* Adicionar após o nome do arquivo, dentro da mesma div */}
             {file.type === "folder" && taskCount && taskCount > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenTasks?.()
-                }}
-                className="ml-1"
-              >
-                <FolderTaskBadge count={taskCount} />
-              </button>
+              <div className="absolute top-1 right-1">
+                <FolderTaskBadge count={taskCount} overdueCount={overdueCount} />
+              </div>
             )}
           </h3>
           <p className="text-xs text-gray-500 mt-1">

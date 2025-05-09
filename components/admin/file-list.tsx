@@ -34,9 +34,9 @@ import {
   BookOpen,
 } from "lucide-react"
 import { getBunnyPublicUrl } from "@/lib/bunny"
-import { FolderTasks } from "./folder-tasks"
 import { FolderTaskBadge } from "./folder-task-badge"
 import { fetchFolderTaskCounts } from "@/lib/folder-tasks-manager"
+import { FolderTasksPanel } from "./folder-tasks-panel"
 
 interface BunnyFile {
   ObjectName: string
@@ -95,15 +95,16 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
   const [multiMoveDestination, setMultiMoveDestination] = useState<string>("")
   const [showMultiMoveModal, setShowMultiMoveModal] = useState(false)
   const [multiMoveError, setMultiMoveError] = useState<string | null>(null)
-  const [showFolderTasks, setShowFolderTasks] = useState(false)
-  const [selectedFolderForTasks, setSelectedFolderForTasks] = useState<string>("")
-  const [folderTaskCounts, setFolderTaskCounts] = useState<Record<string, number>>({})
   const [multiMoveProgress, setMultiMoveProgress] = useState<{
     current: number
     total: number
     currentFile: string
   } | null>(null)
   const [isLoadingTaskCounts, setIsLoadingTaskCounts] = useState(false)
+  const [showTasksPanel, setShowTasksPanel] = useState<boolean>(false)
+  const [showFolderTasks, setShowFolderTasks] = useState(false)
+  const [selectedFolderForTasks, setSelectedFolderForTasks] = useState<string>("")
+  const [folderTaskCounts, setFolderTaskCounts] = useState<Record<string, number>>({})
 
   // Função para carregar automaticamente as contagens de tarefas das pastas
   const loadFolderTaskCounts = useCallback(async (folders: BunnyFile[]) => {
@@ -702,6 +703,7 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
   }
 
   const openFolderTasks = (folderPath: string) => {
+    console.log("Abrindo tarefas para a pasta:", folderPath)
     setSelectedFolderForTasks(folderPath)
     setShowFolderTasks(true)
   }
@@ -861,6 +863,16 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     }
   }
 
+  const openTasksPanel = (folderPath: string) => {
+    setSelectedFolderForTasks(folderPath)
+    setShowTasksPanel(true)
+  }
+
+  const closeTasksPanel = () => {
+    setShowTasksPanel(false)
+    setSelectedFolderForTasks("")
+  }
+
   return (
     <>
       <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
@@ -936,6 +948,10 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
           {renderBreadcrumb()}
         </div>
+
+        <div className="flex flex-wrap gap-2 mb-6"></div>
+
+        {renderBreadcrumb()}
 
         <div className="flex flex-wrap gap-2 mb-6">
           <button
@@ -1228,7 +1244,12 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
                                 {file.ObjectName}
                               </span>
                               {file.IsDirectory && folderTaskCounts[file.Path] > 0 && (
-                                <FolderTaskBadge count={folderTaskCounts[file.Path]} />
+                                <FolderTaskBadge
+                                  count={folderTaskCounts[file.Path]}
+                                  onClick={(e) => {
+                                    openFolderTasks(file.Path)
+                                  }}
+                                />
                               )}
                             </div>
                           </div>
@@ -1562,36 +1583,21 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
         {/* Modais de pasta, move, etc. são mantidos como no código original */}
 
+        {/* Modificar a parte onde o modal de tarefas é renderizado para usar o novo componente FolderTasksPanel */}
+
+        {/* Substituir o modal de tarefas existente por: */}
         {showFolderTasks && selectedFolderForTasks && (
           <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
-            <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
-              <div className="p-4 border-b flex justify-between items-center">
-                <h3 className="font-medium flex items-center">
-                  <FolderOpen className="h-5 w-5 mr-2 text-[#4b7bb5]" />
-                  <span className="ml-2">Tarefas: {selectedFolderForTasks.split("/").filter(Boolean).pop()}</span>
-                </h3>
-                <button
-                  onClick={() => setShowFolderTasks(false)}
-                  className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="p-4">
-                <FolderTasks
-                  folderPath={selectedFolderForTasks}
-                  onTaskCountChange={(count) => updateFolderTaskCount(selectedFolderForTasks, count)}
-                />
-              </div>
-              <div className="p-4 bg-gray-50 flex justify-end space-x-3 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowFolderTasks(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Fechar
-                </button>
-              </div>
+            <FolderTasksPanel folderPath={selectedFolderForTasks} onClose={() => setShowFolderTasks(false)} />
+          </div>
+        )}
+        {showTasksPanel && selectedFolderForTasks && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="max-w-2xl w-full">
+              {/*<FolderTasksPanel
+                folderPath={selectedFolderForTasks}
+                onClose={closeTasksPanel}
+              />*/}
             </div>
           </div>
         )}
