@@ -20,7 +20,7 @@ import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Filter } from "lucide-
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
 
-export default function BlogAdminPage() {
+export default function AdminBlogPage() {
   const [posts, setPosts] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
@@ -124,7 +124,7 @@ export default function BlogAdminPage() {
         title="Gerenciar Blog"
         description="Gerencie os posts, categorias e autores do blog da Integrare"
         actions={
-          <Link href="/blog/admin/novo">
+          <Link href="/admin/blog/novo">
             <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">
               <Plus className="mr-2 h-4 w-4" />
               Novo Post
@@ -190,7 +190,7 @@ export default function BlogAdminPage() {
           ) : posts.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500 mb-4">Nenhum post encontrado</p>
-              <Link href="/blog/admin/novo">
+              <Link href="/admin/blog/novo">
                 <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">
                   <Plus className="mr-2 h-4 w-4" />
                   Criar Novo Post
@@ -251,7 +251,7 @@ export default function BlogAdminPage() {
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                              <Link href={`/blog/admin/editar/${post.id}`}>
+                              <Link href={`/admin/blog/editar/${post.id}`}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 <span>Editar</span>
                               </Link>

@@ -1,97 +1,104 @@
--- Tabela de categorias do blog
-CREATE TABLE IF NOT EXISTS blog_categories (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name VARCHAR(100) NOT NULL,
-  slug VARCHAR(100) NOT NULL UNIQUE,
-  description TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Tabela de autores do blog
+-- Verificar se a tabela blog_authors existe
 CREATE TABLE IF NOT EXISTS blog_authors (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name VARCHAR(100) NOT NULL,
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
   email VARCHAR(255),
-  avatar VARCHAR(255),
+  avatar_url TEXT,
   bio TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabela de posts do blog
+-- Verificar se a tabela blog_categories existe
+CREATE TABLE IF NOT EXISTS blog_categories (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) NOT NULL UNIQUE,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Verificar se a tabela blog_posts existe
 CREATE TABLE IF NOT EXISTS blog_posts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id SERIAL PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   slug VARCHAR(255) NOT NULL UNIQUE,
   excerpt TEXT,
   content TEXT,
-  cover_image VARCHAR(255),
-  author_id UUID REFERENCES blog_authors(id),
-  category_id UUID REFERENCES blog_categories(id),
-  status VARCHAR(20) DEFAULT 'draft', -- draft, published, scheduled
+  featured_image TEXT,
+  author_id INTEGER REFERENCES blog_authors(id),
+  category_id INTEGER REFERENCES blog_categories(id),
+  published BOOLEAN DEFAULT false,
   published_at TIMESTAMP WITH TIME ZONE,
-  featured BOOLEAN DEFAULT FALSE,
+  read_time VARCHAR(50),
   meta_title VARCHAR(255),
   meta_description TEXT,
-  tags TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  is_featured BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabela de comentários do blog
-CREATE TABLE IF NOT EXISTS blog_comments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  post_id UUID REFERENCES blog_posts(id) ON DELETE CASCADE,
-  author_name VARCHAR(100) NOT NULL,
-  author_email VARCHAR(255) NOT NULL,
-  content TEXT NOT NULL,
-  status VARCHAR(20) DEFAULT 'pending', -- pending, approved, spam
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- Verificar se a tabela blog_tags existe
+CREATE TABLE IF NOT EXISTS blog_tags (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) NOT NULL UNIQUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Função para atualizar o timestamp de updated_at
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- Verificar se a tabela blog_posts_tags existe
+CREATE TABLE IF NOT EXISTS blog_posts_tags (
+  post_id INTEGER REFERENCES blog_posts(id) ON DELETE CASCADE,
+  tag_id INTEGER REFERENCES blog_tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (post_id, tag_id)
+);
 
--- Triggers para atualizar o timestamp de updated_at
-CREATE TRIGGER update_blog_categories_updated_at
-BEFORE UPDATE ON blog_categories
-FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-
-CREATE TRIGGER update_blog_authors_updated_at
-BEFORE UPDATE ON blog_authors
-FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-
-CREATE TRIGGER update_blog_posts_updated_at
-BEFORE UPDATE ON blog_posts
-FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-
-CREATE TRIGGER update_blog_comments_updated_at
-BEFORE UPDATE ON blog_comments
-FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-
--- Inserir algumas categorias de exemplo
+-- Inserir algumas categorias de exemplo se não existirem
 INSERT INTO blog_categories (name, slug, description)
-VALUES
-  ('Marketing Digital', 'marketing-digital', 'Artigos sobre estratégias e tendências de marketing digital'),
-  ('SEO', 'seo', 'Dicas e técnicas para otimização de sites para mecanismos de busca'),
-  ('Redes Sociais', 'redes-sociais', 'Estratégias para redes sociais e gestão de comunidades online'),
-  ('E-mail Marketing', 'email-marketing', 'Melhores práticas para campanhas de e-mail marketing'),
-  ('Análise de Dados', 'analise-de-dados', 'Como utilizar dados para tomar decisões de marketing'),
-  ('Tendências', 'tendencias', 'Novidades e tendências no mundo do marketing')
-ON CONFLICT (slug) DO NOTHING;
+SELECT 'Marketing Digital', 'marketing-digital', 'Artigos sobre marketing digital e estratégias online'
+WHERE NOT EXISTS (SELECT 1 FROM blog_categories WHERE slug = 'marketing-digital');
 
--- Inserir alguns autores de exemplo
-INSERT INTO blog_authors (name, email, avatar, bio)
-VALUES
-  ('Ana Silva', 'ana.silva@integrare.com.br', '/placeholder.svg?height=100&width=100&query=woman%20profile', 'Especialista em Marketing Digital com mais de 10 anos de experiência no mercado.'),
-  ('Carlos Mendes', 'carlos.mendes@integrare.com.br', '/placeholder.svg?height=100&width=100&query=man%20profile', 'Consultor de SEO e especialista em estratégias de conteúdo.'),
-  ('Juliana Costa', 'juliana.costa@integrare.com.br', '/placeholder.svg?height=100&width=100&query=woman%20profile%20professional', 'Gerente de Mídias Sociais com experiência em grandes marcas nacionais.')
-ON CONFLICT (email) DO NOTHING;
+INSERT INTO blog_categories (name, slug, description)
+SELECT 'SEO', 'seo', 'Artigos sobre otimização para motores de busca'
+WHERE NOT EXISTS (SELECT 1 FROM blog_categories WHERE slug = 'seo');
+
+INSERT INTO blog_categories (name, slug, description)
+SELECT 'Redes Sociais', 'redes-sociais', 'Artigos sobre estratégias para redes sociais'
+WHERE NOT EXISTS (SELECT 1 FROM blog_categories WHERE slug = 'redes-sociais');
+
+-- Inserir um autor de exemplo se não existir
+INSERT INTO blog_authors (name, email, avatar_url, bio)
+SELECT 'Admin Integrare', 'admin@redeintegrare.com.br', '/placeholder.svg?height=100&width=100&query=avatar', 'Administrador do blog da Integrare'
+WHERE NOT EXISTS (SELECT 1 FROM blog_authors WHERE email = 'admin@redeintegrare.com.br');
+
+-- Inserir um post de exemplo se não existir
+INSERT INTO blog_posts (title, slug, excerpt, content, featured_image, author_id, category_id, published, published_at, read_time)
+SELECT 
+  'Bem-vindo ao Blog da Integrare', 
+  'bem-vindo-ao-blog-da-integrare',
+  'Este é o primeiro post do blog da Integrare. Aqui você encontrará conteúdos sobre marketing, negócios e tecnologia.',
+  '<p>Bem-vindo ao blog da Integrare!</p><p>Este é o nosso primeiro post e estamos muito felizes em compartilhar conteúdos relevantes sobre marketing, negócios e tecnologia com você.</p><p>Fique ligado para mais conteúdos em breve!</p>',
+  '/placeholder.svg?height=600&width=1200&query=welcome+blog',
+  (SELECT id FROM blog_authors WHERE email = 'admin@redeintegrare.com.br'),
+  (SELECT id FROM blog_categories WHERE slug = 'marketing-digital'),
+  true,
+  CURRENT_TIMESTAMP,
+  '2 min'
+WHERE NOT EXISTS (SELECT 1 FROM blog_posts WHERE slug = 'bem-vindo-ao-blog-da-integrare');
+
+-- Inserir um post de teste se não existir
+INSERT INTO blog_posts (title, slug, excerpt, content, featured_image, author_id, category_id, published, published_at, read_time)
+SELECT 
+  'Post de Teste', 
+  'teste',
+  'Este é um post de teste para verificar o funcionamento do blog.',
+  '<p>Este é um post de teste para verificar o funcionamento do blog.</p><p>Se você está vendo este conteúdo, significa que o sistema está funcionando corretamente!</p>',
+  '/placeholder.svg?height=600&width=1200&query=test+blog',
+  (SELECT id FROM blog_authors WHERE email = 'admin@redeintegrare.com.br'),
+  (SELECT id FROM blog_categories WHERE slug = 'marketing-digital'),
+  true,
+  CURRENT_TIMESTAMP,
+  '1 min'
+WHERE NOT EXISTS (SELECT 1 FROM blog_posts WHERE slug = 'teste');

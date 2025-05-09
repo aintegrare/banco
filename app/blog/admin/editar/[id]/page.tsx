@@ -10,90 +10,318 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
 import { BlogEditor } from "@/components/blog/blog-editor"
-import { ArrowLeft, Save } from "lucide-react"
+import { ArrowLeft, Save, Upload, X, Calendar, Tag, User, FileText, Trash2 } from "lucide-react"
 import Link from "next/link"
-
-// Categorias de exemplo
-const categories = [
-  { id: "1", name: "Marketing Digital" },
-  { id: "2", name: "SEO" },
-  { id: "3", name: "Redes Sociais" },
-  { id: "4", name: "E-mail Marketing" },
-  { id: "5", name: "Análise de Dados" },
-  { id: "6", name: "Tendências" },
-  { id: "7", name: "Estratégia" },
-  { id: "8", name: "Branding" },
-]
-
-// Autores de exemplo
-const authors = [
-  { id: "1", name: "Ana Silva" },
-  { id: "2", name: "Carlos Mendes" },
-  { id: "3", name: "Juliana Costa" },
-  { id: "4", name: "Ricardo Oliveira" },
-  { id: "5", name: "Fernanda Lima" },
-  { id: "6", name: "Paulo Santos" },
-]
-
-// Dados de exemplo para os posts do blog
-const blogPosts = [
-  {
-    id: "1",
-    title: "Como o Marketing Digital Transformou os Negócios em 2023",
-    slug: "como-o-marketing-digital-transformou-os-negocios-em-2023",
-    excerpt:
-      "Descubra as principais tendências de marketing digital que impactaram os negócios no último ano e como se preparar para o futuro.",
-    content: `
-      <p>O marketing digital continua a evoluir rapidamente, transformando a maneira como as empresas se conectam com seus clientes. Em 2023, vimos mudanças significativas que redefiniram estratégias e abriram novas oportunidades para negócios de todos os tamanhos.</p>
-      
-      <h2>Inteligência Artificial no Marketing</h2>
-      <p>A IA deixou de ser uma tecnologia futurista para se tornar uma ferramenta essencial no arsenal de marketing. Empresas estão utilizando IA para personalizar experiências, analisar dados de clientes e automatizar tarefas repetitivas, permitindo que as equipes de marketing se concentrem em estratégias criativas e inovadoras.</p>
-    `,
-    coverImage: "/digital-marketing-concept.png",
-    authorId: "1",
-    categoryId: "1",
-    status: "published",
-    publishedAt: "2023-12-15T10:00:00Z",
-    featured: true,
-    metaTitle: "Marketing Digital em 2023: Transformações nos Negócios",
-    metaDescription:
-      "Descubra como o marketing digital transformou os negócios em 2023 e quais tendências continuarão a impactar o mercado.",
-    tags: "marketing digital, tendências, negócios, 2023",
-  },
-]
+import { createClient } from "@/lib/supabase/client"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { format, parseISO } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { toast } from "@/components/ui/use-toast"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 export default function EditBlogPostPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(true)
-  const [post, setPost] = useState<any>(null)
-  const [isFeatured, setIsFeatured] = useState(false)
+  const [title, setTitle] = useState("")
+  const [slug, setSlug] = useState("")
+  const [excerpt, setExcerpt] = useState("")
   const [content, setContent] = useState("")
+  const [categoryId, setCategoryId] = useState("")
+  const [authorId, setAuthorId] = useState("")
+  const [tagInput, setTagInput] = useState("")
+  const [tags, setTags] = useState<string[]>([])
+  const [status, setStatus] = useState<"draft" | "published" | "scheduled">("draft")
+  const [publishDate, setPublishDate] = useState<Date | null>(null)
+  const [featuredImage, setFeaturedImage] = useState("")
+  const [previewImage, setPreviewImage] = useState("")
+  const [imageFile, setImageFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [categories, setCategories] = useState<any[]>([])
+  const [authors, setAuthors] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [metaTitle, setMetaTitle] = useState("")
+  const [metaDescription, setMetaDescription] = useState("")
+  const [originalSlug, setOriginalSlug] = useState("")
 
+  // Carregar dados do post e opções ao montar o componente
   useEffect(() => {
-    // Simulação de carregamento de dados
-    const foundPost = blogPosts.find((p) => p.id === params.id)
+    const fetchData = async () => {
+      try {
+        const supabase = createClient()
 
-    if (foundPost) {
-      setPost(foundPost)
-      setContent(foundPost.content)
-      setIsFeatured(foundPost.featured)
+        // Buscar categorias
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from("blog_categories")
+          .select("*")
+          .order("name")
+
+        if (categoriesError) throw categoriesError
+
+        // Buscar autores
+        const { data: authorsData, error: authorsError } = await supabase.from("blog_authors").select("*").order("name")
+
+        if (authorsError) throw authorsError
+
+        setCategories(categoriesData || [])
+        setAuthors(authorsData || [])
+
+        // Buscar dados do post
+        const response = await fetch(`/api/blog/posts/${params.id}`)
+        if (!response.ok) {
+          throw new Error("Erro ao carregar post")
+        }
+
+        const postData = await response.json()
+
+        // Preencher o formulário com os dados do post
+        setTitle(postData.title || "")
+        setSlug(postData.slug || "")
+        setOriginalSlug(postData.slug || "")
+        setExcerpt(postData.excerpt || "")
+        setContent(postData.content || "")
+        setCategoryId(postData.category_id?.toString() || "")
+        setAuthorId(postData.author_id?.toString() || "")
+        setTags(postData.tags ? postData.tags.split(",").map((tag: string) => tag.trim()) : [])
+        setStatus(postData.status || "draft")
+
+        if (postData.published_at) {
+          setPublishDate(parseISO(postData.published_at))
+        }
+
+        setFeaturedImage(postData.featured_image || "")
+        if (postData.featured_image) {
+          setPreviewImage(postData.featured_image)
+        }
+
+        setMetaTitle(postData.meta_title || "")
+        setMetaDescription(postData.meta_description || "")
+      } catch (error) {
+        console.error("Erro ao carregar dados:", error)
+        toast({
+          title: "Erro ao carregar dados",
+          description: "Não foi possível carregar o post. Tente novamente mais tarde.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
     }
 
-    setIsLoading(false)
+    fetchData()
   }, [params.id])
+
+  // Gerar slug a partir do título
+  const generateSlug = (text: string) => {
+    return text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+      .replace(/[^\w\s]/gi, "")
+      .replace(/\s+/g, "-")
+  }
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTitle = e.target.value
+    setTitle(newTitle)
+    if (slug === originalSlug || slug === generateSlug(title)) {
+      setSlug(generateSlug(newTitle))
+    }
+  }
+
+  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && tagInput.trim()) {
+      e.preventDefault()
+      if (!tags.includes(tagInput.trim())) {
+        setTags([...tags, tagInput.trim()])
+      }
+      setTagInput("")
+    }
+  }
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(tags.filter((tag) => tag !== tagToRemove))
+  }
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files && files.length > 0) {
+      const file = files[0]
+      setImageFile(file)
+
+      // Criar URL temporária para preview
+      const objectUrl = URL.createObjectURL(file)
+      setPreviewImage(objectUrl)
+      setFeaturedImage("")
+
+      // Limpar URL quando o componente for desmontado
+      return () => URL.revokeObjectURL(objectUrl)
+    }
+  }
+
+  const uploadImage = async () => {
+    if (!imageFile) return null
+
+    try {
+      const supabase = createClient()
+      const fileExt = imageFile.name.split(".").pop()
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`
+      const filePath = `blog/${fileName}`
+
+      const { error: uploadError, data } = await supabase.storage.from("media").upload(filePath, imageFile)
+
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage.from("media").getPublicUrl(filePath)
+      return urlData.publicUrl
+    } catch (error) {
+      console.error("Erro ao fazer upload da imagem:", error)
+      toast({
+        title: "Erro ao fazer upload",
+        description: "Não foi possível fazer o upload da imagem. Tente novamente.",
+        variant: "destructive",
+      })
+      return null
+    }
+  }
+
+  const handleEditorImageUpload = async (file: File) => {
+    try {
+      const supabase = createClient()
+      const fileExt = file.name.split(".").pop()
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`
+      const filePath = `blog/content/${fileName}`
+
+      const { error: uploadError } = await supabase.storage.from("media").upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage.from("media").getPublicUrl(filePath)
+      return urlData.publicUrl
+    } catch (error) {
+      console.error("Erro ao fazer upload da imagem do editor:", error)
+      throw error
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
 
-    // Simulação de envio para API
-    setTimeout(() => {
-      setIsSubmitting(false)
+    try {
+      // Validar campos obrigatórios
+      if (!title || !slug || !excerpt || !content || !categoryId || !authorId) {
+        throw new Error("Por favor, preencha todos os campos obrigatórios")
+      }
+
+      // Upload da imagem de capa, se houver
+      let imageUrl = featuredImage
+      if (imageFile) {
+        const uploadedUrl = await uploadImage()
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl
+        }
+      }
+
+      // Determinar data de publicação
+      let publishedAt = null
+      if (status === "published") {
+        publishedAt = new Date().toISOString()
+      } else if (status === "scheduled" && publishDate) {
+        publishedAt = publishDate.toISOString()
+      }
+
+      // Preparar dados para envio
+      const postData = {
+        title,
+        slug,
+        excerpt,
+        content,
+        featured_image: imageUrl,
+        author_id: authorId,
+        category_id: categoryId,
+        status,
+        published_at: publishedAt,
+        tags: tags.join(", "),
+        meta_title: metaTitle || title,
+        meta_description: metaDescription || excerpt,
+      }
+
+      // Enviar para a API
+      const response = await fetch(`/api/blog/posts/${params.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(postData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Erro ao atualizar post")
+      }
+
+      toast({
+        title: "Post atualizado com sucesso!",
+        description: "As alterações foram salvas.",
+      })
+
       router.push("/blog/admin")
-    }, 1500)
+    } catch (error: any) {
+      console.error("Erro ao salvar post:", error)
+      toast({
+        title: "Erro ao salvar post",
+        description: error.message || "Ocorreu um erro ao salvar o post. Por favor, tente novamente.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    setIsDeleting(true)
+
+    try {
+      const response = await fetch(`/api/blog/posts/${params.id}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Erro ao excluir post")
+      }
+
+      toast({
+        title: "Post excluído com sucesso!",
+        description: "O post foi removido permanentemente.",
+      })
+
+      router.push("/blog/admin")
+    } catch (error: any) {
+      console.error("Erro ao excluir post:", error)
+      toast({
+        title: "Erro ao excluir post",
+        description: error.message || "Ocorreu um erro ao excluir o post. Por favor, tente novamente.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   if (isLoading) {
@@ -102,20 +330,6 @@ export default function EditBlogPostPage({ params }: { params: { id: string } })
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4b7bb5] mx-auto"></div>
           <p className="mt-4 text-[#4b7bb5]">Carregando post...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!post) {
-    return (
-      <div className="min-h-screen bg-[#f2f1ef] flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-[#4072b0] mb-4">Post não encontrado</h2>
-          <p className="text-gray-600 mb-6">O post que você está procurando não existe ou foi removido.</p>
-          <Link href="/blog/admin">
-            <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">Voltar para Administração</Button>
-          </Link>
         </div>
       </div>
     )
@@ -134,6 +348,34 @@ export default function EditBlogPostPage({ params }: { params: { id: string } })
                 Cancelar
               </Button>
             </Link>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Excluir
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação não pode ser desfeita. O post será excluído permanentemente.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-red-600 hover:bg-red-700"
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? "Excluindo..." : "Sim, excluir post"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
             <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]" onClick={handleSubmit} disabled={isSubmitting}>
               <Save className="mr-2 h-4 w-4" />
               {isSubmitting ? "Salvando..." : "Salvar Alterações"}
@@ -147,158 +389,315 @@ export default function EditBlogPostPage({ params }: { params: { id: string } })
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Coluna principal */}
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-                <div>
-                  <Label htmlFor="title">Título do Post</Label>
-                  <Input
-                    id="title"
-                    placeholder="Digite o título do post"
-                    className="mt-1"
-                    defaultValue={post.title}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="excerpt">Resumo</Label>
-                  <Textarea
-                    id="excerpt"
-                    placeholder="Digite um breve resumo do post"
-                    className="mt-1 h-24"
-                    defaultValue={post.excerpt}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label>Conteúdo</Label>
-                  <div className="mt-1 border rounded-md">
-                    <BlogEditor value={content} onChange={setContent} />
+              <Card>
+                <CardContent className="p-6 space-y-4">
+                  <div>
+                    <Label htmlFor="title" className="text-base font-medium">
+                      Título do Post <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="title"
+                      placeholder="Digite o título do post"
+                      className="mt-1"
+                      value={title}
+                      onChange={handleTitleChange}
+                      required
+                    />
                   </div>
-                </div>
-              </div>
 
-              <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-                <h3 className="text-lg font-medium text-[#4072b0]">Imagem de Capa</h3>
-                <div className="mb-4">
-                  <img
-                    src={post.coverImage || "/placeholder.svg"}
-                    alt={post.title}
-                    className="w-full h-48 object-cover rounded-md"
-                  />
-                </div>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                  <div className="space-y-2">
-                    <div className="text-gray-500">Arraste uma nova imagem ou</div>
-                    <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
-                      Selecionar Arquivo
-                    </Button>
+                  <div>
+                    <Label htmlFor="slug" className="text-base font-medium">
+                      Slug (URL) <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="slug"
+                      placeholder="url-do-post"
+                      className="mt-1"
+                      value={slug}
+                      onChange={(e) => setSlug(e.target.value)}
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      URL: https://integrare.com.br/blog/<span className="text-[#4b7bb5]">{slug || "url-do-post"}</span>
+                    </p>
                   </div>
-                </div>
-                <div className="text-sm text-gray-500">Recomendado: 1200 x 600 pixels, máximo 2MB (JPG, PNG)</div>
-              </div>
+
+                  <div>
+                    <Label htmlFor="excerpt" className="text-base font-medium">
+                      Resumo <span className="text-red-500">*</span>
+                    </Label>
+                    <Textarea
+                      id="excerpt"
+                      placeholder="Digite um breve resumo do post"
+                      className="mt-1 h-24"
+                      value={excerpt}
+                      onChange={(e) => setExcerpt(e.target.value)}
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      O resumo aparece nos resultados de busca e na listagem de posts. Recomendamos entre 150-160
+                      caracteres.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <Label className="text-base font-medium">
+                    Conteúdo <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="mt-2">
+                    <BlogEditor value={content} onChange={setContent} onImageUpload={handleEditorImageUpload} />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6 space-y-4">
+                  <h3 className="text-lg font-medium text-[#4072b0] flex items-center">
+                    <FileText className="mr-2 h-5 w-5" />
+                    Imagem de Capa
+                  </h3>
+
+                  {previewImage && (
+                    <div className="relative">
+                      <img
+                        src={previewImage || "/placeholder.svg"}
+                        alt="Preview"
+                        className="w-full h-64 object-cover rounded-md"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2 h-8 w-8"
+                        onClick={() => {
+                          setPreviewImage("")
+                          setImageFile(null)
+                          setFeaturedImage("")
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+
+                  {!previewImage && (
+                    <>
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                        <input
+                          type="file"
+                          id="coverImage"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                        />
+                        <div className="space-y-2">
+                          <div className="text-gray-500">Arraste uma imagem ou</div>
+                          <label htmlFor="coverImage">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="border-[#4b7bb5] text-[#4b7bb5]"
+                              onClick={() => document.getElementById("coverImage")?.click()}
+                            >
+                              <Upload className="mr-2 h-4 w-4" />
+                              Selecionar Arquivo
+                            </Button>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="featuredImage">Ou informe a URL da imagem</Label>
+                        <Input
+                          id="featuredImage"
+                          placeholder="https://exemplo.com/imagem.jpg"
+                          className="mt-1"
+                          value={featuredImage}
+                          onChange={(e) => setFeaturedImage(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="text-sm text-gray-500">Recomendado: 1200 x 600 pixels, máximo 2MB (JPG, PNG)</div>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Barra lateral */}
             <div className="space-y-6">
-              <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-                <h3 className="text-lg font-medium text-[#4072b0]">Publicação</h3>
+              <Card>
+                <CardContent className="p-6 space-y-4">
+                  <h3 className="text-lg font-medium text-[#4072b0] flex items-center">
+                    <Calendar className="mr-2 h-5 w-5" />
+                    Publicação
+                  </h3>
 
-                <div>
-                  <Label htmlFor="status">Status</Label>
-                  <Select defaultValue={post.status}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Selecione o status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="draft">Rascunho</SelectItem>
-                      <SelectItem value="published">Publicado</SelectItem>
-                      <SelectItem value="scheduled">Agendado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status</Label>
+                    <Select
+                      value={status}
+                      onValueChange={(value: "draft" | "published" | "scheduled") => setStatus(value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="draft">Rascunho</SelectItem>
+                        <SelectItem value="published">Publicado</SelectItem>
+                        <SelectItem value="scheduled">Agendado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div>
-                  <Label htmlFor="publishDate">Data de Publicação</Label>
-                  <Input
-                    id="publishDate"
-                    type="datetime-local"
-                    className="mt-1"
-                    defaultValue={post.publishedAt ? new Date(post.publishedAt).toISOString().slice(0, 16) : ""}
-                  />
-                </div>
+                  {status === "scheduled" && (
+                    <div className="space-y-2">
+                      <Label>Data de Publicação</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start text-left font-normal">
+                            <Calendar className="mr-2 h-4 w-4" />
+                            {publishDate ? (
+                              format(publishDate, "PPP", { locale: ptBR })
+                            ) : (
+                              <span>Selecione uma data</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <CalendarComponent
+                            mode="single"
+                            selected={publishDate || undefined}
+                            onSelect={(date) => setPublishDate(date)}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="featured" className="cursor-pointer">
-                    Post em Destaque
-                  </Label>
-                  <Switch id="featured" checked={isFeatured} onCheckedChange={setIsFeatured} />
-                </div>
-              </div>
+              <Card>
+                <CardContent className="p-6 space-y-4">
+                  <h3 className="text-lg font-medium text-[#4072b0] flex items-center">
+                    <Tag className="mr-2 h-5 w-5" />
+                    Categorização
+                  </h3>
 
-              <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-                <h3 className="text-lg font-medium text-[#4072b0]">Categorização</h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="category">
+                      Categoria <span className="text-red-500">*</span>
+                    </Label>
+                    <Select value={categoryId} onValueChange={setCategoryId} required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category.id} value={category.id.toString()}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div>
-                  <Label htmlFor="category">Categoria</Label>
-                  <Select defaultValue={post.categoryId}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Selecione uma categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
+                  <div className="space-y-2">
+                    <Label htmlFor="tags">Tags</Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {tags.map((tag) => (
+                        <Badge key={tag} variant="secondary" className="flex items-center gap-1">
+                          {tag}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTag(tag)}
+                            className="text-gray-500 hover:text-gray-700"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    </div>
+                    <Input
+                      id="tagInput"
+                      placeholder="Digite uma tag e pressione Enter"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={handleAddTag}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
 
-                <div>
-                  <Label htmlFor="tags">Tags</Label>
-                  <Input id="tags" placeholder="Separe as tags por vírgula" className="mt-1" defaultValue={post.tags} />
-                </div>
-              </div>
+              <Card>
+                <CardContent className="p-6 space-y-4">
+                  <h3 className="text-lg font-medium text-[#4072b0] flex items-center">
+                    <User className="mr-2 h-5 w-5" />
+                    Autor
+                  </h3>
 
-              <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-                <h3 className="text-lg font-medium text-[#4072b0]">Autor</h3>
+                  <div>
+                    <Label htmlFor="author">
+                      Autor do Post <span className="text-red-500">*</span>
+                    </Label>
+                    <Select value={authorId} onValueChange={setAuthorId} required>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Selecione o autor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {authors.map((author) => (
+                          <SelectItem key={author.id} value={author.id.toString()}>
+                            {author.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
 
-                <div>
-                  <Label htmlFor="author">Autor do Post</Label>
-                  <Select defaultValue={post.authorId}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Selecione o autor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {authors.map((author) => (
-                        <SelectItem key={author.id} value={author.id}>
-                          {author.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              <Card>
+                <CardContent className="p-6">
+                  <Tabs defaultValue="seo">
+                    <TabsList className="grid w-full grid-cols-1">
+                      <TabsTrigger value="seo">SEO</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="seo" className="space-y-4 mt-4">
+                      <div>
+                        <Label htmlFor="metaTitle">Título SEO</Label>
+                        <Input
+                          id="metaTitle"
+                          placeholder="Título para SEO"
+                          className="mt-1"
+                          value={metaTitle}
+                          onChange={(e) => setMetaTitle(e.target.value)}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Recomendado: até 60 caracteres. Se vazio, o título do post será usado.
+                        </p>
+                      </div>
 
-              <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-                <h3 className="text-lg font-medium text-[#4072b0]">SEO</h3>
-
-                <div>
-                  <Label htmlFor="metaTitle">Título SEO</Label>
-                  <Input id="metaTitle" placeholder="Título para SEO" className="mt-1" defaultValue={post.metaTitle} />
-                </div>
-
-                <div>
-                  <Label htmlFor="metaDescription">Descrição SEO</Label>
-                  <Textarea
-                    id="metaDescription"
-                    placeholder="Descrição para SEO"
-                    className="mt-1"
-                    defaultValue={post.metaDescription}
-                  />
-                </div>
-              </div>
+                      <div>
+                        <Label htmlFor="metaDescription">Descrição SEO</Label>
+                        <Textarea
+                          id="metaDescription"
+                          placeholder="Descrição para SEO"
+                          className="mt-1"
+                          value={metaDescription}
+                          onChange={(e) => setMetaDescription(e.target.value)}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Recomendado: entre 150-160 caracteres. Se vazio, o resumo será usado.
+                        </p>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </form>

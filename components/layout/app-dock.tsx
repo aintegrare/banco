@@ -82,10 +82,10 @@ export function AppDock() {
     { href: "/admin/arquivos", icon: <FileText size={24} />, label: "Arquivos" },
     { href: "/admin/projetos", icon: <FolderKanban size={24} />, label: "Projetos", badge: 3 },
     { href: "/admin/tarefas", icon: <BarChart3 size={24} />, label: "Tarefas", badge: 5 },
+    { href: "/admin/blog", icon: <FileImage size={24} />, label: "Blog" },
   ]
 
   const marketingItems = [
-    { href: "/admin/blog", icon: <FileImage size={24} />, label: "Blog" },
     { href: "/admin/clientes", icon: <Users size={24} />, label: "Clientes" },
     { href: "/admin/agenda", icon: <Calendar size={24} />, label: "Agenda" },
   ]
