@@ -1,21 +1,32 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-export async function middleware(req: NextRequest) {
-  // Permitir acesso à página de login
-  if (req.nextUrl.pathname === "/admin/login") {
+export function middleware(request: NextRequest) {
+  // Verificar se a rota é /admin ou subpasta
+  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin")
+  const isLoginRoute = request.nextUrl.pathname === "/admin/login"
+
+  // Se não for rota admin, não aplicar middleware
+  if (!isAdminRoute) {
     return NextResponse.next()
   }
 
-  // Verificar se há um token de autenticação nos cookies
-  const authCookie = req.cookies.get("sb-auth-token")
-
-  // Se não houver token e a rota começar com /admin, redirecionar para login
-  if (!authCookie && req.nextUrl.pathname.startsWith("/admin")) {
-    const redirectUrl = new URL("/admin/login", req.url)
-    return NextResponse.redirect(redirectUrl)
+  // Se for a rota de login, permitir acesso
+  if (isLoginRoute) {
+    return NextResponse.next()
   }
 
+  // Verificar se o usuário está autenticado
+  const session = request.cookies.get("session")
+
+  // Se não estiver autenticado, redirecionar para login
+  if (!session) {
+    const loginUrl = new URL("/admin/login", request.url)
+    loginUrl.searchParams.set("redirectTo", request.nextUrl.pathname)
+    return NextResponse.redirect(loginUrl)
+  }
+
+  // Usuário autenticado, permitir acesso
   return NextResponse.next()
 }
 

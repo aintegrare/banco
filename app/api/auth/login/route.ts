@@ -6,18 +6,19 @@ export async function POST(request: Request) {
   try {
     const { email, password } = await request.json()
 
-    // Verificar se as variáveis de ambiente estão disponíveis
+    // Verificar variáveis de ambiente
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
     if (!supabaseUrl || !supabaseAnonKey) {
-      return NextResponse.json({ error: "Configuração do Supabase não encontrada no servidor" }, { status: 500 })
+      return NextResponse.json({ error: "Configuração do Supabase não encontrada" }, { status: 500 })
     }
 
-    // Criar cliente Supabase no servidor
+    // Criar cliente Supabase
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: false,
+        autoRefreshToken: false,
       },
     })
 
@@ -28,21 +29,20 @@ export async function POST(request: Request) {
     })
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return NextResponse.json({ error: error.message }, { status: 401 })
     }
 
-    // Definir cookies de autenticação
+    // Definir cookie de sessão
     const cookieStore = cookies()
-    cookieStore.set("sb-auth-token", data.session?.access_token || "", {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 1 semana
+    cookieStore.set("session", JSON.stringify(data.session), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 7, // 1 semana
+      path: "/",
     })
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error("Erro no login:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
