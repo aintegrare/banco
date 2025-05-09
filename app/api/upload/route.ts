@@ -42,18 +42,30 @@ export async function POST(request: NextRequest) {
 
     // Verificar o tipo de arquivo
     const fileType = file.type
+    const fileExtension = file.name.split(".").pop()?.toLowerCase() || ""
+
+    // Lista de extensões Adobe permitidas
+    const allowedAdobeExtensions = ["psd", "psb", "ai", "indd", "idml"]
+
+    // Verificar se é um tipo MIME conhecido ou uma extensão Adobe permitida
     const isAllowedType =
       fileType === "application/pdf" ||
       fileType.startsWith("text/") ||
       fileType === "application/msword" ||
       fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      fileType.startsWith("image/") // Permitir imagens
+      fileType.startsWith("image/") ||
+      fileType === "application/vnd.adobe.photoshop" ||
+      fileType === "image/vnd.adobe.photoshop" ||
+      fileType === "application/illustrator" ||
+      fileType === "application/x-indesign" ||
+      allowedAdobeExtensions.includes(fileExtension)
 
     if (!isAllowedType) {
-      console.error(`API Upload: Tipo de arquivo não permitido - ${fileType}`)
+      console.error(`API Upload: Tipo de arquivo não permitido - ${fileType}, extensão: ${fileExtension}`)
       return NextResponse.json(
         {
-          error: "Tipo de arquivo não permitido. Apenas PDF, DOC, DOCX, arquivos de texto e imagens são aceitos.",
+          error:
+            "Tipo de arquivo não permitido. Apenas PDF, DOC, DOCX, arquivos de texto, imagens e arquivos Adobe (PSD, AI, INDD) são aceitos.",
         },
         { status: 400 },
       )
@@ -65,7 +77,15 @@ export async function POST(request: NextRequest) {
     const fileName = `${timestamp}-${originalFileName.replace(/\s+/g, "-")}`
 
     // Determinar o diretório base com base no tipo de arquivo
-    const baseDir = fileType.startsWith("image/") ? "images" : "documents"
+    const fileExtensionForDir = originalFileName.split(".").pop()?.toLowerCase() || ""
+    const adobeExtensions = ["psd", "psb", "ai", "indd", "idml"]
+
+    let baseDir = "documents"
+    if (fileType.startsWith("image/")) {
+      baseDir = "images"
+    } else if (adobeExtensions.includes(fileExtensionForDir)) {
+      baseDir = "design" // Criar uma pasta específica para arquivos de design
+    }
 
     // Construir o caminho completo para o arquivo
     let filePath = ""
@@ -96,7 +116,22 @@ export async function POST(request: NextRequest) {
 
       // Armazenar metadados do documento
       const isImage = fileType.startsWith("image/")
-      const documentType = isImage ? "image" : fileType.includes("pdf") ? "pdf" : "document"
+      const fileExtensionForMetadata = originalFileName.split(".").pop()?.toLowerCase() || ""
+
+      // Determinar o tipo de documento
+      let documentType = "document"
+      if (isImage) {
+        documentType = "image"
+      } else if (fileType.includes("pdf")) {
+        documentType = "pdf"
+      } else if (["psd", "psb"].includes(fileExtensionForMetadata)) {
+        documentType = "photoshop"
+      } else if (["ai"].includes(fileExtensionForMetadata)) {
+        documentType = "illustrator"
+      } else if (["indd", "idml"].includes(fileExtensionForMetadata)) {
+        documentType = "indesign"
+      }
+
       const metadata = await addDocumentMetadata({
         title: originalFileName.replace(/\.[^/.]+$/, ""),
         originalFileName,
