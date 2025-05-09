@@ -1,14 +1,14 @@
 import type React from "react"
-import { AppDock } from "@/components/layout/app-dock"
-import { AuthCheck } from "@/components/auth/auth-check"
+import { SimpleAuthCheck } from "@/components/auth/simple-auth-check"
+import { SimpleDock } from "@/components/layout/simple-dock"
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AuthCheck>
-      <div className="min-h-screen flex flex-col">
-        <main className="flex-grow">{children}</main>
-        <AppDock />
+    <SimpleAuthCheck>
+      <div className="min-h-screen pb-20">
+        {children}
+        <SimpleDock />
       </div>
-    </AuthCheck>
+    </SimpleAuthCheck>
   )
 }
