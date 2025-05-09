@@ -12,17 +12,22 @@ export function getSupabaseClient() {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("Variáveis de ambiente do Supabase não encontradas")
     throw new Error("Supabase URL and key must be defined")
   }
 
-  supabaseClient = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-    },
-  })
-
-  return supabaseClient
+  try {
+    supabaseClient = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+    })
+    return supabaseClient
+  } catch (error) {
+    console.error("Erro ao criar cliente Supabase:", error)
+    throw error
+  }
 }
 
 export const createClient = getSupabaseClient

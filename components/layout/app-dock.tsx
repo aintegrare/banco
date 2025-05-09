@@ -19,7 +19,7 @@ import {
   FileImage,
   LogOut,
 } from "lucide-react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { getSupabaseClient } from "@/lib/supabase/client"
 
 interface DockItemProps {
   href: string
@@ -98,17 +98,22 @@ function DockItem({ href, icon, label, isActive, badge, onClick }: DockItemProps
 export function AppDock() {
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClientComponentClient()
+
+  // Usamos o método getSupabaseClient do nosso singleton em vez de createClientComponentClient
+  const handleLogout = async () => {
+    try {
+      const supabase = getSupabaseClient()
+      await supabase.auth.signOut()
+      router.push("/admin/login")
+    } catch (error) {
+      console.error("Erro ao fazer logout:", error)
+    }
+  }
 
   const isActive = (path: string) => {
     if (path === "/admin" && pathname === "/admin") return true
     if (path === "/admin" && pathname === "/") return true
     return pathname.startsWith(path)
-  }
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push("/admin/login")
   }
 
   // Categorias de itens do dock

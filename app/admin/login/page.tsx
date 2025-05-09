@@ -4,7 +4,6 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("estrategia@designmarketing.com.br")
@@ -12,23 +11,36 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
-  const supabase = createClientComponentClient()
+
+  // Não inicializamos o cliente Supabase diretamente aqui
+  // Em vez disso, usamos as APIs fetch para comunicação com o backend
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setError("")
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // Usar uma API do servidor para fazer login
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
       })
 
-      if (error) {
-        setError(error.message)
-      } else {
-        router.push("/admin")
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Falha ao fazer login")
       }
+
+      // Redirecionar para o dashboard após login bem-sucedido
+      router.push("/admin")
     } catch (err: any) {
       setError(err.message || "Erro ao fazer login")
     } finally {
@@ -38,6 +50,7 @@ export default function LoginPage() {
 
   const handleCreateAdmin = async () => {
     setLoading(true)
+    setError("")
 
     try {
       const response = await fetch("/api/setup/create-admin", {
@@ -51,15 +64,16 @@ export default function LoginPage() {
         }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Erro ao criar usuário")
+        throw new Error(data.error || "Erro ao criar usuário administrador")
       }
 
       setPassword("Jivago14#")
-      alert("Usuário administrador criado com sucesso!")
+      alert("Usuário administrador criado com sucesso! Agora você pode fazer login.")
     } catch (err: any) {
-      setError(err.message || "Erro ao criar usuário")
+      setError(err.message || "Erro ao criar usuário administrador")
     } finally {
       setLoading(false)
     }

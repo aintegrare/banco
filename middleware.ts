@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-// Middleware simplificado para evitar problemas de renderização
 export async function middleware(req: NextRequest) {
   // Permitir acesso à página de login
   if (req.nextUrl.pathname === "/admin/login") {

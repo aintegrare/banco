@@ -1,40 +1,49 @@
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
+import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 
 export async function POST(request: Request) {
   try {
     const { email, password } = await request.json()
 
-    // Validar dados
-    if (!email || !password) {
-      return NextResponse.json({ error: "Email e senha são obrigatórios" }, { status: 400 })
+    // Verificar se as variáveis de ambiente estão disponíveis
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return NextResponse.json({ error: "Configuração do Supabase não encontrada no servidor" }, { status: 500 })
     }
 
-    // Criar cliente Supabase
-    const supabase = createRouteHandlerClient({ cookies })
+    // Criar cliente Supabase com chave de serviço para ter permissões de admin
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
 
     // Verificar se o usuário já existe
-    const { data: existingUser } = await supabase.from("users").select("*").eq("email", email).single()
+    const { data: existingUsers } = await supabase.auth.admin.listUsers()
+    const userExists = existingUsers.users.some((user) => user.email === email)
 
-    if (existingUser) {
-      return NextResponse.json({ message: "Usuário já existe" }, { status: 200 })
+    if (userExists) {
+      return NextResponse.json({ message: "Usuário já existe" })
     }
 
-    // Criar usuário
-    const { error } = await supabase.auth.admin.createUser({
+    // Criar o usuário administrador
+    const { data, error } = await supabase.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
+      user_metadata: { role: "admin" },
     })
 
     if (error) {
-      throw error
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json({ message: "Usuário administrador criado com sucesso" }, { status: 201 })
+    return NextResponse.json({ success: true, user: data.user })
   } catch (error: any) {
-    console.error("Erro ao criar usuário:", error)
-    return NextResponse.json({ error: error.message || "Erro ao criar usuário administrador" }, { status: 500 })
+    console.error("Erro ao criar usuário admin:", error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
