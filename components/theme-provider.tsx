@@ -1,11 +1,39 @@
-'use client'
+"use client"
 
-import * as React from 'react'
-import {
-  ThemeProvider as NextThemesProvider,
-  type ThemeProviderProps,
-} from 'next-themes'
+import * as React from "react"
+import { ThemeProvider as NextThemesProvider } from "next-themes"
 
-export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
-  return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+interface ThemeProviderProps extends React.PropsWithChildren {
+  attribute?: string
+  defaultTheme?: string
+  enableSystem?: boolean
+  storageKey?: string
+}
+
+export function ThemeProvider({
+  attribute = "class",
+  defaultTheme = "system",
+  enableSystem = true,
+  storageKey = "theme",
+  children,
+}: ThemeProviderProps) {
+  return (
+    <NextThemesProvider
+      attribute={attribute}
+      defaultTheme={defaultTheme}
+      enableSystem={enableSystem}
+      storageKey={storageKey}
+    >
+      {children}
+    </NextThemesProvider>
+  )
+}
+
+export function useTheme() {
+  const [theme, setTheme] = React.useState("system")
+
+  return {
+    theme,
+    setTheme,
+  }
 }
