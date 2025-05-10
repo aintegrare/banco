@@ -13,19 +13,16 @@ export default function Loading() {
           <Skeleton className="h-10 flex-1" />
           <Skeleton className="h-10 w-[150px]" />
         </div>
-        <div className="flex gap-4">
-          <Skeleton className="h-10 w-[150px]" />
-          <Skeleton className="h-10 w-[150px]" />
-          <Skeleton className="h-10 w-[150px]" />
-        </div>
+      </div>
+
+      <div className="mb-6">
+        <Skeleton className="h-10 w-[300px]" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Array(6)
-          .fill(0)
-          .map((_, i) => (
-            <Skeleton key={i} className="h-[220px] rounded-lg" />
-          ))}
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <Skeleton key={i} className="h-[220px] rounded-lg" />
+        ))}
       </div>
     </div>
   )

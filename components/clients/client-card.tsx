@@ -1,27 +1,10 @@
 import Link from "next/link"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Building2, Calendar, Phone, Mail, MapPin, BarChart3 } from "lucide-react"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { Building2, Calendar, Phone, Mail, MapPin } from "lucide-react"
 
-interface ClientCardProps {
-  client: {
-    id: string
-    name: string
-    company: string
-    email: string
-    phone: string
-    address: string
-    status: "active" | "inactive" | "lead"
-    segment: string
-    value?: number
-    lastContact?: string
-    projectsCount?: number
-  }
-}
-
-export function ClientCard({ client }: ClientCardProps) {
-  const getStatusColor = (status: string) => {
+export function ClientCard({ client }) {
+  const getStatusColor = (status) => {
     switch (status) {
       case "active":
         return "bg-green-100 text-green-800 hover:bg-green-200"
@@ -34,7 +17,7 @@ export function ClientCard({ client }: ClientCardProps) {
     }
   }
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status) => {
     switch (status) {
       case "active":
         return "Ativo"
@@ -44,6 +27,23 @@ export function ClientCard({ client }: ClientCardProps) {
         return "Lead"
       default:
         return status
+    }
+  }
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(value || 0)
+  }
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A"
+    try {
+      const date = new Date(dateString)
+      return new Intl.DateTimeFormat("pt-BR").format(date)
+    } catch (e) {
+      return "Data inválida"
     }
   }
 
@@ -76,19 +76,15 @@ export function ClientCard({ client }: ClientCardProps) {
               <MapPin className="h-3.5 w-3.5 mr-2" />
               {client.address}
             </div>
-            <div className="flex items-center text-gray-600">
-              <BarChart3 className="h-3.5 w-3.5 mr-2" />
-              Segmento: {client.segment}
-            </div>
           </div>
         </CardContent>
         <CardFooter className="flex justify-between border-t pt-4 text-xs text-gray-500">
           <div className="flex items-center">
             <Calendar className="h-3.5 w-3.5 mr-1" />
-            Último contato: {client.lastContact ? formatDate(client.lastContact) : "N/A"}
+            Último contato: {formatDate(client.lastContact)}
           </div>
           <div>
-            <span className="font-medium text-[#4b7bb5]">{formatCurrency(client.value || 0)}</span>
+            <span className="font-medium text-[#4b7bb5]">{formatCurrency(client.value)}</span>
           </div>
         </CardFooter>
       </Card>

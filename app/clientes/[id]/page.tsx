@@ -1,16 +1,12 @@
 import { PageHeader } from "@/components/layout/page-header"
-import { ClientDetails } from "@/components/clients/client-details"
-import { ClientInteractions } from "@/components/clients/client-interactions"
-import { ClientProjects } from "@/components/clients/client-projects"
-import { ClientNotes } from "@/components/clients/client-notes"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Edit, ArrowLeft } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { ArrowLeft, Edit, Building2, Mail, Phone, MapPin } from "lucide-react"
 import Link from "next/link"
 
-// Em produção, isso seria uma chamada real à API
-const getClient = async (id: string) => {
-  // Simulando dados para demonstração
+// Dados de exemplo simplificados
+const getClient = (id) => {
   return {
     id,
     name: "João Silva",
@@ -22,18 +18,37 @@ const getClient = async (id: string) => {
     segment: "SaaS",
     value: 15000,
     lastContact: "2023-05-01",
-    projectsCount: 3,
-    website: "www.techsolutions.com",
-    cnpj: "12.345.678/0001-90",
-    contactName: "João Silva",
-    contactPosition: "CEO",
-    createdAt: "2023-01-15",
-    notes: "Cliente desde janeiro de 2023. Interessado em expandir serviços.",
   }
 }
 
-export default async function ClientDetailsPage({ params }: { params: { id: string } }) {
-  const client = await getClient(params.id)
+export default function ClientDetailsPage({ params }) {
+  const client = getClient(params.id)
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "active":
+        return "bg-green-100 text-green-800"
+      case "inactive":
+        return "bg-gray-100 text-gray-800"
+      case "lead":
+        return "bg-blue-100 text-blue-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case "active":
+        return "Ativo"
+      case "inactive":
+        return "Inativo"
+      case "lead":
+        return "Lead"
+      default:
+        return status
+    }
+  }
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -56,29 +71,53 @@ export default async function ClientDetailsPage({ params }: { params: { id: stri
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
-          <ClientDetails client={client} />
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-lg font-medium text-[#4b7bb5]">Detalhes do Cliente</CardTitle>
+                <Badge className={getStatusColor(client.status)}>{getStatusText(client.status)}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">Informações Básicas</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center text-sm">
+                      <Building2 className="h-4 w-4 mr-2 text-gray-400" />
+                      <span className="font-medium mr-2">Empresa:</span> {client.company}
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <Mail className="h-4 w-4 mr-2 text-gray-400" />
+                      <span className="font-medium mr-2">Email:</span> {client.email}
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <Phone className="h-4 w-4 mr-2 text-gray-400" />
+                      <span className="font-medium mr-2">Telefone:</span> {client.phone}
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <MapPin className="h-4 w-4 mr-2 text-gray-400" />
+                      <span className="font-medium mr-2">Endereço:</span> {client.address}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="lg:col-span-2">
-          <Tabs defaultValue="interactions" className="w-full">
-            <TabsList className="w-full justify-start">
-              <TabsTrigger value="interactions">Interações</TabsTrigger>
-              <TabsTrigger value="projects">Projetos</TabsTrigger>
-              <TabsTrigger value="notes">Notas</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="interactions" className="mt-6">
-              <ClientInteractions clientId={client.id} />
-            </TabsContent>
-
-            <TabsContent value="projects" className="mt-6">
-              <ClientProjects clientId={client.id} />
-            </TabsContent>
-
-            <TabsContent value="notes" className="mt-6">
-              <ClientNotes clientId={client.id} />
-            </TabsContent>
-          </Tabs>
+          <Card>
+            <CardHeader>
+              <CardTitle>Interações e Projetos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-500">
+                Esta é uma versão simplificada. Em uma implementação completa, aqui seriam exibidas as interações com o
+                cliente, projetos relacionados e notas.
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

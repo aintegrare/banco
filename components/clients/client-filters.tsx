@@ -3,89 +3,59 @@
 import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent } from "@/components/ui/card"
-import { Search, Filter, X } from "lucide-react"
+import { Search, Filter } from "lucide-react"
 
 export function ClientFilters() {
   const [showFilters, setShowFilters] = useState(false)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [segment, setSegment] = useState("")
-  const [status, setStatus] = useState("")
-
-  const handleReset = () => {
-    setSearchTerm("")
-    setSegment("")
-    setStatus("")
-  }
 
   return (
-    <div className="mb-6">
+    <div className="mb-6 p-4 border rounded-lg bg-white">
       <div className="flex gap-4 mb-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Buscar clientes..."
-            className="pl-10"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          <Input placeholder="Buscar clientes..." className="pl-10" />
         </div>
-        <Button variant="outline" className="flex items-center gap-2" onClick={() => setShowFilters(!showFilters)}>
-          <Filter className="h-4 w-4" />
-          Filtros
+        <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="flex items-center">
+          <Filter className="mr-2 h-4 w-4" />
+          {showFilters ? "Ocultar Filtros" : "Filtros"}
         </Button>
       </div>
 
       {showFilters && (
-        <Card className="mb-4">
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <label htmlFor="segment" className="block text-sm font-medium text-gray-700 mb-1">
-                  Segmento
-                </label>
-                <Select value={segment} onValueChange={setSegment}>
-                  <SelectTrigger id="segment">
-                    <SelectValue placeholder="Todos os segmentos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os segmentos</SelectItem>
-                    <SelectItem value="ecommerce">E-commerce</SelectItem>
-                    <SelectItem value="saas">SaaS</SelectItem>
-                    <SelectItem value="retail">Varejo</SelectItem>
-                    <SelectItem value="education">Educação</SelectItem>
-                    <SelectItem value="health">Saúde</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        <div className="flex flex-wrap gap-4">
+          <div className="w-full sm:w-auto">
+            <select className="w-full sm:w-[180px] h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+              <option value="">Status</option>
+              <option value="all">Todos</option>
+              <option value="active">Ativos</option>
+              <option value="inactive">Inativos</option>
+              <option value="lead">Leads</option>
+            </select>
+          </div>
 
-              <div className="flex-1">
-                <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
-                  Status
-                </label>
-                <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger id="status">
-                    <SelectValue placeholder="Todos os status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os status</SelectItem>
-                    <SelectItem value="active">Ativo</SelectItem>
-                    <SelectItem value="inactive">Inativo</SelectItem>
-                    <SelectItem value="lead">Lead</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="w-full sm:w-auto">
+            <select className="w-full sm:w-[180px] h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+              <option value="">Segmento</option>
+              <option value="all">Todos</option>
+              <option value="ecommerce">E-commerce</option>
+              <option value="saas">SaaS</option>
+              <option value="retail">Varejo</option>
+              <option value="education">Educação</option>
+              <option value="health">Saúde</option>
+            </select>
+          </div>
 
-              <div className="flex items-end">
-                <Button variant="outline" size="sm" onClick={handleReset} className="h-10">
-                  <X className="h-4 w-4 mr-2" />
-                  Limpar Filtros
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          <div className="w-full sm:w-auto">
+            <select className="w-full sm:w-[180px] h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+              <option value="">Ordenar por</option>
+              <option value="name_asc">Nome (A-Z)</option>
+              <option value="name_desc">Nome (Z-A)</option>
+              <option value="recent">Mais recentes</option>
+              <option value="oldest">Mais antigos</option>
+              <option value="value_desc">Maior valor</option>
+            </select>
+          </div>
+        </div>
       )}
     </div>
   )

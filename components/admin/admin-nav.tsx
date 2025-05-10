@@ -12,6 +12,7 @@ import {
   Database,
   MessageSquare,
   FileText,
+  Users,
 } from "lucide-react"
 
 const navItems = [
@@ -79,6 +80,18 @@ export function AdminNav() {
           </Link>
         )
       })}
+      <Link
+        href="/clientes"
+        className={cn(
+          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
+          pathname === "/clientes"
+            ? "bg-accent text-accent-foreground"
+            : "hover:bg-accent hover:text-accent-foreground",
+        )}
+      >
+        <Users className="h-4 w-4" />
+        <span>Clientes</span>
+      </Link>
     </nav>
   )
 }

@@ -13,7 +13,7 @@ export default function Loading() {
       </div>
 
       <div className="mt-6">
-        <Skeleton className="h-[600px] rounded-lg" />
+        <Skeleton className="h-[500px] rounded-lg" />
       </div>
     </div>
   )

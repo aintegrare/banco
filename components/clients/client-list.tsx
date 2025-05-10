@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 
-// Dados de exemplo - seriam substituídos por dados reais da API
+// Dados de exemplo simplificados
 const mockClients = [
   {
     id: "1",
@@ -19,7 +19,6 @@ const mockClients = [
     segment: "SaaS",
     value: 15000,
     lastContact: "2023-05-01",
-    projectsCount: 3,
   },
   {
     id: "2",
@@ -32,7 +31,6 @@ const mockClients = [
     segment: "E-commerce",
     value: 8500,
     lastContact: "2023-05-10",
-    projectsCount: 1,
   },
   {
     id: "3",
@@ -45,7 +43,6 @@ const mockClients = [
     segment: "Saúde",
     value: 12000,
     lastContact: "2023-04-15",
-    projectsCount: 2,
   },
   {
     id: "4",
@@ -58,71 +55,35 @@ const mockClients = [
     segment: "Educação",
     value: 0,
     lastContact: "2023-05-18",
-    projectsCount: 0,
   },
-  {
-    id: "5",
-    name: "Roberto Almeida",
-    company: "Varejo Moderno",
-    email: "roberto@varejomoderno.com",
-    phone: "(11) 97654-3210",
-    address: "Campinas, SP",
-    status: "active",
-    segment: "Varejo",
-    value: 20000,
-    lastContact: "2023-05-05",
-    projectsCount: 2,
-  },
-  {
-    id: "6",
-    name: "Fernanda Lima",
-    company: "Digital Marketing",
-    email: "fernanda@digitalmarketing.com",
-    phone: "(11) 91234-8765",
-    address: "São Paulo, SP",
-    status: "lead",
-    segment: "Marketing",
-    value: 0,
-    lastContact: "2023-05-20",
-    projectsCount: 0,
-  },
-] as const
+]
 
 export function ClientList() {
-  const [clients, setClients] = useState<typeof mockClients>([])
+  const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    // Simulando uma chamada de API
-    const fetchClients = async () => {
+    // Simulando uma chamada de API com um pequeno atraso
+    const timer = setTimeout(() => {
       try {
-        // Em produção, isso seria uma chamada real à API
-        // const response = await fetch('/api/clients')
-        // const data = await response.json()
-
-        // Simulando um pequeno atraso
-        await new Promise((resolve) => setTimeout(resolve, 800))
-
         setClients(mockClients)
         setLoading(false)
       } catch (err) {
-        setError("Erro ao carregar clientes. Tente novamente mais tarde.")
+        setError("Erro ao carregar clientes")
         setLoading(false)
       }
-    }
+    }, 500)
 
-    fetchClients()
+    return () => clearTimeout(timer)
   }, [])
 
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Array(6)
-          .fill(0)
-          .map((_, i) => (
-            <div key={i} className="h-[220px] bg-gray-100 animate-pulse rounded-lg"></div>
-          ))}
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className="h-[220px] bg-gray-100 animate-pulse rounded-lg"></div>
+        ))}
       </div>
     )
   }

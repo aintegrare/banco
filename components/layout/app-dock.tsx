@@ -12,12 +12,12 @@ import {
   Search,
   Wrench,
   BarChart3,
-  Users,
   Calendar,
   MessageSquare,
   Globe,
   FileImage,
   LogOut,
+  Users,
 } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase/client"
 
