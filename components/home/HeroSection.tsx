@@ -9,9 +9,13 @@ export function HeroSection() {
   const sectionRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
+    setIsVisible(true) // Ativa animações imediatamente para o hero
+
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setIsVisible(entry.isIntersecting)
+        if (entry.isIntersecting) {
+          setIsVisible(true)
+        }
       },
       { threshold: 0.1 },
     )
@@ -41,10 +45,17 @@ export function HeroSection() {
   return (
     <section
       ref={sectionRef}
-      className="relative py-20 md:py-32 overflow-hidden bg-gradient-to-br from-[#4b7bb5] to-[#3d649e] dark:from-[#3d649e] dark:to-[#1e3c64] text-white"
+      className="relative py-24 md:py-32 lg:py-40 overflow-hidden bg-gradient-to-br from-[#4b7bb5] to-[#3d649e] dark:from-[#3d649e] dark:to-[#1e3c64] text-white"
     >
-      <div className="absolute inset-0 bg-[url('/hero-pattern.png')] opacity-10 bg-cover bg-center" />
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20 dark:to-black/40" />
+      {/* Elementos decorativos flutuantes */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#6b91c1]/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute top-1/2 -left-32 w-80 h-80 bg-[#4072b0]/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-[#527eb7]/20 rounded-full blur-3xl animate-pulse"></div>
+      </div>
+
+      <div className="absolute inset-0 bg-[url('/pattern-bg.png')] opacity-10 bg-cover bg-center mix-blend-overlay"></div>
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20 dark:to-black/40"></div>
 
       <div className="container relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
@@ -53,17 +64,25 @@ export function HeroSection() {
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
             }`}
           >
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
-              Marketing Estratégico para Resultados Reais
+            <div className="mb-4">
+              <div className="inline-block py-1 px-3 rounded-full bg-white/20 backdrop-blur-sm text-sm font-medium mb-4 animate-fadeIn">
+                Agência de Marketing Digital
+              </div>
+            </div>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-tight">
+              Marketing Estratégico para{" "}
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-[#f2f1ef]">
+                Resultados Reais
+              </span>
             </h1>
-            <p className="mt-6 text-lg md:text-xl text-white/90 max-w-lg">
+            <p className="mt-6 text-lg md:text-xl text-white/90 max-w-lg leading-relaxed">
               Transformamos negócios através de estratégias de marketing baseadas em dados e focadas em resultados
               mensuráveis.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row gap-4">
               <Button
                 size="lg"
-                className="bg-white text-[#3d649e] hover:bg-white/90 dark:bg-white/90 dark:hover:bg-white"
+                className="bg-white text-[#3d649e] hover:bg-white/90 dark:bg-white/90 dark:hover:bg-white shadow-lg hover:shadow-xl transition-all"
                 onClick={() => scrollToSection("sobre")}
               >
                 Conheça Nossa Abordagem
@@ -71,7 +90,7 @@ export function HeroSection() {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-white text-white hover:bg-white/10"
+                className="border-white text-white hover:bg-white/10 transition-colors"
                 onClick={() => scrollToSection("contato")}
               >
                 Fale Conosco
@@ -86,11 +105,33 @@ export function HeroSection() {
           >
             <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-[#6b91c1] to-[#4072b0] rounded-lg blur-md opacity-75 animate-pulse"></div>
-              <img
-                src="/hero-image.png"
-                alt="Equipe de marketing digital trabalhando"
-                className="relative rounded-lg shadow-2xl"
-              />
+              <div className="relative rounded-lg shadow-2xl overflow-hidden backdrop-blur">
+                <img
+                  src="/marketing-agency-team.png"
+                  alt="Equipe de marketing digital trabalhando"
+                  className="relative rounded-lg shadow-2xl w-full h-auto object-cover transform hover:scale-105 transition-transform duration-700"
+                />
+                <div className="absolute inset-0 bg-gradient-to-tr from-[#3d649e]/40 to-transparent mix-blend-overlay"></div>
+              </div>
+
+              {/* Elementos flutuantes */}
+              <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-white rounded-lg shadow-xl p-4 transform rotate-6 animate-float">
+                <div className="flex items-center justify-center h-full">
+                  <div>
+                    <div className="text-3xl font-bold text-[#3d649e]">250%</div>
+                    <div className="text-xs text-[#4b7bb5]">Aumento médio em conversões</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="absolute -top-8 -right-8 w-28 h-28 bg-[#4072b0] rounded-full shadow-xl p-4 transform -rotate-12 animate-float-delayed">
+                <div className="flex items-center justify-center h-full text-white text-center">
+                  <div>
+                    <div className="text-2xl font-bold">5★</div>
+                    <div className="text-xs">Avaliação dos clientes</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

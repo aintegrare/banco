@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { uploadFileToBunny } from "@/lib/bunny"
 import { addDocumentMetadata } from "@/lib/api"
+import { ensureClientFolderInPath } from "@/lib/document-processor"
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,6 +22,7 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file") as File | null
 
     const folder = (formData.get("folder") as string) || ""
+    const clientName = (formData.get("clientName") as string) || ""
 
     if (!file) {
       console.error("API Upload: Nenhum arquivo enviado")
@@ -114,6 +116,9 @@ export async function POST(request: NextRequest) {
       const fileUrl = await uploadFileToBunny(filePath, buffer, file.type)
       console.log(`API Upload: Upload concluído com sucesso. URL: ${fileUrl}`)
 
+      // Adicionar esta linha para garantir que o caminho inclua a pasta do cliente
+      const correctedUrl = await ensureClientFolderInPath(fileUrl, clientName)
+
       // Armazenar metadados do documento
       const isImage = fileType.startsWith("image/")
       const fileExtensionForMetadata = originalFileName.split(".").pop()?.toLowerCase() || ""
@@ -136,7 +141,7 @@ export async function POST(request: NextRequest) {
         title: originalFileName.replace(/\.[^/.]+$/, ""),
         originalFileName,
         storedFileName: fileName,
-        fileUrl,
+        fileUrl: correctedUrl,
         filePath,
         fileType,
         documentType,
@@ -148,7 +153,7 @@ export async function POST(request: NextRequest) {
       // Para simplificar o teste, vamos retornar sucesso sem processar o documento
       return NextResponse.json({
         success: true,
-        fileUrl,
+        fileUrl: correctedUrl,
         fileName,
         originalFileName,
         fileType,

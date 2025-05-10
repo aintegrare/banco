@@ -14,6 +14,26 @@
   .animate-slideInRight {
     animation: slideInRight 0.3s ease-out;
   }
+
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
+  }
+
+  .animate-float-delayed {
+    animation: float 4s ease-in-out 2s infinite;
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.2) 25%,
+      rgba(255, 255, 255, 0.2) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
 }
 
 @keyframes fadeIn {
@@ -45,4 +65,99 @@
     transform: translateX(0);
     opacity: 1;
   }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(2deg);
+  }
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Melhorar estilização de scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b7bb5;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3d649e;
+}
+
+/* Melhorias gerais */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: white;
+  color: #1f2937;
+}
+
+.dark body {
+  background-color: #111827;
+  color: #f9fafb;
+}
+
+/* Smooth transitions for theme changes */
+*,
+*::before,
+*::after {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 0.2s;
+  transition-timing-function: ease-in-out;
+}
+
+/* Focus outlines - Abordagem corrigida sem usar @apply */
+*:focus-visible {
+  outline-width: 2px;
+  outline-offset: 2px;
+  outline-color: #4b7bb5;
+}
+
+.dark *:focus-visible {
+  outline-color: #6b91c1;
+}
+
+/* Botão de scroll para o topo com animação */
+.scroll-top-button {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  padding: 0.75rem;
+  border-radius: 9999px;
+  background-color: #4072b0;
+  color: white;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transition-property: all;
+  transition-duration: 300ms;
+  z-index: 50;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+.scroll-top-button:hover {
+  background-color: #3d649e;
 }

@@ -57,8 +57,8 @@ const navItems = [
     icon: Database,
   },
   {
-    href: "/admin/configuracoes/chat",
     title: "Chat (Jaque)",
+    href: "/admin/configuracoes/chat",
     icon: MessageSquare,
   },
 ]

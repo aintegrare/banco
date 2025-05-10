@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ClientDialog } from "./client-dialog"
 import {
+  AlertCircle,
   ArrowUpDown,
   Building2,
   Calendar,
@@ -37,6 +38,16 @@ import { useRouter } from "next/navigation"
 import { toast } from "@/components/ui/use-toast"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 type Client = {
   id: number
@@ -99,6 +110,9 @@ export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps)
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [segmentFilter, setSegmentFilter] = useState("todos")
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [clientToDelete, setClientToDelete] = useState<number | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   useEffect(() => {
     fetchClients()
@@ -167,7 +181,8 @@ export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps)
       }
 
       if (!response.ok) {
-        throw new Error("Erro ao salvar cliente")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erro ao salvar cliente")
       }
 
       const savedClient = await response.json()
@@ -178,29 +193,35 @@ export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps)
       })
 
       fetchClients()
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving client:", error)
       toast({
         title: "Erro",
-        description: "Não foi possível salvar o cliente",
+        description: error.message || "Não foi possível salvar o cliente",
         variant: "destructive",
       })
       throw error
     }
   }
 
-  const handleDeleteClient = async (clientId: number) => {
-    if (!confirm("Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.")) {
-      return
-    }
+  const confirmDeleteClient = (clientId: number) => {
+    setClientToDelete(clientId)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const handleDeleteClient = async () => {
+    if (!clientToDelete) return
 
     try {
-      const response = await fetch(`/api/crm/clients/${clientId}`, {
+      setDeleteLoading(true)
+      const response = await fetch(`/api/crm/clients/${clientToDelete}`, {
         method: "DELETE",
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        throw new Error("Erro ao excluir cliente")
+        throw new Error(data.error || data.details || "Erro ao excluir cliente")
       }
 
       toast({
@@ -209,13 +230,17 @@ export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps)
       })
 
       fetchClients()
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting client:", error)
       toast({
-        title: "Erro",
-        description: "Não foi possível excluir o cliente",
+        title: "Erro ao excluir",
+        description: error.message || "Não foi possível excluir o cliente",
         variant: "destructive",
       })
+    } finally {
+      setDeleteLoading(false)
+      setIsDeleteDialogOpen(false)
+      setClientToDelete(null)
     }
   }
 
@@ -501,7 +526,7 @@ export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps)
                               className="text-red-600"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                handleDeleteClient(client.id)
+                                confirmDeleteClient(client.id)
                               }}
                             >
                               <Trash className="h-4 w-4 mr-2" />
@@ -525,6 +550,31 @@ export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps)
         client={selectedClient}
         onSave={handleSaveClient}
       />
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              Confirmar exclusão
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita e todos os dados relacionados
+              (interações, notas) também serão excluídos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteClient}
+              disabled={deleteLoading}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteLoading ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

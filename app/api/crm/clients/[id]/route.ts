@@ -50,26 +50,51 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const supabase = createClient()
-    const id = params.id
+    const id = Number.parseInt(params.id, 10) // Converter para número
 
-    // Primeiro, desabilite o trigger que atualiza o updated_at
-    // Isso é necessário porque o trigger está causando o erro
-    await supabase.rpc("disable_client_triggers")
-
-    // Agora exclua o cliente
-    const { error } = await supabase.from("clients").delete().eq("id", id)
-
-    // Reative o trigger após a exclusão
-    await supabase.rpc("enable_client_triggers")
-
-    if (error) {
-      console.error("Error deleting client:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (isNaN(id)) {
+      return NextResponse.json({ error: "ID de cliente inválido" }, { status: 400 })
     }
 
+    console.log(`Attempting to delete client with ID: ${id}`)
+
+    // Primeiro, verificamos se existem registros relacionados nas tabelas dependentes
+    // e os excluímos para evitar violações de chave estrangeira
+
+    // Excluir interações do cliente
+    const { error: interactionsError } = await supabase.from("client_interactions").delete().eq("client_id", id)
+
+    if (interactionsError) {
+      console.error("Error deleting client interactions:", interactionsError)
+      // Continuamos mesmo com erro, pois pode não haver interações
+    }
+
+    // Excluir notas do cliente
+    const { error: notesError } = await supabase.from("client_notes").delete().eq("client_id", id)
+
+    if (notesError) {
+      console.error("Error deleting client notes:", notesError)
+      // Continuamos mesmo com erro, pois pode não haver notas
+    }
+
+    // Agora excluímos o cliente
+    const { error: deleteError } = await supabase.from("clients").delete().eq("id", id)
+
+    if (deleteError) {
+      console.error("Error deleting client:", deleteError)
+      return NextResponse.json({ error: deleteError.message }, { status: 500 })
+    }
+
+    console.log(`Successfully deleted client with ID: ${id}`)
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error("Unexpected error:", error)
-    return NextResponse.json({ error: "Erro ao excluir cliente" }, { status: 500 })
+  } catch (error: any) {
+    console.error("Unexpected error during client deletion:", error)
+    return NextResponse.json(
+      {
+        error: "Erro ao excluir cliente",
+        details: error?.message || "Erro desconhecido",
+      },
+      { status: 500 },
+    )
   }
 }

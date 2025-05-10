@@ -1,56 +1,38 @@
-"use client"
-
-import { type ReactNode, useState } from "react"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import type React from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CheckCircle } from "lucide-react"
 
 interface ServiceCardProps {
-  icon: ReactNode
+  icon: React.ReactNode
   title: string
   description: string
   features: string[]
 }
 
 export function ServiceCard({ icon, title, description, features }: ServiceCardProps) {
-  const [isHovered, setIsHovered] = useState(false)
-
   return (
-    <Card
-      className={`h-full border-none shadow-lg hover:shadow-xl transition-all duration-300 ${
-        isHovered ? "transform -translate-y-2" : ""
-      } dark:bg-gray-900 dark:text-white`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <CardHeader>
-        <div
-          className={`bg-[#4b7bb5]/10 dark:bg-[#4b7bb5]/20 p-3 rounded-full w-fit transition-all duration-300 ${
-            isHovered ? "bg-[#4b7bb5]/20 dark:bg-[#4b7bb5]/30 scale-110" : ""
-          }`}
-        >
+    <Card className="h-full overflow-hidden bg-white dark:bg-gray-900 border-none shadow-lg hover:shadow-xl transition-all duration-300 group">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-[#4b7bb5]/5 rounded-bl-full transform translate-x-8 -translate-y-8 group-hover:translate-x-4 group-hover:-translate-y-4 transition-transform duration-500"></div>
+
+      <CardHeader className="pt-6 px-6">
+        <div className="mb-3 w-12 h-12 rounded-lg flex items-center justify-center bg-[#4b7bb5]/10 group-hover:bg-[#4b7bb5]/20 transition-colors">
           {icon}
         </div>
-        <CardTitle className="mt-4">{title}</CardTitle>
-        <CardDescription className="dark:text-gray-400">{description}</CardDescription>
+        <CardTitle className="text-xl font-bold text-[#3d649e] dark:text-[#6b91c1] group-hover:text-[#4072b0] transition-colors">
+          {title}
+        </CardTitle>
+        <CardDescription className="text-gray-600 dark:text-gray-400 mt-2">{description}</CardDescription>
       </CardHeader>
-      <CardContent>
-        <ul className="space-y-2 text-sm">
+      <CardContent className="px-6 pb-6">
+        <ul className="space-y-2 mt-4">
           {features.map((feature, index) => (
-            <li key={index} className="flex items-center gap-2">
-              <div className="h-1.5 w-1.5 rounded-full bg-[#4b7bb5] dark:bg-[#6b91c1]"></div>
-              <span className="dark:text-gray-300">{feature}</span>
+            <li key={index} className="flex items-start gap-2 group/item">
+              <CheckCircle className="h-5 w-5 text-[#4b7bb5] dark:text-[#6b91c1] mt-0.5 flex-shrink-0 opacity-80 group-hover/item:opacity-100 transition-opacity" />
+              <span className="text-gray-700 dark:text-gray-300 text-sm">{feature}</span>
             </li>
           ))}
         </ul>
       </CardContent>
-      <CardFooter>
-        <Button
-          variant="outline"
-          className="w-full text-[#4072b0] border-[#4072b0] hover:bg-[#4072b0] hover:text-white dark:text-[#6b91c1] dark:border-[#6b91c1] dark:hover:bg-[#6b91c1] dark:hover:text-white transition-colors"
-        >
-          Saiba Mais
-        </Button>
-      </CardFooter>
     </Card>
   )
 }

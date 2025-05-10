@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Globe, MessageSquare, PenTool, BarChart2, TrendingUp, Users } from "lucide-react"
 import { ServiceCard } from "@/components/shared/ServiceCard"
+import { Button } from "@/components/ui/button"
 
 export function ServicesSection() {
   const [isVisible, setIsVisible] = useState(false)
@@ -75,8 +76,20 @@ export function ServicesSection() {
     },
   ]
 
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id)
+    if (element) {
+      const offsetTop = element.getBoundingClientRect().top + window.pageYOffset
+      window.scrollTo({
+        top: offsetTop - 80,
+        behavior: "smooth",
+      })
+    }
+  }
+
   return (
-    <section id="servicos" ref={sectionRef} className="py-20 bg-[#f2f1ef] dark:bg-gray-800 relative">
+    <section id="servicos" ref={sectionRef} className="py-24 bg-[#f8f7f5] dark:bg-gray-800 relative overflow-hidden">
+      {/* Background Elements */}
       <div className="absolute top-0 left-0 right-0">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320" className="w-full h-auto rotate-180">
           <path
@@ -88,14 +101,34 @@ export function ServicesSection() {
         </svg>
       </div>
 
-      <div className="container pt-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold tracking-tight text-[#3d649e] dark:text-[#6b91c1] sm:text-4xl">
+      <div className="container pt-16 relative z-10">
+        <div className="text-center mb-16 max-w-3xl mx-auto">
+          <div
+            className={`inline-block py-1 px-3 rounded-full border border-[#4072b0]/20 text-[#4072b0] dark:text-[#6b91c1] text-sm font-medium mb-4 transition-all duration-700 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            }`}
+          >
             Nossos Serviços
+          </div>
+          <h2
+            className={`text-3xl font-bold tracking-tight text-[#3d649e] dark:text-[#6b91c1] sm:text-4xl transition-all duration-700 delay-100 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            }`}
+          >
+            Soluções de Marketing Completas
           </h2>
-          <div className="w-20 h-1 bg-[#4072b0] dark:bg-[#6b91c1] mx-auto mt-4 mb-6 rounded-full"></div>
-          <p className="mt-4 text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Oferecemos um ecossistema completo de serviços de marketing digital para impulsionar seu negócio.
+          <div
+            className={`w-20 h-1 bg-[#4072b0] dark:bg-[#6b91c1] mx-auto mt-4 mb-6 rounded-full transition-all duration-700 delay-200 ${
+              isVisible ? "opacity-100 scale-100" : "opacity-0 scale-0"
+            }`}
+          ></div>
+          <p
+            className={`mt-4 text-lg text-gray-600 dark:text-gray-300 transition-all duration-700 delay-300 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            }`}
+          >
+            Oferecemos um ecossistema completo de serviços de marketing digital para impulsionar seu negócio com
+            estratégias personalizadas e resultados mensuráveis.
           </p>
         </div>
 
@@ -111,6 +144,19 @@ export function ServicesSection() {
               <ServiceCard {...service} />
             </div>
           ))}
+        </div>
+
+        <div
+          className={`text-center mt-12 transition-all duration-700 delay-900 ${
+            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+          }`}
+        >
+          <Button
+            onClick={() => scrollToSection("contato")}
+            className="bg-[#4072b0] hover:bg-[#3d649e] text-white hover:shadow-lg transition-all"
+          >
+            Solicite uma proposta personalizada
+          </Button>
         </div>
       </div>
 

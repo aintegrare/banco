@@ -606,6 +606,7 @@ export async function renameBunnyFile(oldPath: string, newName: string): Promise
 }
 
 // Função para obter a URL pública de um arquivo - CORRIGIDA
+// Modificar a função getBunnyPublicUrl para garantir que os caminhos estejam corretos
 export function getBunnyPublicUrl(filePath: string): string {
   if (!filePath) {
     console.warn("Bunny URL: Caminho de arquivo vazio ou nulo")
@@ -614,6 +615,17 @@ export function getBunnyPublicUrl(filePath: string): string {
 
   // Normalizar o caminho do arquivo
   const normalizedPath = filePath.replace(/\/+/g, "/").replace(/^\//, "")
+
+  // CORREÇÃO CRÍTICA: Garantir que o caminho inclua "documents/clientes"
+  if (normalizedPath.includes("documents/") && !normalizedPath.includes("documents/clientes/")) {
+    // Se contém "documents" mas não "documents/clientes", inserir "clientes" após "documents"
+    const pathParts = normalizedPath.split("documents/")
+    if (pathParts.length > 1) {
+      const newPath = `documents/clientes/${pathParts[1]}`
+      console.log(`Bunny URL: Corrigindo caminho de ${normalizedPath} para ${newPath}`)
+      return `${BUNNY_PULLZONE_URL}/${newPath}`
+    }
+  }
 
   // Remover qualquer prefixo "zona-de-guardar/" se existir
   const cleanPath = normalizedPath.replace(/^zona-de-guardar\//, "")
@@ -736,6 +748,52 @@ export function fixBunnyUrl(url: string): string {
   }
 
   return url
+}
+
+// Adicionar esta nova função após a função fixBunnyUrl
+
+// Função para garantir que as URLs de documentos incluam o caminho correto para clientes
+export function ensureCorrectDocumentPath(url: string): string {
+  if (!url) return url
+
+  // Se a URL já estiver completa com http/https, extrair o caminho
+  let path = url
+  if (url.startsWith("http")) {
+    try {
+      const urlObj = new URL(url)
+      path = urlObj.pathname.replace(/^\//, "")
+    } catch (e) {
+      console.error("URL inválida:", url)
+      return url
+    }
+  }
+
+  // Verificar se o caminho já contém "documents/clientes"
+  if (!path.includes("documents/clientes") && path.includes("documents")) {
+    // Se contém "documents" mas não "documents/clientes", inserir "clientes" após "documents"
+    const pathParts = path.split("documents/")
+    if (pathParts.length > 1) {
+      const newPath = `documents/clientes/${pathParts[1]}`
+      console.log(`Corrigindo caminho de documento: ${path} -> ${newPath}`)
+
+      // Se a URL original era completa, reconstruir
+      if (url.startsWith("http")) {
+        try {
+          const urlObj = new URL(url)
+          urlObj.pathname = `/${newPath}`
+          return urlObj.toString()
+        } catch (e) {
+          console.error("Erro ao reconstruir URL:", e)
+          return `${BUNNY_PULLZONE_URL}/${newPath}`
+        }
+      }
+
+      return `${BUNNY_PULLZONE_URL}/${newPath}`
+    }
+  }
+
+  // Se já estiver correto ou não for um caminho de documento, retornar a URL original
+  return url.startsWith("http") ? url : `${BUNNY_PULLZONE_URL}/${path}`
 }
 
 // Nova função para extrair o nome do arquivo de um caminho

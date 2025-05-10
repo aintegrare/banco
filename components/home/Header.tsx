@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, X } from "lucide-react"
+import { Menu, X, Sun, Moon } from "lucide-react"
 import { useTheme } from "@/components/theme-provider"
 
 interface HeaderProps {
@@ -35,63 +35,77 @@ export function Header({ isScrolled }: HeaderProps) {
   return (
     <header
       className={`sticky top-0 z-40 transition-all duration-300 ${
-        isScrolled ? "bg-white/90 dark:bg-gray-900/90 backdrop-blur-md shadow-sm" : "bg-white dark:bg-gray-900"
+        isScrolled
+          ? "bg-white/90 dark:bg-gray-900/90 backdrop-blur-md shadow-sm py-3"
+          : "bg-white dark:bg-gray-900 py-5"
       }`}
     >
-      <div className="container flex h-16 items-center justify-between py-4">
+      <div className="container flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/logo-integrare.png" alt="Integrare Logo" className="h-8" />
+          <img src="/logo-integrare.png" alt="Integrare Logo" className="h-10" />
         </div>
 
-        <nav className="hidden md:flex items-center gap-6">
+        <nav className="hidden md:flex items-center gap-8">
           <button
             onClick={() => scrollToSection("sobre")}
-            className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors"
+            className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors relative group"
           >
             Sobre
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#4b7bb5] group-hover:w-full transition-all duration-300"></span>
           </button>
           <button
             onClick={() => scrollToSection("servicos")}
-            className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors"
+            className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors relative group"
           >
             Serviços
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#4b7bb5] group-hover:w-full transition-all duration-300"></span>
           </button>
           <button
             onClick={() => scrollToSection("resultados")}
-            className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors"
+            className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors relative group"
           >
             Cases
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#4b7bb5] group-hover:w-full transition-all duration-300"></span>
           </button>
           <button
             onClick={() => scrollToSection("clientes")}
-            className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors"
+            className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors relative group"
           >
             Clientes
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#4b7bb5] group-hover:w-full transition-all duration-300"></span>
           </button>
           <button
             onClick={() => scrollToSection("depoimentos")}
-            className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors"
+            className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors relative group"
           >
             Depoimentos
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#4b7bb5] group-hover:w-full transition-all duration-300"></span>
           </button>
           <a
             href="/blog"
-            className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors"
+            className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors relative group"
           >
             Blog
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#4b7bb5] group-hover:w-full transition-all duration-300"></span>
           </a>
-          <button
-            onClick={() => scrollToSection("contato")}
-            className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors"
-          >
-            Contato
-          </button>
         </nav>
 
         <div className="flex items-center gap-4">
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}
+          >
+            {theme === "dark" ? (
+              <Sun className="h-5 w-5 text-[#6b91c1]" />
+            ) : (
+              <Moon className="h-5 w-5 text-[#4072b0]" />
+            )}
+          </button>
+
           <Button
             onClick={() => scrollToSection("contato")}
-            className="hidden md:flex bg-[#4072b0] hover:bg-[#3d649e] dark:bg-[#4b7bb5] dark:hover:bg-[#6b91c1] transition-colors"
+            className="hidden md:flex bg-[#4072b0] hover:bg-[#3d649e] text-white dark:bg-[#4b7bb5] dark:hover:bg-[#6b91c1] transition-colors"
           >
             Fale Conosco
           </Button>
@@ -110,7 +124,7 @@ export function Header({ isScrolled }: HeaderProps) {
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu - Com animação de slide */}
       <div
         className={`md:hidden fixed inset-0 z-50 bg-white dark:bg-gray-900 transition-transform duration-300 ease-in-out ${
           isMenuOpen ? "translate-x-0" : "translate-x-full"
@@ -119,7 +133,7 @@ export function Header({ isScrolled }: HeaderProps) {
         <div className="container py-4">
           <div className="flex justify-between items-center mb-8">
             <div className="flex items-center gap-2">
-              <img src="/logo-integrare.png" alt="Integrare Logo" className="h-8" />
+              <img src="/logo-integrare.png" alt="Integrare Logo" className="h-10" />
             </div>
             <button
               onClick={closeMenu}
@@ -130,59 +144,69 @@ export function Header({ isScrolled }: HeaderProps) {
             </button>
           </div>
 
-          <nav className="flex flex-col gap-6">
+          <nav className="flex flex-col gap-4">
             <button
               onClick={() => scrollToSection("sobre")}
-              className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+              className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors flex items-center justify-between"
             >
-              Sobre
+              <span>Sobre</span>
+              <span className="text-[#4b7bb5]/50">01</span>
             </button>
             <button
               onClick={() => scrollToSection("servicos")}
-              className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+              className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors flex items-center justify-between"
             >
-              Serviços
+              <span>Serviços</span>
+              <span className="text-[#4b7bb5]/50">02</span>
             </button>
             <button
               onClick={() => scrollToSection("resultados")}
-              className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+              className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors flex items-center justify-between"
             >
-              Cases
+              <span>Cases</span>
+              <span className="text-[#4b7bb5]/50">03</span>
             </button>
             <button
               onClick={() => scrollToSection("clientes")}
-              className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+              className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors flex items-center justify-between"
             >
-              Clientes
+              <span>Clientes</span>
+              <span className="text-[#4b7bb5]/50">04</span>
             </button>
             <button
               onClick={() => scrollToSection("depoimentos")}
-              className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+              className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors flex items-center justify-between"
             >
-              Depoimentos
+              <span>Depoimentos</span>
+              <span className="text-[#4b7bb5]/50">05</span>
             </button>
             <a
               href="/blog"
-              className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+              className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors flex items-center justify-between"
             >
-              Blog
+              <span>Blog</span>
+              <span className="text-[#4b7bb5]/50">06</span>
             </a>
             <button
               onClick={() => scrollToSection("contato")}
-              className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+              className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors flex items-center justify-between"
             >
-              Contato
+              <span>Contato</span>
+              <span className="text-[#4b7bb5]/50">07</span>
             </button>
 
-            <Button
-              onClick={() => {
-                scrollToSection("contato")
-                closeMenu()
-              }}
-              className="mt-4 bg-[#4072b0] hover:bg-[#3d649e] dark:bg-[#4b7bb5] dark:hover:bg-[#6b91c1]"
-            >
-              Fale Conosco
-            </Button>
+            <div className="mt-8 flex justify-center">
+              <Button
+                onClick={() => {
+                  scrollToSection("contato")
+                  closeMenu()
+                }}
+                size="lg"
+                className="w-full bg-[#4072b0] hover:bg-[#3d649e] text-white dark:bg-[#4b7bb5] dark:hover:bg-[#6b91c1]"
+              >
+                Fale Conosco
+              </Button>
+            </div>
           </nav>
         </div>
       </div>
