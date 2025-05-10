@@ -32,7 +32,7 @@ export function AboutSection() {
       <div className="absolute top-0 right-0 w-1/3 h-1/3 bg-[#4b7bb5]/5 rounded-bl-full"></div>
       <div className="absolute bottom-0 left-0 w-1/4 h-1/4 bg-[#6b91c1]/5 rounded-tr-full"></div>
 
-      <div className="container">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
         <div className="text-center mb-16 max-w-3xl mx-auto">
           <div
             className={`inline-block py-1 px-3 rounded-full border border-[#4072b0]/20 text-[#4072b0] dark:text-[#6b91c1] text-sm font-medium mb-4 transition-all duration-700 ${

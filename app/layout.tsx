@@ -33,7 +33,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body className={`${inter.className} pb-20`}>
+      <body className={`${inter.className} pb-20 w-full mx-auto`}>
         <ThemeProvider attribute="class" defaultTheme="light">
           {children}
           <AppDock />

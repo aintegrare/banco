@@ -36,7 +36,7 @@ export default function Home() {
 
   return (
     <div
-      className={`flex min-h-screen flex-col ${isPageLoaded ? "opacity-100 transition-opacity duration-500" : "opacity-0"}`}
+      className={`flex min-h-screen flex-col w-full mx-auto ${isPageLoaded ? "opacity-100 transition-opacity duration-500" : "opacity-0"}`}
     >
       <Header isScrolled={isScrolled} />
       <main className="flex-1">

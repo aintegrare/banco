@@ -101,7 +101,7 @@ export function ServicesSection() {
         </svg>
       </div>
 
-      <div className="container pt-16 relative z-10">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 relative z-10">
         <div className="text-center mb-16 max-w-3xl mx-auto">
           <div
             className={`inline-block py-1 px-3 rounded-full border border-[#4072b0]/20 text-[#4072b0] dark:text-[#6b91c1] text-sm font-medium mb-4 transition-all duration-700 ${

@@ -57,7 +57,7 @@ export function ResultsSection() {
 
   return (
     <section id="resultados" ref={sectionRef} className="py-20 bg-white dark:bg-gray-900">
-      <div className="container">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold tracking-tight text-[#3d649e] dark:text-[#6b91c1] sm:text-4xl">
             Cases de Sucesso

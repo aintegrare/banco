@@ -57,7 +57,7 @@ export function HeroSection() {
       <div className="absolute inset-0 bg-[url('/pattern-bg.png')] opacity-10 bg-cover bg-center mix-blend-overlay"></div>
       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20 dark:to-black/40"></div>
 
-      <div className="container relative z-10">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <div
             className={`transition-all duration-1000 delay-300 ${

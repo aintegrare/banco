@@ -40,7 +40,7 @@ export function Header({ isScrolled }: HeaderProps) {
           : "bg-white dark:bg-gray-900 py-5"
       }`}
     >
-      <div className="container flex items-center justify-between">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <a href="https://www.redeintegrare.com">
             <img src="/logo-integrare.png" alt="Integrare Logo" className="h-10" />
@@ -132,7 +132,7 @@ export function Header({ isScrolled }: HeaderProps) {
           isMenuOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="container py-4">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center mb-8">
             <div className="flex items-center gap-2">
               <a href="https://www.redeintegrare.com">

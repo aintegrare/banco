@@ -260,7 +260,7 @@ export function TestimonialsSection() {
 
   return (
     <section id="depoimentos" className="py-16 bg-[#f2f1ef] dark:bg-gray-900" ref={ref}>
-      <div className="container">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-[#4072b0] dark:text-[#6b91c1] mb-4">
             O Que Nossos Clientes Dizem
