@@ -152,7 +152,7 @@ export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps)
   }
 
   const handleEditClient = (client: Client) => {
-    setSelectedClient(client)
+    setSelectedClient({ ...client })
     setIsDialogOpen(true)
   }
 
@@ -192,7 +192,8 @@ export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps)
         description: `Cliente ${savedClient.name} foi ${clientData.id ? "atualizado" : "criado"} com sucesso.`,
       })
 
-      fetchClients()
+      // Atualizar a lista de clientes
+      await fetchClients()
     } catch (error: any) {
       console.error("Error saving client:", error)
       toast({

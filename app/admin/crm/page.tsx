@@ -67,7 +67,8 @@ export default function CrmPage() {
       })
 
       if (!response.ok) {
-        throw new Error("Erro ao criar cliente")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erro ao criar cliente")
       }
 
       const savedClient = await response.json()
@@ -78,6 +79,7 @@ export default function CrmPage() {
       })
 
       router.refresh()
+      return savedClient
     } catch (error) {
       console.error("Error creating client:", error)
       toast({

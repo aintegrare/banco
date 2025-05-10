@@ -1,10 +1,8 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { BlogPostCard } from "@/components/blog/blog-post-card"
-import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
-import { PlusCircle } from "lucide-react"
-import { BlogCategories } from "@/components/blog/blog-categories"
+import { PlusCircle, ArrowRight } from "lucide-react"
 import { BlogFeaturedPost } from "@/components/blog/blog-featured-post"
 import { BlogSearch } from "@/components/blog/blog-search"
 
@@ -56,7 +54,7 @@ const blogPosts = [
     excerpt:
       "Como utilizar as redes sociais de forma estratégica para aumentar o engajamento e a fidelização de clientes.",
     content: "",
-    coverImage: "/placeholder.svg?key=i7ig0",
+    coverImage: "/social-media-marketing.png",
     author: {
       name: "Juliana Costa",
       avatar: "/professional-woman-profile.png",
@@ -90,10 +88,10 @@ const blogPosts = [
     excerpt:
       "Dicas práticas para criar campanhas de e-mail marketing eficientes que geram conversões e fortalecem o relacionamento com clientes.",
     content: "",
-    coverImage: "/placeholder.svg?key=bobx7",
+    coverImage: "/email-marketing-campaign.png",
     author: {
       name: "Fernanda Lima",
-      avatar: "/placeholder.svg?key=hs3j9",
+      avatar: "/professional-woman-avatar.png",
     },
     category: "E-mail Marketing",
     publishedAt: "2023-10-12T11:20:00Z",
@@ -107,10 +105,10 @@ const blogPosts = [
     excerpt:
       "As principais tendências de marketing que devem dominar o mercado em 2024 e como se preparar para aproveitar essas oportunidades.",
     content: "",
-    coverImage: "/placeholder.svg?key=7567c",
+    coverImage: "/marketing-trends-2024.png",
     author: {
       name: "Paulo Santos",
-      avatar: "/placeholder.svg?key=8i98z",
+      avatar: "/professional-man-avatar.png",
     },
     category: "Tendências",
     publishedAt: "2023-12-05T13:40:00Z",
@@ -128,49 +126,118 @@ const regularPosts = blogPosts.filter((post) => !post.featured)
 export default function BlogPage() {
   return (
     <div className="min-h-screen bg-[#f2f1ef]">
-      <PageHeader
-        title="Blog da Integrare"
-        description="Conteúdos sobre marketing, negócios e tecnologia"
-        actions={
-          <Link href="/blog/admin/novo">
-            <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Novo Post
-            </Button>
-          </Link>
-        }
-      />
+      {/* Header com padrão de fundo */}
+      <div className="relative bg-[#4072b0] text-white overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <img src="/pattern-bg.png" alt="" className="w-full h-full object-cover" />
+        </div>
+        <div className="container relative z-10 py-16 px-4">
+          <div className="max-w-3xl mx-auto text-center">
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">Blog da Integrare</h1>
+            <p className="text-xl opacity-90 mb-8">
+              Conteúdos sobre marketing, negócios e tecnologia para impulsionar sua empresa
+            </p>
+            <div className="flex justify-center gap-4">
+              <Link href="/blog/admin/novo">
+                <Button className="bg-white text-[#4072b0] hover:bg-gray-100">
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Novo Post
+                </Button>
+              </Link>
+              <Link href="#categorias">
+                <Button variant="outline" className="border-white text-white hover:bg-white/10">
+                  Explorar Categorias
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
 
-      <div className="container mx-auto px-4 py-8">
+        {/* Forma decorativa */}
+        <div
+          className="absolute bottom-0 left-0 right-0 h-16 bg-[#f2f1ef]"
+          style={{
+            clipPath: "polygon(0 100%, 100% 100%, 100% 0, 0 100%)",
+          }}
+        ></div>
+      </div>
+
+      <div className="container mx-auto px-4 py-12">
+        {/* Post em destaque */}
+        {featuredPost && (
+          <div className="mb-16">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold text-[#4072b0]">Post em Destaque</h2>
+              <Link
+                href="/blog/categoria/destaque"
+                className="text-[#4b7bb5] hover:text-[#3d649e] flex items-center text-sm font-medium"
+              >
+                Ver todos os destaques
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </div>
+            <BlogFeaturedPost post={featuredPost} />
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Coluna principal */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Post em destaque */}
-            {featuredPost && <BlogFeaturedPost post={featuredPost} />}
-
+          <div className="lg:col-span-2 space-y-12">
             {/* Lista de posts */}
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-[#4072b0]">Posts Recentes</h2>
+            <div className="space-y-8">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-[#4072b0]">Posts Recentes</h2>
+                <Link
+                  href="/blog/todos"
+                  className="text-[#4b7bb5] hover:text-[#3d649e] flex items-center text-sm font-medium"
+                >
+                  Ver todos os posts
+                  <ArrowRight className="ml-1 h-4 w-4" />
+                </Link>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {regularPosts.map((post) => (
-                  <BlogPostCard key={post.id} post={post} />
+                {regularPosts.slice(0, 4).map((post, index) => (
+                  <div key={post.id}>
+                    <BlogPostCard
+                      post={{
+                        id: Number(post.id),
+                        title: post.title,
+                        slug: post.slug,
+                        excerpt: post.excerpt,
+                        featured_image: post.coverImage,
+                        author: {
+                          id: 1,
+                          name: post.author.name,
+                          avatar_url: post.author.avatar,
+                        },
+                        category: {
+                          id: 1,
+                          name: post.category,
+                          slug: post.category.toLowerCase().replace(/ /g, "-"),
+                        },
+                        published_at: post.publishedAt,
+                        readTime: post.readTime,
+                      }}
+                    />
+                  </div>
                 ))}
               </div>
 
               {/* Paginação */}
-              <div className="flex justify-center mt-8">
-                <div className="flex space-x-2">
-                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+              <div className="flex justify-center mt-12">
+                <div className="inline-flex items-center rounded-md border border-[#4b7bb5]/20 bg-white p-1 shadow-sm">
+                  <Button variant="outline" className="border-[#4b7bb5]/20 text-[#4b7bb5] hover:bg-[#4b7bb5]/5">
                     Anterior
                   </Button>
-                  <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">1</Button>
-                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                  <Button className="bg-[#4b7bb5] hover:bg-[#3d649e] text-white">1</Button>
+                  <Button variant="outline" className="border-[#4b7bb5]/20 text-[#4b7bb5] hover:bg-[#4b7bb5]/5">
                     2
                   </Button>
-                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                  <Button variant="outline" className="border-[#4b7bb5]/20 text-[#4b7bb5] hover:bg-[#4b7bb5]/5">
                     3
                   </Button>
-                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                  <Button variant="outline" className="border-[#4b7bb5]/20 text-[#4b7bb5] hover:bg-[#4b7bb5]/5">
                     Próxima
                   </Button>
                 </div>
@@ -181,29 +248,82 @@ export default function BlogPage() {
           {/* Barra lateral */}
           <div className="space-y-8">
             <BlogSearch />
-            <BlogCategories />
+
+            <div id="categorias" className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+              <h3 className="text-xl font-bold text-[#4072b0] mb-4">Categorias</h3>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href="/blog/categoria/marketing-digital"
+                  className="px-3 py-1.5 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors"
+                >
+                  Marketing Digital
+                </Link>
+                <Link
+                  href="/blog/categoria/seo"
+                  className="px-3 py-1.5 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors"
+                >
+                  SEO
+                </Link>
+                <Link
+                  href="/blog/categoria/redes-sociais"
+                  className="px-3 py-1.5 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors"
+                >
+                  Redes Sociais
+                </Link>
+                <Link
+                  href="/blog/categoria/analise-de-dados"
+                  className="px-3 py-1.5 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors"
+                >
+                  Análise de Dados
+                </Link>
+                <Link
+                  href="/blog/categoria/email-marketing"
+                  className="px-3 py-1.5 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors"
+                >
+                  E-mail Marketing
+                </Link>
+                <Link
+                  href="/blog/categoria/tendencias"
+                  className="px-3 py-1.5 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors"
+                >
+                  Tendências
+                </Link>
+                <Link
+                  href="/blog/categorias"
+                  className="px-3 py-1.5 bg-[#4b7bb5]/5 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors"
+                >
+                  Ver todas
+                </Link>
+              </div>
+            </div>
 
             {/* Posts populares */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
               <h3 className="text-xl font-bold text-[#4072b0] mb-4">Posts Populares</h3>
               <div className="space-y-4">
                 {blogPosts.slice(0, 3).map((post) => (
-                  <div key={post.id} className="flex items-start space-x-3">
-                    <div className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden">
+                  <div key={post.id} className="flex items-start space-x-3 group">
+                    <div className="flex-shrink-0 w-20 h-20 rounded-md overflow-hidden">
                       <img
                         src={post.coverImage || "/placeholder.svg"}
                         alt={post.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
                     </div>
                     <div>
                       <Link
                         href={`/blog/${post.slug}`}
-                        className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] line-clamp-2"
+                        className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] line-clamp-2 group-hover:underline"
                       >
                         {post.title}
                       </Link>
-                      <p className="text-xs text-gray-500 mt-1">{post.readTime} de leitura</p>
+                      <div className="flex items-center mt-1 text-xs text-gray-500">
+                        <span>{post.readTime} de leitura</span>
+                        <span className="mx-1">•</span>
+                        <span>
+                          {new Date(post.publishedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -211,17 +331,36 @@ export default function BlogPage() {
             </div>
 
             {/* Newsletter */}
-            <div className="bg-[#4b7bb5] rounded-lg shadow-sm p-6 text-white">
-              <h3 className="text-xl font-bold mb-2">Inscreva-se na Newsletter</h3>
-              <p className="text-sm mb-4">Receba nossos conteúdos exclusivos diretamente no seu e-mail.</p>
-              <div className="space-y-3">
-                <input
-                  type="email"
-                  placeholder="Seu melhor e-mail"
-                  className="w-full px-3 py-2 rounded-md text-gray-800 text-sm"
-                />
-                <Button className="w-full bg-white text-[#4b7bb5] hover:bg-gray-100">Inscrever-se</Button>
+            <div className="relative overflow-hidden rounded-lg shadow-sm">
+              <div className="absolute inset-0 bg-gradient-to-br from-[#4b7bb5] to-[#3d649e] opacity-90"></div>
+              <div className="absolute inset-0 opacity-10">
+                <img src="/pattern-bg.png" alt="" className="w-full h-full object-cover" />
               </div>
+              <div className="relative z-10 p-6 text-white">
+                <h3 className="text-xl font-bold mb-2">Inscreva-se na Newsletter</h3>
+                <p className="text-sm mb-4 text-white/90">
+                  Receba nossos conteúdos exclusivos diretamente no seu e-mail.
+                </p>
+                <div className="space-y-3">
+                  <input
+                    type="email"
+                    placeholder="Seu melhor e-mail"
+                    className="w-full px-3 py-2 rounded-md text-gray-800 text-sm"
+                  />
+                  <Button className="w-full bg-white text-[#4b7bb5] hover:bg-gray-100">Inscrever-se</Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Anúncio ou CTA */}
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100 text-center">
+              <h3 className="text-lg font-bold text-[#4072b0] mb-2">Precisa de ajuda com marketing?</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Nossa equipe de especialistas está pronta para ajudar sua empresa a crescer.
+              </p>
+              <Link href="/contato">
+                <Button className="bg-[#4b7bb5] hover:bg-[#3d649e] w-full">Fale com um especialista</Button>
+              </Link>
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { Calendar, Clock } from "lucide-react"
 
 interface Author {
   id: number
@@ -35,7 +36,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
   const publishDate = post.published_at ? new Date(post.published_at) : new Date()
   const formattedDate = publishDate.toLocaleDateString("pt-BR", {
     day: "2-digit",
-    month: "long",
+    month: "short",
     year: "numeric",
   })
 
@@ -71,16 +72,18 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
 
   if (variant === "horizontal") {
     return (
-      <div className={`bg-white rounded-lg shadow-sm overflow-hidden group ${className}`}>
+      <div
+        className={`bg-white rounded-lg shadow-sm overflow-hidden group border border-gray-100 hover:shadow-md transition-all duration-300 ${className}`}
+      >
         <div className="flex flex-col md:flex-row">
           <div className="md:w-1/3 h-48 md:h-auto relative overflow-hidden">
             <img
               src={post.featured_image || "/placeholder.svg"}
               alt={post.title}
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
             <div className="absolute top-3 left-3">
-              <span className="inline-block px-3 py-1 bg-[#4b7bb5] text-white text-xs rounded-md">
+              <span className="inline-block px-3 py-1 bg-[#4b7bb5]/10 text-[#4b7bb5] text-xs rounded-full">
                 {post.category?.name || "Sem categoria"}
               </span>
             </div>
@@ -102,7 +105,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
                 <img
                   src={post.author?.avatar_url || "/placeholder.svg"}
                   alt={post.author?.name || "Autor"}
-                  className="w-8 h-8 rounded-full mr-2 object-cover"
+                  className="w-8 h-8 rounded-full mr-2 object-cover border border-white shadow-sm"
                 />
                 <div>
                   <span className="text-sm font-medium">{post.author?.name || "Autor desconhecido"}</span>
@@ -129,15 +132,17 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
 
   // Default variant
   return (
-    <div className={`bg-white rounded-lg shadow-sm overflow-hidden flex flex-col h-full group ${className}`}>
+    <div
+      className={`bg-white rounded-lg shadow-sm overflow-hidden flex flex-col h-full group border border-gray-100 hover:shadow-md transition-all duration-300 ${className}`}
+    >
       <div className="relative h-48 overflow-hidden">
         <img
           src={post.featured_image || "/placeholder.svg"}
           alt={post.title}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <div className="absolute top-3 left-3">
-          <span className="inline-block px-3 py-1 bg-[#4b7bb5] text-white text-xs rounded-md">
+          <span className="inline-block px-3 py-1 bg-[#4b7bb5]/10 text-[#4b7bb5] text-xs rounded-full">
             {post.category?.name || "Sem categoria"}
           </span>
         </div>
@@ -145,11 +150,13 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
 
       <div className="p-5 flex-grow flex flex-col">
         <div className="flex items-center text-xs text-gray-500 mb-2">
+          <Calendar className="h-3 w-3 mr-1 text-[#4b7bb5]" />
           <span>
             {formattedDate.split(" de ")[0]} {formattedDate.split(" de ")[1]?.substring(0, 3)},{" "}
             {formattedDate.split(" de ")[2]}
           </span>
           <span className="mx-2">•</span>
+          <Clock className="h-3 w-3 mr-1 text-[#4b7bb5]" />
           <span>{readTime}</span>
         </div>
 
@@ -166,7 +173,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
             <img
               src={post.author?.avatar_url || "/placeholder.svg"}
               alt={post.author?.name || "Autor"}
-              className="w-8 h-8 rounded-full mr-2 object-cover"
+              className="w-8 h-8 rounded-full mr-2 object-cover border border-white shadow-sm"
             />
             <span className="text-sm text-gray-700">{post.author?.name || "Autor desconhecido"}</span>
           </div>

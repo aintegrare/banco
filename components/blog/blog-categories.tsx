@@ -1,30 +1,38 @@
 import Link from "next/link"
 
-// Categorias de exemplo
+// Dados de exemplo para categorias
 const categories = [
-  { id: "1", name: "Marketing Digital", count: 12 },
-  { id: "2", name: "SEO", count: 8 },
-  { id: "3", name: "Redes Sociais", count: 15 },
-  { id: "4", name: "E-mail Marketing", count: 6 },
-  { id: "5", name: "Análise de Dados", count: 9 },
-  { id: "6", name: "Tendências", count: 7 },
+  { name: "Marketing Digital", slug: "marketing-digital", count: 12 },
+  { name: "SEO", slug: "seo", count: 8 },
+  { name: "Redes Sociais", slug: "redes-sociais", count: 10 },
+  { name: "Análise de Dados", slug: "analise-de-dados", count: 6 },
+  { name: "E-mail Marketing", slug: "email-marketing", count: 5 },
+  { name: "Tendências", slug: "tendencias", count: 7 },
+  { name: "Branding", slug: "branding", count: 4 },
+  { name: "Conteúdo", slug: "conteudo", count: 9 },
 ]
 
 export function BlogCategories() {
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
+    <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
       <h3 className="text-xl font-bold text-[#4072b0] mb-4">Categorias</h3>
-      <div className="space-y-2">
+      <ul className="space-y-2">
         {categories.map((category) => (
-          <Link
-            key={category.id}
-            href={`/blog/categoria/${category.name.toLowerCase().replace(/\s+/g, "-")}`}
-            className="flex items-center justify-between py-2 border-b border-gray-100 hover:text-[#3d649e]"
-          >
-            <span className="text-[#4b7bb5]">{category.name}</span>
-            <span className="text-sm text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{category.count}</span>
-          </Link>
+          <li key={category.slug} className="group">
+            <Link
+              href={`/blog/categoria/${category.slug}`}
+              className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-[#4b7bb5]/5 transition-colors group-hover:text-[#4b7bb5]"
+            >
+              <span className="text-gray-700 group-hover:text-[#4b7bb5] transition-colors">{category.name}</span>
+              <span className="bg-[#4b7bb5]/10 text-[#4b7bb5] text-xs rounded-full px-2 py-1">{category.count}</span>
+            </Link>
+          </li>
         ))}
+      </ul>
+      <div className="mt-4 pt-4 border-t border-gray-100">
+        <Link href="/blog/categorias" className="text-[#4b7bb5] hover:text-[#3d649e] text-sm font-medium">
+          Ver todas as categorias
+        </Link>
       </div>
     </div>
   )

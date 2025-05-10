@@ -42,6 +42,14 @@ export async function POST(request: NextRequest) {
     const supabase = createClient()
     const client = await request.json()
 
+    // Validar campos obrigatórios
+    const requiredFields = ["name", "company", "email", "phone", "address", "segment", "status"]
+    for (const field of requiredFields) {
+      if (!client[field]) {
+        return NextResponse.json({ error: `Campo ${field} é obrigatório` }, { status: 400 })
+      }
+    }
+
     // Add timestamps
     client.created_at = new Date().toISOString()
     client.updated_at = new Date().toISOString()

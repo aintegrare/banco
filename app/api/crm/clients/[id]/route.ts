@@ -30,6 +30,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const id = params.id
     const updates = await request.json()
 
+    // Validar campos obrigatórios se estiverem presentes
+    const requiredFields = ["name", "company", "email", "phone", "address", "segment", "status"]
+    for (const field of requiredFields) {
+      if (updates[field] !== undefined && !updates[field]) {
+        return NextResponse.json({ error: `Campo ${field} é obrigatório` }, { status: 400 })
+      }
+    }
+
     // Add updated timestamp
     updates.updated_at = new Date().toISOString()
 
@@ -38,6 +46,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (error) {
       console.error("Error updating client:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    if (!data) {
+      return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 })
     }
 
     return NextResponse.json(data)
