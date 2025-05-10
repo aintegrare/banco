@@ -48,6 +48,8 @@ import { getBunnyPublicUrl } from "@/lib/bunny"
 import { FolderTaskBadge } from "./folder-task-badge"
 import { fetchFolderTaskCounts } from "@/lib/folder-tasks-manager"
 import { FolderTasksPanel } from "./folder-tasks-panel"
+// Primeiro, vamos adicionar a importação do novo componente no topo do arquivo
+import { FolderSelector } from "./folder-selector"
 
 interface BunnyFile {
   ObjectName: string
@@ -2266,27 +2268,18 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
                   <p className="font-medium text-gray-700 bg-gray-50 p-2 rounded-md">{fileToMove.ObjectName}</p>
                 </div>
                 <div>
-                  <label htmlFor="destinationPath" className="block text-sm font-medium text-gray-700 mb-1">
-                    Destino:
-                  </label>
-                  <select
-                    id="destinationPath"
-                    value={destinationPath}
-                    onChange={(e) => setDestinationPath(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5]"
-                  >
-                    <option value="">Selecione uma pasta</option>
-                    <option value="documents">Documentos (Raiz)</option>
-                    <option value="images">Imagens (Raiz)</option>
-                    {availableFolders
-                      .filter((folder) => folder !== fileToMove.Path && !folder.startsWith(fileToMove.Path + "/"))
-                      .map((folder) => (
-                        <option key={folder} value={folder}>
-                          {folder}
-                        </option>
-                      ))}
-                  </select>
+                  <FolderSelector
+                    onSelect={(path) => setDestinationPath(path)}
+                    currentPath={getCurrentPathString()}
+                    excludePaths={fileToMove.IsDirectory ? [fileToMove.Path] : []}
+                  />
                   {moveFileError && <p className="mt-2 text-sm text-red-600">{moveFileError}</p>}
+                  {destinationPath && (
+                    <div className="mt-3 p-2 bg-blue-50 rounded-md border border-blue-100">
+                      <p className="text-sm text-blue-700">Destino selecionado:</p>
+                      <p className="text-sm font-medium text-blue-800">{destinationPath}</p>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="p-4 bg-gray-50 flex justify-end space-x-3 border-t">
@@ -2317,6 +2310,98 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
         </div>
       )}
 
+      {showMultiMoveModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="font-medium flex items-center">
+                <MoveIcon className="h-5 w-5 mr-2 text-purple-500" />
+                <span className="ml-2">Mover {selectedFiles.length} arquivo(s)</span>
+              </h3>
+              <button
+                onClick={() => setShowMultiMoveModal(false)}
+                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleMoveMultipleFiles}>
+              <div className="p-6">
+                <div className="mb-4">
+                  <p className="text-sm text-gray-500 mb-2">Arquivos selecionados:</p>
+                  <div className="max-h-32 overflow-y-auto bg-gray-50 p-2 rounded-md">
+                    {selectedFiles.map((file) => (
+                      <div key={file.Path} className="flex items-center py-1">
+                        <div className="mr-2">
+                          {file.IsDirectory ? (
+                            <FolderOpen className="h-4 w-4 text-[#4b7bb5]" />
+                          ) : (
+                            getFileIcon(file.ObjectName)
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-700 truncate">{file.ObjectName}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <FolderSelector
+                    onSelect={(path) => setMultiMoveDestination(path)}
+                    currentPath={getCurrentPathString()}
+                    excludePaths={selectedFiles.filter((f) => f.IsDirectory).map((f) => f.Path)}
+                  />
+                  {multiMoveError && <p className="mt-2 text-sm text-red-600">{multiMoveError}</p>}
+                  {multiMoveDestination && (
+                    <div className="mt-3 p-2 bg-blue-50 rounded-md border border-blue-100">
+                      <p className="text-sm text-blue-700">Destino selecionado:</p>
+                      <p className="text-sm font-medium text-blue-800">{multiMoveDestination}</p>
+                    </div>
+                  )}
+                </div>
+
+                {multiMoveProgress && (
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-600 mb-1">
+                      Movendo {multiMoveProgress.current + 1} de {multiMoveProgress.total}
+                    </p>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div
+                        className="bg-[#4b7bb5] h-2.5 rounded-full"
+                        style={{ width: `${((multiMoveProgress.current + 1) / multiMoveProgress.total) * 100}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 truncate">{multiMoveProgress.currentFile}</p>
+                  </div>
+                )}
+              </div>
+              <div className="p-4 bg-gray-50 flex justify-end space-x-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowMultiMoveModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  disabled={isMovingMultiple}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isMovingMultiple || !multiMoveDestination}
+                  className="px-4 py-2 bg-[#4b7bb5] border border-transparent rounded-md text-sm font-medium text-white hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4b7bb5] disabled:opacity-50 transition-colors"
+                >
+                  {isMovingMultiple ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1.5 inline animate-spin" />
+                      Movendo...
+                    </>
+                  ) : (
+                    "Mover"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {showFolderTasks && selectedFolderForTasks && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
           <FolderTasksPanel folderPath={selectedFolderForTasks} onClose={() => setShowFolderTasks(false)} />
