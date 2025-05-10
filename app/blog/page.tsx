@@ -5,7 +5,6 @@ import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { PlusCircle } from "lucide-react"
 import { BlogCategories } from "@/components/blog/blog-categories"
-import { BlogFeaturedPost } from "@/components/blog/blog-featured-post"
 import { BlogSearch } from "@/components/blog/blog-search"
 import { createClient } from "@/lib/supabase/server"
 
@@ -26,7 +25,8 @@ async function getPosts() {
         author:blog_authors(id, name, avatar_url),
         category:blog_categories(id, name, slug)
       `)
-      .order("created_at", { ascending: false })
+      .eq("published", true)
+      .order("published_at", { ascending: false })
       .limit(10)
 
     if (error) {
@@ -41,154 +41,29 @@ async function getPosts() {
   }
 }
 
-// Dados de exemplo para os posts do blog (usados apenas se não houver dados no banco)
-const dummyPosts = [
-  {
-    id: "1",
-    title: "Como o Marketing Digital Transformou os Negócios em 2023",
-    slug: "como-o-marketing-digital-transformou-os-negocios-em-2023",
-    excerpt:
-      "Descubra as principais tendências de marketing digital que impactaram os negócios no último ano e como se preparar para o futuro.",
-    content: "",
-    featured_image: "/digital-marketing-concept.png",
-    author: {
-      id: 1,
-      name: "Ana Silva",
-      avatar_url: "/woman-profile.png",
-    },
-    category: {
-      id: 1,
-      name: "Marketing Digital",
-      slug: "marketing-digital",
-    },
-    published_at: "2023-12-15T10:00:00Z",
-    read_time: "5 min",
-    featured: true,
-  },
-  {
-    id: "2",
-    title: "Estratégias de SEO para Pequenas Empresas",
-    slug: "estrategias-de-seo-para-pequenas-empresas",
-    excerpt:
-      "Um guia completo sobre como pequenas empresas podem melhorar seu posicionamento nos mecanismos de busca sem grandes investimentos.",
-    content: "",
-    featured_image: "/seo-strategies-concept.png",
-    author: {
-      id: 2,
-      name: "Carlos Mendes",
-      avatar_url: "/man-profile.png",
-    },
-    category: {
-      id: 2,
-      name: "SEO",
-      slug: "seo",
-    },
-    published_at: "2023-11-28T14:30:00Z",
-    read_time: "8 min",
-    featured: false,
-  },
-  {
-    id: "3",
-    title: "O Poder das Redes Sociais para Engajamento de Clientes",
-    slug: "o-poder-das-redes-sociais-para-engajamento-de-clientes",
-    excerpt:
-      "Como utilizar as redes sociais de forma estratégica para aumentar o engajamento e a fidelização de clientes.",
-    content: "",
-    featured_image: "/social-media-marketing.png",
-    author: {
-      id: 3,
-      name: "Juliana Costa",
-      avatar_url: "/professional-woman-profile.png",
-    },
-    category: {
-      id: 3,
-      name: "Redes Sociais",
-      slug: "redes-sociais",
-    },
-    published_at: "2023-11-10T09:15:00Z",
-    read_time: "6 min",
-    featured: false,
-  },
-  {
-    id: "4",
-    title: "Análise de Dados: Como Tomar Decisões Baseadas em Informações",
-    slug: "analise-de-dados-como-tomar-decisoes-baseadas-em-informacoes",
-    excerpt:
-      "A importância da análise de dados para tomada de decisões estratégicas e como implementar uma cultura data-driven na sua empresa.",
-    content: "",
-    featured_image: "/data-analysis-visual.png",
-    author: {
-      id: 4,
-      name: "Ricardo Oliveira",
-      avatar_url: "/man-profile-glasses.png",
-    },
-    category: {
-      id: 4,
-      name: "Análise de Dados",
-      slug: "analise-de-dados",
-    },
-    published_at: "2023-10-25T16:45:00Z",
-    read_time: "7 min",
-    featured: false,
-  },
-  {
-    id: "5",
-    title: "E-mail Marketing: Estratégias que Realmente Funcionam",
-    slug: "email-marketing-estrategias-que-realmente-funcionam",
-    excerpt:
-      "Dicas práticas para criar campanhas de e-mail marketing eficientes que geram conversões e fortalecem o relacionamento com clientes.",
-    content: "",
-    featured_image: "/email-marketing-concept.png",
-    author: {
-      id: 5,
-      name: "Fernanda Lima",
-      avatar_url: "/woman-profile.png",
-    },
-    category: {
-      id: 5,
-      name: "E-mail Marketing",
-      slug: "email-marketing",
-    },
-    published_at: "2023-10-12T11:20:00Z",
-    read_time: "5 min",
-    featured: false,
-  },
-  {
-    id: "6",
-    title: "Tendências de Marketing para 2024",
-    slug: "tendencias-de-marketing-para-2024",
-    excerpt:
-      "As principais tendências de marketing que devem dominar o mercado em 2024 e como se preparar para aproveitar essas oportunidades.",
-    content: "",
-    featured_image: "/marketing-trends.png",
-    author: {
-      id: 6,
-      name: "Paulo Santos",
-      avatar_url: "/man-profile.png",
-    },
-    category: {
-      id: 6,
-      name: "Tendências",
-      slug: "tendencias",
-    },
-    published_at: "2023-12-05T13:40:00Z",
-    read_time: "9 min",
-    featured: false,
-  },
-]
+// Função para calcular o tempo de leitura
+function calculateReadTime(content: string): string {
+  const wordsPerMinute = 200
+  const words = content ? content.split(/\s+/).length : 0
+  const minutes = Math.ceil(words / wordsPerMinute)
+  return `${minutes} min`
+}
 
 export default async function BlogPage() {
   // Buscar posts do banco de dados
-  const dbPosts = await getPosts()
+  const posts = await getPosts()
 
-  // Usar dados do banco ou dados de exemplo se não houver dados no banco
-  const blogPosts = dbPosts.length > 0 ? dbPosts : dummyPosts
+  // Adicionar tempo de leitura aos posts
+  const postsWithReadTime = posts.map((post) => ({
+    ...post,
+    read_time: calculateReadTime(post.content),
+  }))
 
-  // Encontrar o post em destaque
-  const featuredPost = blogPosts.find((post) => post.featured === true)
+  // Encontrar o post mais recente para destacar
+  const featuredPost = postsWithReadTime.length > 0 ? postsWithReadTime[0] : null
 
   // Filtrar os posts que não estão em destaque
-  const regularPosts = blogPosts.filter((post) => post.featured !== true)
+  const regularPosts = postsWithReadTime.length > 1 ? postsWithReadTime.slice(1) : []
 
   return (
     <div className="min-h-screen bg-[#f2f1ef]">
@@ -210,35 +85,101 @@ export default async function BlogPage() {
           {/* Coluna principal */}
           <div className="lg:col-span-2 space-y-8">
             {/* Post em destaque */}
-            {featuredPost && <BlogFeaturedPost post={featuredPost} />}
+            {featuredPost && (
+              <div>
+                <h2 className="text-2xl font-bold text-[#4072b0] mb-4">Post em Destaque</h2>
+                <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                  <div className="grid grid-cols-1 md:grid-cols-2">
+                    <div className="h-64 md:h-auto overflow-hidden">
+                      <img
+                        src={
+                          featuredPost.featured_image || "/placeholder.svg?height=400&width=600&query=marketing digital"
+                        }
+                        alt={featuredPost.title}
+                        className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                      />
+                    </div>
+
+                    <div className="p-6 flex flex-col justify-between">
+                      <div>
+                        <div className="inline-block px-3 py-1 bg-[#4b7bb5] text-white text-sm rounded-md mb-4">
+                          {featuredPost.category?.name || "Sem categoria"}
+                        </div>
+
+                        <Link href={`/blog/${featuredPost.slug}`}>
+                          <h2 className="text-2xl font-bold text-[#4072b0] mb-3 hover:text-[#3d649e]">
+                            {featuredPost.title}
+                          </h2>
+                        </Link>
+
+                        <p className="text-gray-600 mb-4">{featuredPost.excerpt}</p>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center mb-4">
+                          <img
+                            src={
+                              featuredPost.author?.avatar_url || "/placeholder.svg?height=100&width=100&query=profile"
+                            }
+                            alt={featuredPost.author?.name || "Autor"}
+                            className="w-10 h-10 rounded-full mr-3"
+                          />
+                          <div>
+                            <div className="font-medium text-[#4b7bb5]">{featuredPost.author?.name || "Autor"}</div>
+                            <div className="text-xs text-gray-500">Autor</div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center text-sm text-gray-600 space-x-4">
+                          <div className="flex items-center">
+                            <span>{new Date(featuredPost.published_at).toLocaleDateString("pt-BR")}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <span>{featuredPost.read_time} de leitura</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Lista de posts */}
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-[#4072b0]">Posts Recentes</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {regularPosts.map((post) => (
-                  <BlogPostCard key={post.id} post={post} />
-                ))}
-              </div>
+              {regularPosts.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {regularPosts.map((post) => (
+                    <BlogPostCard key={post.id} post={post} />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white rounded-lg p-6 text-center">
+                  <p className="text-gray-600">Nenhum post encontrado.</p>
+                </div>
+              )}
 
               {/* Paginação */}
-              <div className="flex justify-center mt-8">
-                <div className="flex space-x-2">
-                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
-                    Anterior
-                  </Button>
-                  <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">1</Button>
-                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
-                    2
-                  </Button>
-                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
-                    3
-                  </Button>
-                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
-                    Próxima
-                  </Button>
+              {regularPosts.length > 0 && (
+                <div className="flex justify-center mt-8">
+                  <div className="flex space-x-2">
+                    <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                      Anterior
+                    </Button>
+                    <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">1</Button>
+                    <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                      2
+                    </Button>
+                    <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                      3
+                    </Button>
+                    <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                      Próxima
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -251,11 +192,11 @@ export default async function BlogPage() {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h3 className="text-xl font-bold text-[#4072b0] mb-4">Posts Populares</h3>
               <div className="space-y-4">
-                {blogPosts.slice(0, 3).map((post) => (
+                {postsWithReadTime.slice(0, 3).map((post) => (
                   <div key={post.id} className="flex items-start space-x-3">
                     <div className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden">
                       <img
-                        src={post.featured_image || "/placeholder.svg"}
+                        src={post.featured_image || "/placeholder.svg?height=100&width=100&query=blog"}
                         alt={post.title}
                         className="w-full h-full object-cover"
                       />

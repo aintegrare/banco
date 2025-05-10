@@ -1,13 +1,17 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { BlogAuthor } from "@/components/blog/blog-author"
-import { BlogRelatedPosts } from "@/components/blog/blog-related-posts"
-import { BlogShareButtons } from "@/components/blog/blog-share-buttons"
-import { BlogCategories } from "@/components/blog/blog-categories"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Calendar, Clock } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
+
+// Função para calcular o tempo de leitura
+function calculateReadTime(content: string): string {
+  const wordsPerMinute = 200
+  const words = content ? content.split(/\s+/).length : 0
+  const minutes = Math.ceil(words / wordsPerMinute)
+  return `${minutes} min`
+}
 
 // Função para buscar o post pelo slug
 async function getPostBySlug(slug: string) {
@@ -27,6 +31,11 @@ async function getPostBySlug(slug: string) {
     if (error) {
       console.error("Erro ao buscar post:", error)
       return null
+    }
+
+    // Adicionar tempo de leitura
+    if (data) {
+      data.read_time = calculateReadTime(data.content)
     }
 
     return data
@@ -49,6 +58,7 @@ async function getRelatedPosts(categoryId: string, currentPostId: string) {
         slug,
         excerpt,
         featured_image,
+        content,
         published_at,
         author:blog_authors(id, name, avatar_url),
         category:blog_categories(id, name, slug)
@@ -62,6 +72,13 @@ async function getRelatedPosts(categoryId: string, currentPostId: string) {
     if (error) {
       console.error("Erro ao buscar posts relacionados:", error)
       return []
+    }
+
+    // Adicionar tempo de leitura
+    if (data) {
+      data.forEach((post) => {
+        post.read_time = calculateReadTime(post.content)
+      })
     }
 
     return data
@@ -158,22 +175,101 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
             />
 
             {/* Autor */}
-            {post?.author && <BlogAuthor author={post.author} />}
+            {post?.author && (
+              <div className="bg-white rounded-lg p-6 flex items-start space-x-4">
+                <img
+                  src={post.author.avatar_url || "/placeholder.svg?height=100&width=100&query=profile"}
+                  alt={post.author.name}
+                  className="w-16 h-16 rounded-full"
+                />
+                <div>
+                  <h3 className="text-lg font-bold text-[#4072b0]">{post.author.name}</h3>
+                  <p className="text-gray-600 text-sm mt-1">{post.author.bio || "Autor do blog da Integrare."}</p>
+                </div>
+              </div>
+            )}
 
             {/* Compartilhar */}
-            <BlogShareButtons
-              title={post?.title || "Post do Blog Integrare"}
-              url={`https://contatos.redeintegrare.com.br/blog/${params.slug}`}
-            />
+            <div className="bg-white rounded-lg p-6">
+              <h3 className="text-lg font-bold text-[#4072b0] mb-4">Compartilhe este artigo</h3>
+              <div className="flex space-x-2">
+                <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                  Facebook
+                </Button>
+                <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                  Twitter
+                </Button>
+                <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                  LinkedIn
+                </Button>
+                <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
+                  WhatsApp
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Barra lateral */}
           <div className="space-y-8">
             {/* Categorias */}
-            <BlogCategories />
+            <div className="bg-white rounded-lg p-6">
+              <h3 className="text-lg font-bold text-[#4072b0] mb-4">Categorias</h3>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href="/blog/categoria/marketing-digital"
+                  className="px-3 py-1 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm"
+                >
+                  Marketing Digital
+                </Link>
+                <Link
+                  href="/blog/categoria/seo"
+                  className="px-3 py-1 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm"
+                >
+                  SEO
+                </Link>
+                <Link
+                  href="/blog/categoria/redes-sociais"
+                  className="px-3 py-1 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm"
+                >
+                  Redes Sociais
+                </Link>
+                <Link
+                  href="/blog/categoria/analise-de-dados"
+                  className="px-3 py-1 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm"
+                >
+                  Análise de Dados
+                </Link>
+              </div>
+            </div>
 
             {/* Posts relacionados */}
-            <BlogRelatedPosts posts={relatedPosts} />
+            {relatedPosts.length > 0 && (
+              <div className="bg-white rounded-lg p-6">
+                <h3 className="text-lg font-bold text-[#4072b0] mb-4">Posts Relacionados</h3>
+                <div className="space-y-4">
+                  {relatedPosts.map((relatedPost) => (
+                    <div key={relatedPost.id} className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden">
+                        <img
+                          src={relatedPost.featured_image || "/placeholder.svg?height=100&width=100&query=blog"}
+                          alt={relatedPost.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div>
+                        <Link
+                          href={`/blog/${relatedPost.slug}`}
+                          className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] line-clamp-2"
+                        >
+                          {relatedPost.title}
+                        </Link>
+                        <p className="text-xs text-gray-500 mt-1">{relatedPost.read_time} de leitura</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Newsletter */}
             <div className="bg-[#4b7bb5] rounded-lg shadow-sm p-6 text-white">

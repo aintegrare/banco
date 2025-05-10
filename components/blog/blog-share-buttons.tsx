@@ -1,8 +1,7 @@
 "use client"
 
-import { Facebook, Twitter, Linkedin, Link2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { toast } from "@/hooks/use-toast"
+import { Facebook, Twitter, Linkedin, Share2 } from "lucide-react"
 
 interface BlogShareButtonsProps {
   title: string
@@ -10,51 +9,66 @@ interface BlogShareButtonsProps {
 }
 
 export function BlogShareButtons({ title, url }: BlogShareButtonsProps) {
-  const encodedTitle = encodeURIComponent(title)
-  const encodedUrl = encodeURIComponent(url)
-
-  const shareLinks = {
-    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
-    twitter: `https://twitter.com/intent/tweet?text=${encodedTitle}&url=${encodedUrl}`,
-    linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+  // Função para compartilhar no Facebook
+  const shareOnFacebook = () => {
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, "_blank")
   }
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(url).then(() => {
-      toast({
-        title: "Link copiado!",
-        description: "O link foi copiado para a área de transferência.",
-      })
-    })
+  // Função para compartilhar no Twitter
+  const shareOnTwitter = () => {
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
+      "_blank",
+    )
+  }
+
+  // Função para compartilhar no LinkedIn
+  const shareOnLinkedIn = () => {
+    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`, "_blank")
+  }
+
+  // Função para compartilhar via WhatsApp
+  const shareOnWhatsApp = () => {
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(title + " " + url)}`, "_blank")
   }
 
   return (
-    <div className="mt-8">
-      <h3 className="text-lg font-bold text-[#4072b0] mb-4">Compartilhar</h3>
-      <div className="flex space-x-2">
-        <a href={shareLinks.facebook} target="_blank" rel="noopener noreferrer" aria-label="Compartilhar no Facebook">
-          <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-[#4b7bb5]">
-            <Facebook className="h-5 w-5 text-[#4b7bb5]" />
-          </Button>
-        </a>
-        <a href={shareLinks.twitter} target="_blank" rel="noopener noreferrer" aria-label="Compartilhar no Twitter">
-          <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-[#4b7bb5]">
-            <Twitter className="h-5 w-5 text-[#4b7bb5]" />
-          </Button>
-        </a>
-        <a href={shareLinks.linkedin} target="_blank" rel="noopener noreferrer" aria-label="Compartilhar no LinkedIn">
-          <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-[#4b7bb5]">
-            <Linkedin className="h-5 w-5 text-[#4b7bb5]" />
-          </Button>
-        </a>
+    <div className="bg-white rounded-lg p-6">
+      <h3 className="text-lg font-bold text-[#4072b0] mb-4 flex items-center">
+        <Share2 className="mr-2 h-5 w-5" />
+        Compartilhe este artigo
+      </h3>
+      <div className="flex flex-wrap gap-2">
         <Button
           variant="outline"
-          size="icon"
-          className="h-10 w-10 rounded-full border-[#4b7bb5]"
-          onClick={copyToClipboard}
-          aria-label="Copiar link"
+          className="border-[#4b7bb5] text-[#4b7bb5] hover:bg-[#4b7bb5] hover:text-white"
+          onClick={shareOnFacebook}
         >
-          <Link2 className="h-5 w-5 text-[#4b7bb5]" />
+          <Facebook className="mr-2 h-4 w-4" />
+          Facebook
+        </Button>
+        <Button
+          variant="outline"
+          className="border-[#4b7bb5] text-[#4b7bb5] hover:bg-[#4b7bb5] hover:text-white"
+          onClick={shareOnTwitter}
+        >
+          <Twitter className="mr-2 h-4 w-4" />
+          Twitter
+        </Button>
+        <Button
+          variant="outline"
+          className="border-[#4b7bb5] text-[#4b7bb5] hover:bg-[#4b7bb5] hover:text-white"
+          onClick={shareOnLinkedIn}
+        >
+          <Linkedin className="mr-2 h-4 w-4" />
+          LinkedIn
+        </Button>
+        <Button
+          variant="outline"
+          className="border-[#4b7bb5] text-[#4b7bb5] hover:bg-[#4b7bb5] hover:text-white"
+          onClick={shareOnWhatsApp}
+        >
+          WhatsApp
         </Button>
       </div>
     </div>

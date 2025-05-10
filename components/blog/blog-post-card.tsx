@@ -40,7 +40,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
   })
 
   // Calcular tempo de leitura se não for fornecido
-  const readTime = post.read_time || `${Math.ceil(post.excerpt.length / 600)} min`
+  const readTime = post.read_time || "5 min"
 
   if (variant === "compact") {
     return (
@@ -48,7 +48,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
         <div className="flex items-start space-x-3">
           <div className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden">
             <img
-              src={post.featured_image || "/placeholder.svg"}
+              src={post.featured_image || "/placeholder.svg?height=100&width=100&query=blog"}
               alt={post.title}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
@@ -73,7 +73,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
         <div className="flex flex-col md:flex-row">
           <div className="md:w-1/3 h-48 md:h-auto relative overflow-hidden">
             <img
-              src={post.featured_image || "/placeholder.svg"}
+              src={post.featured_image || "/placeholder.svg?height=300&width=400&query=blog"}
               alt={post.title}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
@@ -98,7 +98,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
             <div className="flex items-center justify-between mt-4">
               <div className="flex items-center">
                 <img
-                  src={post.author?.avatar_url || "/placeholder.svg"}
+                  src={post.author?.avatar_url || "/placeholder.svg?height=100&width=100&query=profile"}
                   alt={post.author?.name || "Autor"}
                   className="w-8 h-8 rounded-full mr-2 object-cover"
                 />
@@ -130,7 +130,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
     <div className={`bg-white rounded-lg shadow-sm overflow-hidden flex flex-col h-full group ${className}`}>
       <div className="relative h-48 overflow-hidden">
         <img
-          src={post.featured_image || "/placeholder.svg"}
+          src={post.featured_image || "/placeholder.svg?height=300&width=400&query=blog"}
           alt={post.title}
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
@@ -162,7 +162,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
         <div className="mt-auto flex items-center justify-between">
           <div className="flex items-center">
             <img
-              src={post.author?.avatar_url || "/placeholder.svg"}
+              src={post.author?.avatar_url || "/placeholder.svg?height=100&width=100&query=profile"}
               alt={post.author?.name || "Autor"}
               className="w-8 h-8 rounded-full mr-2 object-cover"
             />
