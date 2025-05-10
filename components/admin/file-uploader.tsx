@@ -23,6 +23,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedFolder, setSelectedFolder] = useState<string>("") // Pasta raiz por padrão
   const [showFolderBrowser, setShowFolderBrowser] = useState(false)
+  const [isDraggingOver, setIsDraggingOver] = useState(false)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -64,11 +65,19 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    setIsDraggingOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDraggingOver(false)
   }
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    setIsDraggingOver(false)
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFiles = Array.from(e.dataTransfer.files)
@@ -321,10 +330,15 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
       </div>
 
       <div
-        className={`border-2 border-dashed rounded-lg p-5 text-center ${
-          files.length > 0 ? "border-green-400 bg-green-50" : "border-gray-300 hover:border-[#4b7bb5]"
+        className={`border-2 border-dashed rounded-lg p-5 text-center relative ${
+          isDraggingOver
+            ? "border-[#4b7bb5] bg-[#4b7bb5]/10"
+            : files.length > 0
+              ? "border-green-400 bg-green-50"
+              : "border-gray-300 hover:border-[#4b7bb5]"
         }`}
         onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
         <input
@@ -336,6 +350,15 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
           ref={fileInputRef}
           multiple
         />
+
+        {isDraggingOver && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#4b7bb5]/10 rounded-lg z-10">
+            <div className="bg-white p-4 rounded-lg shadow-md border border-[#4b7bb5]">
+              <Upload className="h-8 w-8 text-[#4b7bb5] mx-auto mb-2" />
+              <p className="font-medium text-[#4b7bb5]">Solte os arquivos aqui</p>
+            </div>
+          </div>
+        )}
 
         {files.length === 0 ? (
           <label htmlFor="file-upload" className="cursor-pointer">
