@@ -19,6 +19,7 @@ import {
 import { Edit, MoreVertical, Send, Trash } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { toast } from "@/components/ui/use-toast"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 interface ClientNotesProps {
   clientId: number
@@ -205,24 +206,34 @@ export function ClientNotes({ clientId }: ClientNotesProps) {
     }
   }
 
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase()
+      .substring(0, 2)
+  }
+
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Nova Nota</CardTitle>
+        <CardHeader className="bg-[#f8fafc] border-b rounded-t-lg">
+          <CardTitle className="text-lg">Nova Nota</CardTitle>
           <CardDescription>Adicione uma nota sobre este cliente</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent>
+          <CardContent className="pt-6">
             <Textarea
               placeholder="Digite sua nota aqui..."
               value={noteContent}
               onChange={(e) => setNoteContent(e.target.value)}
               rows={4}
               required
+              className="resize-none"
             />
           </CardContent>
-          <CardFooter>
+          <CardFooter className="bg-[#f8fafc] border-t">
             <Button type="submit" className="w-full md:w-auto bg-[#4b7bb5] hover:bg-[#3d649e]" disabled={isSubmitting}>
               {isSubmitting ? (
                 "Salvando..."
@@ -240,7 +251,9 @@ export function ClientNotes({ clientId }: ClientNotesProps) {
       <Card>
         <CardHeader>
           <CardTitle>Notas</CardTitle>
-          <CardDescription>Todas as notas registradas para este cliente</CardDescription>
+          <CardDescription>
+            {notes.length} {notes.length === 1 ? "nota" : "notas"} registradas para este cliente
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -261,11 +274,14 @@ export function ClientNotes({ clientId }: ClientNotesProps) {
             <div className="space-y-4">
               {notes.map((note) => (
                 <div key={note.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <Avatar className="h-10 w-10 bg-[#4b7bb5] text-white">
+                      <AvatarFallback>{getInitials(note.user_name)}</AvatarFallback>
+                    </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="whitespace-pre-wrap">{note.content}</p>
                       <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-2 text-sm text-muted-foreground">
-                        <span>{note.user_name}</span>
+                        <span className="font-medium">{note.user_name}</span>
                         <span className="hidden sm:inline">•</span>
                         <span>{formatDate(note.created_at)}</span>
                         {note.updated_at !== note.created_at && (
@@ -313,7 +329,7 @@ export function ClientNotes({ clientId }: ClientNotesProps) {
             value={editingNote?.content || ""}
             onChange={(e) => setEditingNote((prev) => (prev ? { ...prev, content: e.target.value } : null))}
             rows={4}
-            className="my-4"
+            className="my-4 resize-none"
           />
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>

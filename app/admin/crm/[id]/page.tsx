@@ -8,6 +8,13 @@ import { ClientNotes } from "@/components/crm/client-notes"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Suspense } from "react"
 import { ClientDetailsSkeleton } from "@/components/crm/client-details-skeleton"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 
 export const metadata = {
   title: "Detalhes do Cliente | CRM | Integrare Admin",
@@ -42,12 +49,28 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
       />
 
       <div className="p-4 flex-1">
+        <Breadcrumb className="mb-4">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/admin">Dashboard</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/admin/crm">CRM</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink href={`/admin/crm/${clientId}`}>Cliente</BreadcrumbLink>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         <Suspense fallback={<ClientDetailsSkeleton />}>
           <ClientDetails clientId={clientId} />
         </Suspense>
 
         <Tabs defaultValue="interactions" className="mt-6">
-          <TabsList>
+          <TabsList className="w-full max-w-md grid grid-cols-2">
             <TabsTrigger value="interactions">Interações</TabsTrigger>
             <TabsTrigger value="notes">Notas</TabsTrigger>
           </TabsList>

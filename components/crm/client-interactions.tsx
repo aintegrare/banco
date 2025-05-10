@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CalendarX, MessageSquare, Phone, Send, VideoIcon } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface ClientInteractionsProps {
   clientId: number
@@ -57,6 +59,7 @@ export function ClientInteractions({ clientId }: ClientInteractionsProps) {
   const [outcome, setOutcome] = useState("neutral")
   const [description, setDescription] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [filter, setFilter] = useState("all")
 
   useEffect(() => {
     fetchInteractions()
@@ -141,15 +144,29 @@ export function ClientInteractions({ clientId }: ClientInteractionsProps) {
     }
   }
 
+  const filteredInteractions = interactions.filter((interaction) => {
+    if (filter === "all") return true
+    return interaction.type === filter
+  })
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase()
+      .substring(0, 2)
+  }
+
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Nova Interação</CardTitle>
+        <CardHeader className="bg-[#f8fafc] border-b rounded-t-lg">
+          <CardTitle className="text-lg">Nova Interação</CardTitle>
           <CardDescription>Registre uma nova interação com o cliente</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="interaction-type" className="text-sm font-medium">
@@ -197,7 +214,7 @@ export function ClientInteractions({ clientId }: ClientInteractionsProps) {
               />
             </div>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="bg-[#f8fafc] border-t">
             <Button type="submit" className="w-full md:w-auto bg-[#4b7bb5] hover:bg-[#3d649e]" disabled={isSubmitting}>
               {isSubmitting ? (
                 "Salvando..."
@@ -213,9 +230,32 @@ export function ClientInteractions({ clientId }: ClientInteractionsProps) {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Histórico de Interações</CardTitle>
-          <CardDescription>Todas as interações registradas com este cliente</CardDescription>
+        <CardHeader className="pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <CardTitle>Histórico de Interações</CardTitle>
+              <CardDescription>
+                {filteredInteractions.length} {filteredInteractions.length === 1 ? "interação" : "interações"}{" "}
+                registradas
+              </CardDescription>
+            </div>
+            <Tabs defaultValue="all" onValueChange={setFilter} className="w-full sm:w-auto">
+              <TabsList className="grid grid-cols-4 h-8">
+                <TabsTrigger value="all" className="text-xs px-2">
+                  Todas
+                </TabsTrigger>
+                <TabsTrigger value="call" className="text-xs px-2">
+                  Ligações
+                </TabsTrigger>
+                <TabsTrigger value="email" className="text-xs px-2">
+                  Emails
+                </TabsTrigger>
+                <TabsTrigger value="meeting" className="text-xs px-2">
+                  Reuniões
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -237,18 +277,18 @@ export function ClientInteractions({ clientId }: ClientInteractionsProps) {
                 </div>
               ))}
             </div>
-          ) : interactions.length === 0 ? (
+          ) : filteredInteractions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Nenhuma interação registrada</div>
           ) : (
             <div className="space-y-4">
-              {interactions.map((interaction) => (
+              {filteredInteractions.map((interaction) => (
                 <div
                   key={interaction.id}
                   className="flex gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
-                  <div className="bg-[#4b7bb5] text-white p-2 rounded-full h-10 w-10 flex items-center justify-center shrink-0">
-                    {typeIcons[interaction.type]}
-                  </div>
+                  <Avatar className="bg-[#4b7bb5] text-white h-10 w-10 flex items-center justify-center shrink-0">
+                    <AvatarFallback>{typeIcons[interaction.type]}</AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2">

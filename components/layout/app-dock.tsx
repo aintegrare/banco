@@ -126,13 +126,13 @@ export function AppDock() {
   const mainItems = [
     { href: "/admin", icon: <LayoutDashboard size={24} />, label: "Dashboard" },
     { href: "/admin/arquivos", icon: <FileText size={24} />, label: "Arquivos" },
-    { href: "/projetos", icon: <FolderKanban size={24} />, label: "Projetos", badge: 3 },
-    { href: "/tarefas", icon: <BarChart3 size={24} />, label: "Tarefas", badge: 5 },
+    { href: "/projetos", icon: <FolderKanban size={24} />, label: "Projetos" },
+    { href: "/tarefas", icon: <BarChart3 size={24} />, label: "Tarefas" },
     { href: "/admin/blog", icon: <FileImage size={24} />, label: "Blog" },
   ]
 
   const marketingItems = [
-    { href: "/admin/clientes", icon: <Users size={24} />, label: "Clientes" },
+    { href: "/admin/crm", icon: <Users size={24} />, label: "CRM" },
     { href: "/admin/agenda", icon: <Calendar size={24} />, label: "Agenda" },
   ]
 
@@ -140,7 +140,7 @@ export function AppDock() {
     { href: "/admin/ferramentas", icon: <Wrench size={24} />, label: "Ferramentas" },
     { href: "/admin/chat", icon: <MessageSquare size={24} />, label: "Chat" },
     { href: "/search", icon: <Search size={24} />, label: "Busca" },
-    { href: "/admin/site", icon: <Globe size={24} />, label: "Site" },
+    { href: "/admin/site", icon: <Globe size={24} />, label: "Site/" },
     { href: "/admin/configuracoes", icon: <Settings size={24} />, label: "Config" },
   ]
 

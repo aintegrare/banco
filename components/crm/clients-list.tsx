@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -16,9 +18,25 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ClientDialog } from "./client-dialog"
-import { MoreHorizontal, Plus, Search } from "lucide-react"
+import {
+  ArrowUpDown,
+  Building2,
+  Calendar,
+  Clock,
+  DollarSign,
+  Filter,
+  Mail,
+  MoreHorizontal,
+  Phone,
+  Plus,
+  Search,
+  User,
+  Trash,
+} from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "@/components/ui/use-toast"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 type Client = {
   id: number
@@ -48,6 +66,16 @@ const statusColorMap: Record<string, string> = {
   perdido: "bg-red-500",
 }
 
+const segmentIcons: Record<string, React.ReactNode> = {
+  tecnologia: <Building2 className="h-4 w-4" />,
+  marketing: <Building2 className="h-4 w-4" />,
+  "e-commerce": <Building2 className="h-4 w-4" />,
+  saude: <Building2 className="h-4 w-4" />,
+  educacao: <Building2 className="h-4 w-4" />,
+  financeiro: <Building2 className="h-4 w-4" />,
+  other: <Building2 className="h-4 w-4" />,
+}
+
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -55,18 +83,31 @@ const formatCurrency = (value: number) => {
   }).format(value)
 }
 
-export function CrmClientsList() {
+interface CrmClientsListProps {
+  defaultFilter?: string
+}
+
+export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps) {
   const router = useRouter()
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("todos")
+  const [statusFilter, setStatusFilter] = useState(defaultFilter)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedClient, setSelectedClient] = useState<Client | undefined>(undefined)
+  const [sortField, setSortField] = useState<string>("name")
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [segmentFilter, setSegmentFilter] = useState("todos")
 
   useEffect(() => {
     fetchClients()
   }, [])
+
+  useEffect(() => {
+    // Atualiza o filtro quando o defaultFilter muda
+    setStatusFilter(defaultFilter)
+  }, [defaultFilter])
 
   const fetchClients = async () => {
     try {
@@ -182,13 +223,48 @@ export function CrmClientsList() {
     router.push(`/admin/crm/${clientId}`)
   }
 
-  const filteredClients = clients.filter(
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
+    } else {
+      setSortField(field)
+      setSortDirection("asc")
+    }
+  }
+
+  const sortedClients = [...clients].sort((a, b) => {
+    let comparison = 0
+
+    if (sortField === "name") {
+      comparison = a.name.localeCompare(b.name)
+    } else if (sortField === "company") {
+      comparison = a.company.localeCompare(b.company)
+    } else if (sortField === "value") {
+      comparison = a.value - b.value
+    } else if (sortField === "status") {
+      comparison = a.status.localeCompare(b.status)
+    }
+
+    return sortDirection === "asc" ? comparison : -comparison
+  })
+
+  const filteredClients = sortedClients.filter(
     (client) =>
       (client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         client.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
         client.email.toLowerCase().includes(searchQuery.toLowerCase())) &&
-      (statusFilter === "todos" || client.status === statusFilter),
+      (statusFilter === "todos" || client.status === statusFilter) &&
+      (segmentFilter === "todos" || client.segment === segmentFilter),
   )
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase()
+      .substring(0, 2)
+  }
 
   return (
     <>
@@ -196,15 +272,34 @@ export function CrmClientsList() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <CardTitle>Clientes</CardTitle>
-              <CardDescription>Gerencie seus clientes, leads e oportunidades</CardDescription>
+              <CardTitle>
+                {statusFilter === "todos" && "Todos os Clientes"}
+                {statusFilter === "cliente" && "Clientes Ativos"}
+                {statusFilter === "lead" && "Leads"}
+                {statusFilter === "oportunidade" && "Oportunidades"}
+                {statusFilter === "inativo" && "Clientes Inativos"}
+                {statusFilter === "perdido" && "Clientes Perdidos"}
+              </CardTitle>
+              <CardDescription>
+                {filteredClients.length} {filteredClients.length === 1 ? "registro" : "registros"} encontrados
+              </CardDescription>
             </div>
-            <Button className="bg-[#4b7bb5] hover:bg-[#3d649e] sm:self-start" onClick={handleCreateClient}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Cliente
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className={showAdvancedFilters ? "bg-muted" : ""}
+              >
+                <Filter className="h-4 w-4" />
+              </Button>
+              <Button className="bg-[#4b7bb5] hover:bg-[#3d649e] sm:self-start" onClick={handleCreateClient}>
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Cliente
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 mt-4">
+          <div className="flex flex-col gap-4 mt-4">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -215,111 +310,212 @@ export function CrmClientsList() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os status</SelectItem>
-                <SelectItem value="lead">Lead</SelectItem>
-                <SelectItem value="oportunidade">Oportunidade</SelectItem>
-                <SelectItem value="cliente">Cliente</SelectItem>
-                <SelectItem value="inativo">Inativo</SelectItem>
-                <SelectItem value="perdido">Perdido</SelectItem>
-              </SelectContent>
-            </Select>
+
+            {showAdvancedFilters && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os status</SelectItem>
+                    <SelectItem value="lead">Lead</SelectItem>
+                    <SelectItem value="oportunidade">Oportunidade</SelectItem>
+                    <SelectItem value="cliente">Cliente</SelectItem>
+                    <SelectItem value="inativo">Inativo</SelectItem>
+                    <SelectItem value="perdido">Perdido</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={segmentFilter} onValueChange={setSegmentFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Segmento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os segmentos</SelectItem>
+                    <SelectItem value="tecnologia">Tecnologia</SelectItem>
+                    <SelectItem value="marketing">Marketing</SelectItem>
+                    <SelectItem value="e-commerce">E-commerce</SelectItem>
+                    <SelectItem value="saude">Saúde</SelectItem>
+                    <SelectItem value="educacao">Educação</SelectItem>
+                    <SelectItem value="financeiro">Financeiro</SelectItem>
+                    <SelectItem value="other">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome / Empresa</TableHead>
-                <TableHead>Contato</TableHead>
-                <TableHead>Segmento</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                Array.from({ length: 5 }).map((_, index) => (
-                  <TableRow key={`loading-${index}`}>
-                    <TableCell colSpan={6} className="h-12 animate-pulse bg-muted/50"></TableCell>
-                  </TableRow>
-                ))
-              ) : filteredClients.length === 0 ? (
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    Nenhum cliente encontrado
-                  </TableCell>
+                  <TableHead className="w-[250px]">
+                    <Button
+                      variant="ghost"
+                      className="p-0 font-medium flex items-center"
+                      onClick={() => handleSort("name")}
+                    >
+                      Cliente / Empresa
+                      <ArrowUpDown className={`ml-2 h-3 w-3 ${sortField === "name" ? "opacity-100" : "opacity-50"}`} />
+                    </Button>
+                  </TableHead>
+                  <TableHead>Contato</TableHead>
+                  <TableHead>Segmento</TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      className="p-0 font-medium flex items-center"
+                      onClick={() => handleSort("status")}
+                    >
+                      Status
+                      <ArrowUpDown
+                        className={`ml-2 h-3 w-3 ${sortField === "status" ? "opacity-100" : "opacity-50"}`}
+                      />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    <Button
+                      variant="ghost"
+                      className="p-0 font-medium flex items-center ml-auto"
+                      onClick={() => handleSort("value")}
+                    >
+                      Valor
+                      <ArrowUpDown className={`ml-2 h-3 w-3 ${sortField === "value" ? "opacity-100" : "opacity-50"}`} />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
-              ) : (
-                filteredClients.map((client) => (
-                  <TableRow
-                    key={client.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleViewClient(client.id)}
-                  >
-                    <TableCell>
-                      <div className="font-medium">{client.name}</div>
-                      <div className="text-sm text-muted-foreground">{client.company}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div>{client.email}</div>
-                      <div className="text-sm text-muted-foreground">{client.phone}</div>
-                    </TableCell>
-                    <TableCell>{client.segment}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className={`${statusColorMap[client.status]} text-white`}>
-                        {client.status.charAt(0).toUpperCase() + client.status.slice(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(client.value)}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleViewClient(client.id)
-                            }}
-                          >
-                            Ver detalhes
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleEditClient(client)
-                            }}
-                          >
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-600"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteClient(client.id)
-                            }}
-                          >
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={`loading-${index}`}>
+                      <TableCell colSpan={6} className="h-12 animate-pulse bg-muted/50"></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredClients.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      Nenhum cliente encontrado
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  filteredClients.map((client) => (
+                    <TableRow
+                      key={client.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleViewClient(client.id)}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-9 w-9 bg-[#4b7bb5] text-white">
+                            <AvatarFallback>{getInitials(client.name)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-medium">{client.name}</div>
+                            <div className="text-sm text-muted-foreground">{client.company}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-1">
+                                <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="text-sm truncate max-w-[120px]">{client.email}</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <p>{client.email}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <div className="flex items-center gap-1 mt-1">
+                          <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-sm">{client.phone}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          {segmentIcons[client.segment] || <Building2 className="h-4 w-4 text-[#4b7bb5]" />}
+                          <span className="capitalize">{client.segment}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={`${statusColorMap[client.status]} text-white`}>
+                          {client.status.charAt(0).toUpperCase() + client.status.slice(1)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">{formatCurrency(client.value)}</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleViewClient(client.id)
+                              }}
+                            >
+                              <User className="h-4 w-4 mr-2" />
+                              Ver detalhes
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEditClient(client)
+                              }}
+                            >
+                              <Calendar className="h-4 w-4 mr-2" />
+                              Agendar interação
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEditClient(client)
+                              }}
+                            >
+                              <Clock className="h-4 w-4 mr-2" />
+                              Registrar contato
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEditClient(client)
+                              }}
+                            >
+                              <DollarSign className="h-4 w-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-600"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteClient(client.id)
+                              }}
+                            >
+                              <Trash className="h-4 w-4 mr-2" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

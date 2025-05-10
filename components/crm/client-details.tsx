@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Building2, Globe, Mail, MapPin, Phone, User } from "lucide-react"
+import { Building2, Calendar, Clock, Globe, Mail, MapPin, Phone, User } from "lucide-react"
 import { ClientDialog } from "./client-dialog"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useRouter } from "next/navigation"
 import { toast } from "@/components/ui/use-toast"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Progress } from "@/components/ui/progress"
 
 interface ClientDetailsProps {
   clientId: number
@@ -49,6 +51,14 @@ const statusColorMap: Record<string, string> = {
   cliente: "bg-green-500",
   inativo: "bg-gray-500",
   perdido: "bg-red-500",
+}
+
+const statusProgressMap: Record<string, number> = {
+  lead: 20,
+  oportunidade: 60,
+  cliente: 100,
+  inativo: 100,
+  perdido: 100,
 }
 
 const formatCurrency = (value: number) => {
@@ -166,6 +176,15 @@ export function ClientDetails({ clientId }: ClientDetailsProps) {
     }
   }
 
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase()
+      .substring(0, 2)
+  }
+
   if (loading) {
     return (
       <Card>
@@ -209,116 +228,172 @@ export function ClientDetails({ clientId }: ClientDetailsProps) {
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between">
-          <div>
-            <CardTitle className="text-2xl">{client.name}</CardTitle>
-            <CardDescription className="text-lg mt-1">{client.company}</CardDescription>
-          </div>
-          <Badge variant="secondary" className={`${statusColorMap[client.status]} text-white`}>
-            {client.status.charAt(0).toUpperCase() + client.status.slice(1)}
-          </Badge>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Informações de Contato</h3>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <Mail className="h-4 w-4 text-[#4b7bb5]" />
-                  <span>{client.email}</span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-start justify-between pb-2">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16 bg-[#4b7bb5] text-white text-xl">
+                <AvatarFallback>{getInitials(client.name)}</AvatarFallback>
+              </Avatar>
+              <div>
+                <CardTitle className="text-2xl">{client.name}</CardTitle>
+                <CardDescription className="text-lg mt-1">{client.company}</CardDescription>
+              </div>
+            </div>
+            <Badge variant="secondary" className={`${statusColorMap[client.status]} text-white`}>
+              {client.status.charAt(0).toUpperCase() + client.status.slice(1)}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            {(client.status === "lead" || client.status === "oportunidade") && (
+              <div className="mb-6">
+                <div className="flex justify-between mb-2 text-sm">
+                  <span>Progresso</span>
+                  <span>{statusProgressMap[client.status]}%</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-4 w-4 text-[#4b7bb5]" />
-                  <span>{client.phone}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <MapPin className="h-4 w-4 text-[#4b7bb5]" />
-                  <span>{client.address}</span>
-                </div>
-                {client.website && (
+                <Progress value={statusProgressMap[client.status]} className="h-2" />
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <User className="h-5 w-5 text-[#4b7bb5]" />
+                  Informações de Contato
+                </h3>
+                <div className="space-y-3 pl-7">
                   <div className="flex items-center gap-2 text-sm">
-                    <Globe className="h-4 w-4 text-[#4b7bb5]" />
-                    <a
-                      href={client.website.startsWith("http") ? client.website : `https://${client.website}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[#4b7bb5] hover:underline"
-                    >
-                      {client.website}
-                    </a>
+                    <Mail className="h-4 w-4 text-[#4b7bb5]" />
+                    <span>{client.email}</span>
                   </div>
-                )}
+                  <div className="flex items-center gap-2 text-sm">
+                    <Phone className="h-4 w-4 text-[#4b7bb5]" />
+                    <span>{client.phone}</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-sm">
+                    <MapPin className="h-4 w-4 text-[#4b7bb5] mt-0.5" />
+                    <span className="flex-1">{client.address}</span>
+                  </div>
+                  {client.website && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Globe className="h-4 w-4 text-[#4b7bb5]" />
+                      <a
+                        href={client.website.startsWith("http") ? client.website : `https://${client.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#4b7bb5] hover:underline"
+                      >
+                        {client.website}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-[#4b7bb5]" />
+                  Informações Empresariais
+                </h3>
+                <div className="space-y-3 pl-7">
+                  {client.cnpj && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-medium">CNPJ:</span>
+                      <span>{client.cnpj}</span>
+                    </div>
+                  )}
+                  {client.contact_name && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-medium">Contato:</span>
+                      <span>
+                        {client.contact_name}
+                        {client.contact_position && ` (${client.contact_position})`}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-medium">Segmento:</span>
+                    <span className="capitalize">{client.segment}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-medium">Valor:</span>
+                    <span className="font-bold text-[#4b7bb5]">{formatCurrency(client.value)}</span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Informações Empresariais</h3>
-              <div className="space-y-2">
-                {client.cnpj && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Building2 className="h-4 w-4 text-[#4b7bb5]" />
-                    <span>CNPJ: {client.cnpj}</span>
-                  </div>
-                )}
-                {client.contact_name && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <User className="h-4 w-4 text-[#4b7bb5]" />
-                    <span>
-                      Contato: {client.contact_name}
-                      {client.contact_position && ` (${client.contact_position})`}
-                    </span>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="font-semibold">Segmento:</span>
-                  <span>{client.segment.charAt(0).toUpperCase() + client.segment.slice(1)}</span>
+            {client.notes && (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+                  <Calendar className="h-5 w-5 text-[#4b7bb5]" />
+                  Observações
+                </h3>
+                <div className="bg-muted/30 p-4 rounded-md text-sm whitespace-pre-wrap border border-muted">
+                  {client.notes}
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="font-semibold">Valor:</span>
-                  <span>{formatCurrency(client.value)}</span>
+              </div>
+            )}
+
+            <div className="mt-6 flex gap-2 justify-end">
+              <Button variant="outline" onClick={handleEditClient}>
+                Editar Cliente
+              </Button>
+              <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}>
+                Excluir Cliente
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Histórico</CardTitle>
+            <CardDescription>Atividades recentes</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <div className="relative">
+                  <div className="h-8 w-8 rounded-full bg-[#4b7bb5] flex items-center justify-center text-white">
+                    <Clock className="h-4 w-4" />
+                  </div>
+                  <div className="absolute top-8 bottom-0 left-1/2 w-px -translate-x-1/2 bg-border"></div>
+                </div>
+                <div className="space-y-1 pb-4">
+                  <p className="text-sm font-medium">Cliente criado</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(client.created_at)}</p>
+                </div>
+              </div>
+
+              {client.last_contact && (
+                <div className="flex gap-3">
+                  <div className="relative">
+                    <div className="h-8 w-8 rounded-full bg-[#4b7bb5] flex items-center justify-center text-white">
+                      <Phone className="h-4 w-4" />
+                    </div>
+                    <div className="absolute top-8 bottom-0 left-1/2 w-px -translate-x-1/2 bg-border"></div>
+                  </div>
+                  <div className="space-y-1 pb-4">
+                    <p className="text-sm font-medium">Último contato</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(client.last_contact)}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <div className="h-8 w-8 rounded-full bg-[#4b7bb5] flex items-center justify-center text-white">
+                  <Calendar className="h-4 w-4" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Última atualização</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(client.updated_at)}</p>
                 </div>
               </div>
             </div>
-
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Datas</h3>
-              <div className="space-y-2">
-                {client.last_contact && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="font-semibold">Último contato:</span>
-                    <span>{formatDate(client.last_contact)}</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="font-semibold">Criado em:</span>
-                  <span>{formatDate(client.created_at)}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="font-semibold">Atualizado em:</span>
-                  <span>{formatDate(client.updated_at)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {client.notes && (
-            <div className="mt-6">
-              <h3 className="text-lg font-semibold mb-2">Observações</h3>
-              <p className="text-sm whitespace-pre-wrap">{client.notes}</p>
-            </div>
-          )}
-
-          <div className="mt-6 flex gap-2 justify-end">
-            <Button variant="outline" onClick={handleEditClient}>
-              Editar Cliente
-            </Button>
-            <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}>
-              Excluir Cliente
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       {client && (
         <ClientDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} client={client} onSave={handleSaveClient} />
