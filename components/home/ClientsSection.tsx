@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { motion } from "framer-motion"
 
 export function ClientsSection() {
   const [isVisible, setIsVisible] = useState(false)
@@ -26,19 +27,42 @@ export function ClientsSection() {
   }, [])
 
   const clients = [
-    { name: "Cliente 1", logo: "/client-logo-1.png" },
-    { name: "Cliente 2", logo: "/client-logo-2.png" },
-    { name: "Cliente 3", logo: "/client-logo-3.png" },
-    { name: "Cliente 4", logo: "/client-logo-4.png" },
-    { name: "Cliente 5", logo: "/client-logo-5.png" },
-    { name: "Cliente 6", logo: "/client-logo-6.png" },
-    { name: "Cliente 7", logo: "/client-logo-7.png" },
-    { name: "Cliente 8", logo: "/client-logo-8.png" },
+    { name: "Carla Mendes", logo: "/clients/carla-mendes.png" },
+    { name: "YouMais", logo: "/clients/youmais.png" },
+    { name: "Sanches Odontologia", logo: "/clients/sanches-odontologia.png" },
+    { name: "Espaço Chic Boutique", logo: "/clients/espaco-chic.jpeg" },
+    { name: "Marina Regiani", logo: "/clients/marina-regiani.png" },
+    { name: "Portal da Cidade", logo: "/clients/portal-cidade.png" },
+    { name: "Wood 4 All", logo: "/clients/wood4all.png" },
+    { name: "Jon Ric Medical Spa", logo: "/clients/jonric.png" },
+    { name: "Eletro Beltrão", logo: "/clients/eletro-beltrao.png" },
+    { name: "Cacau Show", logo: "/clients/cacau-show.png" },
   ]
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+      },
+    },
+  }
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.5,
+      },
+    },
+  }
 
   return (
     <section id="clientes" ref={sectionRef} className="py-20 bg-[#f2f1ef] dark:bg-gray-800">
-      <div className="container">
+      <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold tracking-tight text-[#3d649e] dark:text-[#6b91c1] sm:text-4xl">
             Nossos Clientes
@@ -49,23 +73,24 @@ export function ClientsSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+        <motion.div
+          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8"
+          variants={containerVariants}
+          initial="hidden"
+          animate={isVisible ? "visible" : "hidden"}
+        >
           {clients.map((client, index) => (
-            <div
-              key={index}
-              className={`transition-all duration-500 ${isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}
-              style={{ transitionDelay: `${100 * index}ms` }}
-            >
-              <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center h-32">
+            <motion.div key={index} variants={itemVariants} className="flex items-center justify-center">
+              <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center h-32 w-full">
                 <img
-                  src={client.logo || "/placeholder.svg?height=80&width=160&query=logo"}
+                  src={client.logo || "/placeholder.svg"}
                   alt={client.name}
                   className="max-h-16 max-w-full grayscale hover:grayscale-0 transition-all duration-300"
                 />
               </div>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   )
