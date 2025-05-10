@@ -88,45 +88,16 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 }
 
 export default async function BlogPostPage({ params }: { params: { slug: string } }) {
-  // Dados de exemplo para desenvolvimento
-  const dummyPost = {
-    id: "1",
-    title: "Post de Exemplo",
-    slug: params.slug,
-    excerpt: "Este é um post de exemplo para desenvolvimento.",
-    content: `
-      <p>Este é um post de exemplo para desenvolvimento. O conteúdo real será carregado do banco de dados.</p>
-      <p>O slug solicitado foi: <strong>${params.slug}</strong></p>
-      <p>Se você está vendo esta página, significa que o post com este slug não foi encontrado no banco de dados, mas estamos mostrando este conteúdo de exemplo para fins de desenvolvimento.</p>
-      <p>Em produção, você pode querer redirecionar para uma página 404 ou mostrar uma mensagem mais amigável.</p>
-    `,
-    featured_image: "/blog-post-concept.png",
-    author: {
-      name: "Autor de Teste",
-      avatar_url: "/diverse-avatars.png",
-      bio: "Este é um autor de teste para desenvolvimento.",
-    },
-    category: {
-      name: "Categoria de Teste",
-      slug: "categoria-teste",
-    },
-    published_at: new Date().toISOString(),
-    read_time: "3 min",
-  }
-
   // Buscar o post pelo slug
   const post = await getPostBySlug(params.slug)
 
-  // Se estamos em desenvolvimento e o post não foi encontrado, usar dados de exemplo
-  const postData = process.env.NODE_ENV === "development" && !post ? dummyPost : post
-
-  // Se não estamos em desenvolvimento e o post não foi encontrado, mostrar página 404
-  if (!postData && process.env.NODE_ENV !== "development") {
+  // Se o post não foi encontrado, mostrar página 404
+  if (!post) {
     notFound()
   }
 
   // Formatar a data de publicação
-  const publishDate = postData?.published_at ? new Date(postData.published_at) : new Date()
+  const publishDate = post?.published_at ? new Date(post.published_at) : new Date()
   const formattedDate = publishDate.toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "long",
@@ -134,7 +105,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
   })
 
   // Buscar posts relacionados
-  const relatedPosts = postData?.category?.id ? await getRelatedPosts(postData.category.id, postData.id) : []
+  const relatedPosts = post?.category?.id ? await getRelatedPosts(post.category.id, post.id) : []
 
   return (
     <div className="min-h-screen bg-[#f2f1ef]">
@@ -154,10 +125,10 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
             {/* Cabeçalho do post */}
             <div>
               <div className="inline-block px-3 py-1 bg-[#4b7bb5] text-white text-sm rounded-md mb-4">
-                {postData?.category?.name || "Sem categoria"}
+                {post?.category?.name || "Sem categoria"}
               </div>
               <h1 className="text-3xl md:text-4xl font-bold text-[#4072b0] mb-4">
-                {postData?.title || "Post não encontrado"}
+                {post?.title || "Post não encontrado"}
               </h1>
               <div className="flex items-center text-sm text-gray-600 mb-6 space-x-4">
                 <div className="flex items-center">
@@ -166,7 +137,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
                 </div>
                 <div className="flex items-center">
                   <Clock className="h-4 w-4 mr-1" />
-                  <span>{postData?.read_time || "3 min"} de leitura</span>
+                  <span>{post?.read_time || "3 min"} de leitura</span>
                 </div>
               </div>
             </div>
@@ -174,8 +145,8 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
             {/* Imagem de capa */}
             <div className="rounded-lg overflow-hidden mb-8">
               <img
-                src={postData?.featured_image || "/placeholder.svg?height=600&width=1200&query=blog post"}
-                alt={postData?.title || "Post não encontrado"}
+                src={post?.featured_image || "/placeholder.svg?height=600&width=1200&query=blog post"}
+                alt={post?.title || "Post não encontrado"}
                 className="w-full h-auto"
               />
             </div>
@@ -183,15 +154,15 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
             {/* Conteúdo do post */}
             <div
               className="prose prose-blue max-w-none"
-              dangerouslySetInnerHTML={{ __html: postData?.content || "<p>Conteúdo não disponível</p>" }}
+              dangerouslySetInnerHTML={{ __html: post?.content || "<p>Conteúdo não disponível</p>" }}
             />
 
             {/* Autor */}
-            {postData?.author && <BlogAuthor author={postData.author} />}
+            {post?.author && <BlogAuthor author={post.author} />}
 
             {/* Compartilhar */}
             <BlogShareButtons
-              title={postData?.title || "Post do Blog Integrare"}
+              title={post?.title || "Post do Blog Integrare"}
               url={`https://contatos.redeintegrare.com.br/blog/${params.slug}`}
             />
           </div>

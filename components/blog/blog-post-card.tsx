@@ -1,5 +1,4 @@
 import Link from "next/link"
-import { Calendar, Clock } from "lucide-react"
 
 interface Author {
   id: number
@@ -14,7 +13,7 @@ interface Category {
 }
 
 interface BlogPost {
-  id: number
+  id: number | string
   title: string
   slug: string
   excerpt: string
@@ -22,7 +21,7 @@ interface BlogPost {
   author: Author
   category: Category
   published_at: string
-  readTime?: string
+  read_time?: string
 }
 
 interface BlogPostCardProps {
@@ -36,12 +35,12 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
   const publishDate = post.published_at ? new Date(post.published_at) : new Date()
   const formattedDate = publishDate.toLocaleDateString("pt-BR", {
     day: "2-digit",
-    month: "short",
+    month: "long",
     year: "numeric",
   })
 
   // Calcular tempo de leitura se não for fornecido
-  const readTime = post.readTime || `${Math.ceil(post.excerpt.length / 600)} min`
+  const readTime = post.read_time || `${Math.ceil(post.excerpt.length / 600)} min`
 
   if (variant === "compact") {
     return (
@@ -61,9 +60,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
             >
               {post.title}
             </Link>
-            <div className="flex items-center mt-1 text-xs text-gray-500">
-              <span>{readTime} de leitura</span>
-            </div>
+            <p className="text-xs text-gray-500 mt-1">{readTime} de leitura</p>
           </div>
         </div>
       </div>
@@ -72,18 +69,16 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
 
   if (variant === "horizontal") {
     return (
-      <div
-        className={`bg-white rounded-lg shadow-sm overflow-hidden group border border-gray-100 hover:shadow-md transition-all duration-300 ${className}`}
-      >
+      <div className={`bg-white rounded-lg shadow-sm overflow-hidden group ${className}`}>
         <div className="flex flex-col md:flex-row">
           <div className="md:w-1/3 h-48 md:h-auto relative overflow-hidden">
             <img
               src={post.featured_image || "/placeholder.svg"}
               alt={post.title}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
             <div className="absolute top-3 left-3">
-              <span className="inline-block px-3 py-1 bg-[#4b7bb5]/10 text-[#4b7bb5] text-xs rounded-full">
+              <span className="inline-block px-3 py-1 bg-[#4b7bb5] text-white text-xs rounded-md">
                 {post.category?.name || "Sem categoria"}
               </span>
             </div>
@@ -105,7 +100,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
                 <img
                   src={post.author?.avatar_url || "/placeholder.svg"}
                   alt={post.author?.name || "Autor"}
-                  className="w-8 h-8 rounded-full mr-2 object-cover border border-white shadow-sm"
+                  className="w-8 h-8 rounded-full mr-2 object-cover"
                 />
                 <div>
                   <span className="text-sm font-medium">{post.author?.name || "Autor desconhecido"}</span>
@@ -132,17 +127,15 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
 
   // Default variant
   return (
-    <div
-      className={`bg-white rounded-lg shadow-sm overflow-hidden flex flex-col h-full group border border-gray-100 hover:shadow-md transition-all duration-300 ${className}`}
-    >
+    <div className={`bg-white rounded-lg shadow-sm overflow-hidden flex flex-col h-full group ${className}`}>
       <div className="relative h-48 overflow-hidden">
         <img
           src={post.featured_image || "/placeholder.svg"}
           alt={post.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <div className="absolute top-3 left-3">
-          <span className="inline-block px-3 py-1 bg-[#4b7bb5]/10 text-[#4b7bb5] text-xs rounded-full">
+          <span className="inline-block px-3 py-1 bg-[#4b7bb5] text-white text-xs rounded-md">
             {post.category?.name || "Sem categoria"}
           </span>
         </div>
@@ -150,13 +143,11 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
 
       <div className="p-5 flex-grow flex flex-col">
         <div className="flex items-center text-xs text-gray-500 mb-2">
-          <Calendar className="h-3 w-3 mr-1 text-[#4b7bb5]" />
           <span>
             {formattedDate.split(" de ")[0]} {formattedDate.split(" de ")[1]?.substring(0, 3)},{" "}
             {formattedDate.split(" de ")[2]}
           </span>
           <span className="mx-2">•</span>
-          <Clock className="h-3 w-3 mr-1 text-[#4b7bb5]" />
           <span>{readTime}</span>
         </div>
 
@@ -173,7 +164,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
             <img
               src={post.author?.avatar_url || "/placeholder.svg"}
               alt={post.author?.name || "Autor"}
-              className="w-8 h-8 rounded-full mr-2 object-cover border border-white shadow-sm"
+              className="w-8 h-8 rounded-full mr-2 object-cover"
             />
             <span className="text-sm text-gray-700">{post.author?.name || "Autor desconhecido"}</span>
           </div>

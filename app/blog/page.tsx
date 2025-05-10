@@ -1,18 +1,48 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { BlogPostCard } from "@/components/blog/blog-post-card"
+import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, ArrowRight } from "lucide-react"
+import { PlusCircle } from "lucide-react"
+import { BlogCategories } from "@/components/blog/blog-categories"
 import { BlogFeaturedPost } from "@/components/blog/blog-featured-post"
 import { BlogSearch } from "@/components/blog/blog-search"
+import { createClient } from "@/lib/supabase/server"
 
 export const metadata: Metadata = {
   title: "Blog | Integrare",
   description: "Conteúdos sobre marketing, negócios e tecnologia da Integrare",
 }
 
-// Dados de exemplo para os posts do blog
-const blogPosts = [
+// Função para buscar posts do banco de dados
+async function getPosts() {
+  try {
+    const supabase = createClient()
+
+    const { data, error } = await supabase
+      .from("blog_posts")
+      .select(`
+        *,
+        author:blog_authors(id, name, avatar_url),
+        category:blog_categories(id, name, slug)
+      `)
+      .order("created_at", { ascending: false })
+      .limit(10)
+
+    if (error) {
+      console.error("Erro ao buscar posts:", error)
+      return []
+    }
+
+    return data || []
+  } catch (error) {
+    console.error("Erro ao buscar posts:", error)
+    return []
+  }
+}
+
+// Dados de exemplo para os posts do blog (usados apenas se não houver dados no banco)
+const dummyPosts = [
   {
     id: "1",
     title: "Como o Marketing Digital Transformou os Negócios em 2023",
@@ -20,14 +50,19 @@ const blogPosts = [
     excerpt:
       "Descubra as principais tendências de marketing digital que impactaram os negócios no último ano e como se preparar para o futuro.",
     content: "",
-    coverImage: "/digital-marketing-concept.png",
+    featured_image: "/digital-marketing-concept.png",
     author: {
+      id: 1,
       name: "Ana Silva",
-      avatar: "/woman-profile.png",
+      avatar_url: "/woman-profile.png",
     },
-    category: "Marketing Digital",
-    publishedAt: "2023-12-15T10:00:00Z",
-    readTime: "5 min",
+    category: {
+      id: 1,
+      name: "Marketing Digital",
+      slug: "marketing-digital",
+    },
+    published_at: "2023-12-15T10:00:00Z",
+    read_time: "5 min",
     featured: true,
   },
   {
@@ -37,14 +72,19 @@ const blogPosts = [
     excerpt:
       "Um guia completo sobre como pequenas empresas podem melhorar seu posicionamento nos mecanismos de busca sem grandes investimentos.",
     content: "",
-    coverImage: "/seo-strategies-concept.png",
+    featured_image: "/seo-strategies-concept.png",
     author: {
+      id: 2,
       name: "Carlos Mendes",
-      avatar: "/man-profile.png",
+      avatar_url: "/man-profile.png",
     },
-    category: "SEO",
-    publishedAt: "2023-11-28T14:30:00Z",
-    readTime: "8 min",
+    category: {
+      id: 2,
+      name: "SEO",
+      slug: "seo",
+    },
+    published_at: "2023-11-28T14:30:00Z",
+    read_time: "8 min",
     featured: false,
   },
   {
@@ -54,14 +94,19 @@ const blogPosts = [
     excerpt:
       "Como utilizar as redes sociais de forma estratégica para aumentar o engajamento e a fidelização de clientes.",
     content: "",
-    coverImage: "/social-media-marketing.png",
+    featured_image: "/social-media-marketing.png",
     author: {
+      id: 3,
       name: "Juliana Costa",
-      avatar: "/professional-woman-profile.png",
+      avatar_url: "/professional-woman-profile.png",
     },
-    category: "Redes Sociais",
-    publishedAt: "2023-11-10T09:15:00Z",
-    readTime: "6 min",
+    category: {
+      id: 3,
+      name: "Redes Sociais",
+      slug: "redes-sociais",
+    },
+    published_at: "2023-11-10T09:15:00Z",
+    read_time: "6 min",
     featured: false,
   },
   {
@@ -71,14 +116,19 @@ const blogPosts = [
     excerpt:
       "A importância da análise de dados para tomada de decisões estratégicas e como implementar uma cultura data-driven na sua empresa.",
     content: "",
-    coverImage: "/data-analysis-visual.png",
+    featured_image: "/data-analysis-visual.png",
     author: {
+      id: 4,
       name: "Ricardo Oliveira",
-      avatar: "/man-profile-glasses.png",
+      avatar_url: "/man-profile-glasses.png",
     },
-    category: "Análise de Dados",
-    publishedAt: "2023-10-25T16:45:00Z",
-    readTime: "7 min",
+    category: {
+      id: 4,
+      name: "Análise de Dados",
+      slug: "analise-de-dados",
+    },
+    published_at: "2023-10-25T16:45:00Z",
+    read_time: "7 min",
     featured: false,
   },
   {
@@ -88,14 +138,19 @@ const blogPosts = [
     excerpt:
       "Dicas práticas para criar campanhas de e-mail marketing eficientes que geram conversões e fortalecem o relacionamento com clientes.",
     content: "",
-    coverImage: "/email-marketing-campaign.png",
+    featured_image: "/email-marketing-concept.png",
     author: {
+      id: 5,
       name: "Fernanda Lima",
-      avatar: "/professional-woman-avatar.png",
+      avatar_url: "/woman-profile.png",
     },
-    category: "E-mail Marketing",
-    publishedAt: "2023-10-12T11:20:00Z",
-    readTime: "5 min",
+    category: {
+      id: 5,
+      name: "E-mail Marketing",
+      slug: "email-marketing",
+    },
+    published_at: "2023-10-12T11:20:00Z",
+    read_time: "5 min",
     featured: false,
   },
   {
@@ -105,139 +160,81 @@ const blogPosts = [
     excerpt:
       "As principais tendências de marketing que devem dominar o mercado em 2024 e como se preparar para aproveitar essas oportunidades.",
     content: "",
-    coverImage: "/marketing-trends-2024.png",
+    featured_image: "/marketing-trends.png",
     author: {
+      id: 6,
       name: "Paulo Santos",
-      avatar: "/professional-man-avatar.png",
+      avatar_url: "/man-profile.png",
     },
-    category: "Tendências",
-    publishedAt: "2023-12-05T13:40:00Z",
-    readTime: "9 min",
+    category: {
+      id: 6,
+      name: "Tendências",
+      slug: "tendencias",
+    },
+    published_at: "2023-12-05T13:40:00Z",
+    read_time: "9 min",
     featured: false,
   },
 ]
 
-// Encontrar o post em destaque
-const featuredPost = blogPosts.find((post) => post.featured)
+export default async function BlogPage() {
+  // Buscar posts do banco de dados
+  const dbPosts = await getPosts()
 
-// Filtrar os posts que não estão em destaque
-const regularPosts = blogPosts.filter((post) => !post.featured)
+  // Usar dados do banco ou dados de exemplo se não houver dados no banco
+  const blogPosts = dbPosts.length > 0 ? dbPosts : dummyPosts
 
-export default function BlogPage() {
+  // Encontrar o post em destaque
+  const featuredPost = blogPosts.find((post) => post.featured === true)
+
+  // Filtrar os posts que não estão em destaque
+  const regularPosts = blogPosts.filter((post) => post.featured !== true)
+
   return (
     <div className="min-h-screen bg-[#f2f1ef]">
-      {/* Header com padrão de fundo */}
-      <div className="relative bg-[#4072b0] text-white overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <img src="/pattern-bg.png" alt="" className="w-full h-full object-cover" />
-        </div>
-        <div className="container relative z-10 py-16 px-4">
-          <div className="max-w-3xl mx-auto text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Blog da Integrare</h1>
-            <p className="text-xl opacity-90 mb-8">
-              Conteúdos sobre marketing, negócios e tecnologia para impulsionar sua empresa
-            </p>
-            <div className="flex justify-center gap-4">
-              <Link href="/blog/admin/novo">
-                <Button className="bg-white text-[#4072b0] hover:bg-gray-100">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Novo Post
-                </Button>
-              </Link>
-              <Link href="#categorias">
-                <Button variant="outline" className="border-white text-white hover:bg-white/10">
-                  Explorar Categorias
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
+      <PageHeader
+        title="Blog da Integrare"
+        description="Conteúdos sobre marketing, negócios e tecnologia"
+        actions={
+          <Link href="/blog/admin/novo">
+            <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Novo Post
+            </Button>
+          </Link>
+        }
+      />
 
-        {/* Forma decorativa */}
-        <div
-          className="absolute bottom-0 left-0 right-0 h-16 bg-[#f2f1ef]"
-          style={{
-            clipPath: "polygon(0 100%, 100% 100%, 100% 0, 0 100%)",
-          }}
-        ></div>
-      </div>
-
-      <div className="container mx-auto px-4 py-12">
-        {/* Post em destaque */}
-        {featuredPost && (
-          <div className="mb-16">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold text-[#4072b0]">Post em Destaque</h2>
-              <Link
-                href="/blog/categoria/destaque"
-                className="text-[#4b7bb5] hover:text-[#3d649e] flex items-center text-sm font-medium"
-              >
-                Ver todos os destaques
-                <ArrowRight className="ml-1 h-4 w-4" />
-              </Link>
-            </div>
-            <BlogFeaturedPost post={featuredPost} />
-          </div>
-        )}
-
+      <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Coluna principal */}
-          <div className="lg:col-span-2 space-y-12">
-            {/* Lista de posts */}
-            <div className="space-y-8">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-[#4072b0]">Posts Recentes</h2>
-                <Link
-                  href="/blog/todos"
-                  className="text-[#4b7bb5] hover:text-[#3d649e] flex items-center text-sm font-medium"
-                >
-                  Ver todos os posts
-                  <ArrowRight className="ml-1 h-4 w-4" />
-                </Link>
-              </div>
+          <div className="lg:col-span-2 space-y-8">
+            {/* Post em destaque */}
+            {featuredPost && <BlogFeaturedPost post={featuredPost} />}
 
+            {/* Lista de posts */}
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-[#4072b0]">Posts Recentes</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {regularPosts.slice(0, 4).map((post, index) => (
-                  <div key={post.id}>
-                    <BlogPostCard
-                      post={{
-                        id: Number(post.id),
-                        title: post.title,
-                        slug: post.slug,
-                        excerpt: post.excerpt,
-                        featured_image: post.coverImage,
-                        author: {
-                          id: 1,
-                          name: post.author.name,
-                          avatar_url: post.author.avatar,
-                        },
-                        category: {
-                          id: 1,
-                          name: post.category,
-                          slug: post.category.toLowerCase().replace(/ /g, "-"),
-                        },
-                        published_at: post.publishedAt,
-                        readTime: post.readTime,
-                      }}
-                    />
-                  </div>
+                {regularPosts.map((post) => (
+                  <BlogPostCard key={post.id} post={post} />
                 ))}
               </div>
 
               {/* Paginação */}
-              <div className="flex justify-center mt-12">
-                <div className="inline-flex items-center rounded-md border border-[#4b7bb5]/20 bg-white p-1 shadow-sm">
-                  <Button variant="outline" className="border-[#4b7bb5]/20 text-[#4b7bb5] hover:bg-[#4b7bb5]/5">
+              <div className="flex justify-center mt-8">
+                <div className="flex space-x-2">
+                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
                     Anterior
                   </Button>
-                  <Button className="bg-[#4b7bb5] hover:bg-[#3d649e] text-white">1</Button>
-                  <Button variant="outline" className="border-[#4b7bb5]/20 text-[#4b7bb5] hover:bg-[#4b7bb5]/5">
+                  <Button className="bg-[#4b7bb5] hover:bg-[#3d649e]">1</Button>
+                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
                     2
                   </Button>
-                  <Button variant="outline" className="border-[#4b7bb5]/20 text-[#4b7bb5] hover:bg-[#4b7bb5]/5">
+                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
                     3
                   </Button>
-                  <Button variant="outline" className="border-[#4b7bb5]/20 text-[#4b7bb5] hover:bg-[#4b7bb5]/5">
+                  <Button variant="outline" className="border-[#4b7bb5] text-[#4b7bb5]">
                     Próxima
                   </Button>
                 </div>
@@ -248,82 +245,29 @@ export default function BlogPage() {
           {/* Barra lateral */}
           <div className="space-y-8">
             <BlogSearch />
-
-            <div id="categorias" className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
-              <h3 className="text-xl font-bold text-[#4072b0] mb-4">Categorias</h3>
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href="/blog/categoria/marketing-digital"
-                  className="px-3 py-1.5 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors"
-                >
-                  Marketing Digital
-                </Link>
-                <Link
-                  href="/blog/categoria/seo"
-                  className="px-3 py-1.5 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors"
-                >
-                  SEO
-                </Link>
-                <Link
-                  href="/blog/categoria/redes-sociais"
-                  className="px-3 py-1.5 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors"
-                >
-                  Redes Sociais
-                </Link>
-                <Link
-                  href="/blog/categoria/analise-de-dados"
-                  className="px-3 py-1.5 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors"
-                >
-                  Análise de Dados
-                </Link>
-                <Link
-                  href="/blog/categoria/email-marketing"
-                  className="px-3 py-1.5 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors"
-                >
-                  E-mail Marketing
-                </Link>
-                <Link
-                  href="/blog/categoria/tendencias"
-                  className="px-3 py-1.5 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors"
-                >
-                  Tendências
-                </Link>
-                <Link
-                  href="/blog/categorias"
-                  className="px-3 py-1.5 bg-[#4b7bb5]/5 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors"
-                >
-                  Ver todas
-                </Link>
-              </div>
-            </div>
+            <BlogCategories />
 
             {/* Posts populares */}
-            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+            <div className="bg-white rounded-lg shadow-sm p-6">
               <h3 className="text-xl font-bold text-[#4072b0] mb-4">Posts Populares</h3>
               <div className="space-y-4">
                 {blogPosts.slice(0, 3).map((post) => (
-                  <div key={post.id} className="flex items-start space-x-3 group">
-                    <div className="flex-shrink-0 w-20 h-20 rounded-md overflow-hidden">
+                  <div key={post.id} className="flex items-start space-x-3">
+                    <div className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden">
                       <img
-                        src={post.coverImage || "/placeholder.svg"}
+                        src={post.featured_image || "/placeholder.svg"}
                         alt={post.title}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        className="w-full h-full object-cover"
                       />
                     </div>
                     <div>
                       <Link
                         href={`/blog/${post.slug}`}
-                        className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] line-clamp-2 group-hover:underline"
+                        className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] line-clamp-2"
                       >
                         {post.title}
                       </Link>
-                      <div className="flex items-center mt-1 text-xs text-gray-500">
-                        <span>{post.readTime} de leitura</span>
-                        <span className="mx-1">•</span>
-                        <span>
-                          {new Date(post.publishedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
-                        </span>
-                      </div>
+                      <p className="text-xs text-gray-500 mt-1">{post.read_time} de leitura</p>
                     </div>
                   </div>
                 ))}
@@ -331,36 +275,17 @@ export default function BlogPage() {
             </div>
 
             {/* Newsletter */}
-            <div className="relative overflow-hidden rounded-lg shadow-sm">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#4b7bb5] to-[#3d649e] opacity-90"></div>
-              <div className="absolute inset-0 opacity-10">
-                <img src="/pattern-bg.png" alt="" className="w-full h-full object-cover" />
+            <div className="bg-[#4b7bb5] rounded-lg shadow-sm p-6 text-white">
+              <h3 className="text-xl font-bold mb-2">Inscreva-se na Newsletter</h3>
+              <p className="text-sm mb-4">Receba nossos conteúdos exclusivos diretamente no seu e-mail.</p>
+              <div className="space-y-3">
+                <input
+                  type="email"
+                  placeholder="Seu melhor e-mail"
+                  className="w-full px-3 py-2 rounded-md text-gray-800 text-sm"
+                />
+                <Button className="w-full bg-white text-[#4b7bb5] hover:bg-gray-100">Inscrever-se</Button>
               </div>
-              <div className="relative z-10 p-6 text-white">
-                <h3 className="text-xl font-bold mb-2">Inscreva-se na Newsletter</h3>
-                <p className="text-sm mb-4 text-white/90">
-                  Receba nossos conteúdos exclusivos diretamente no seu e-mail.
-                </p>
-                <div className="space-y-3">
-                  <input
-                    type="email"
-                    placeholder="Seu melhor e-mail"
-                    className="w-full px-3 py-2 rounded-md text-gray-800 text-sm"
-                  />
-                  <Button className="w-full bg-white text-[#4b7bb5] hover:bg-gray-100">Inscrever-se</Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Anúncio ou CTA */}
-            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100 text-center">
-              <h3 className="text-lg font-bold text-[#4072b0] mb-2">Precisa de ajuda com marketing?</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Nossa equipe de especialistas está pronta para ajudar sua empresa a crescer.
-              </p>
-              <Link href="/contato">
-                <Button className="bg-[#4b7bb5] hover:bg-[#3d649e] w-full">Fale com um especialista</Button>
-              </Link>
             </div>
           </div>
         </div>
