@@ -2,8 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
 
 export default function LoginPage() {
   const [email] = useState("estrategia@designmarketing.com.br")
@@ -11,7 +10,18 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
-  const router = useRouter()
+  const [loginSuccess, setLoginSuccess] = useState(false)
+
+  // Efeito para redirecionar após login bem-sucedido
+  useEffect(() => {
+    if (loginSuccess) {
+      console.log("Login bem-sucedido, redirecionando...")
+      // Armazenar no localStorage como fallback
+      localStorage.setItem("isAuthenticated", "true")
+      // Redirecionar para a página admin
+      window.location.href = "/admin"
+    }
+  }, [loginSuccess])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -41,12 +51,11 @@ export default function LoginPage() {
         throw new Error(data.error || "Falha ao fazer login")
       }
 
-      // Forçar um hard refresh para garantir que o cookie seja processado
-      window.location.href = "/admin"
+      // Marcar login como bem-sucedido para acionar o redirecionamento
+      setLoginSuccess(true)
     } catch (err: any) {
       console.error("Erro no login:", err)
       setError(err.message || "Erro ao fazer login")
-    } finally {
       setLoading(false)
     }
   }
@@ -59,11 +68,15 @@ export default function LoginPage() {
     try {
       console.log("Enviando solicitação para criar usuário admin")
 
-      const response = await fetch("/api/setup/create-admin", {
+      const response = await fetch("/api/auth/create-admin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          email: "estrategia@designmarketing.com.br",
+          password: "Jivago14#",
+        }),
       })
 
       console.log("Resposta recebida:", response.status)

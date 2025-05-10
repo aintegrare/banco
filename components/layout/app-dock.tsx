@@ -113,6 +113,11 @@ export function AppDock() {
   const isActive = (path: string) => {
     if (path === "/admin" && pathname === "/admin") return true
     if (path === "/admin" && pathname === "/") return true
+
+    // Verificações específicas para projetos e tarefas
+    if (path === "/projetos" && pathname.startsWith("/projetos")) return true
+    if (path === "/tarefas" && pathname.startsWith("/tarefas")) return true
+
     return pathname.startsWith(path)
   }
 
@@ -120,8 +125,8 @@ export function AppDock() {
   const mainItems = [
     { href: "/admin", icon: <LayoutDashboard size={24} />, label: "Dashboard" },
     { href: "/admin/arquivos", icon: <FileText size={24} />, label: "Arquivos" },
-    { href: "/admin/projetos", icon: <FolderKanban size={24} />, label: "Projetos", badge: 3 },
-    { href: "/admin/tarefas", icon: <BarChart3 size={24} />, label: "Tarefas", badge: 5 },
+    { href: "/projetos", icon: <FolderKanban size={24} />, label: "Projetos", badge: 3 },
+    { href: "/tarefas", icon: <BarChart3 size={24} />, label: "Tarefas", badge: 5 },
     { href: "/admin/blog", icon: <FileImage size={24} />, label: "Blog" },
   ]
 

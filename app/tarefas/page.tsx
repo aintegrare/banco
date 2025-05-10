@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CreateTaskDialog } from "@/components/tasks/create-task-dialog"
 import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
 import { useToast } from "@/components/ui/use-toast"
+import { ProjectTaskNav } from "@/components/shared/ProjectTaskNav"
 
 interface Task {
   id: string | number
@@ -221,6 +222,7 @@ export default function TasksPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <ProjectTaskNav />
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Tarefas</h1>
         <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-[#4b7bb5] hover:bg-[#3d649e]">

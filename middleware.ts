@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export function middleware(request: NextRequest) {
-  console.log("Middleware executando para:", request.nextUrl.pathname)
+  console.log("Middleware: Verificando rota:", request.nextUrl.pathname)
 
   // Verificar se a rota é /admin ou subpasta
   const isAdminRoute = request.nextUrl.pathname.startsWith("/admin")
@@ -20,17 +20,20 @@ export function middleware(request: NextRequest) {
 
   // Verificar se o usuário está autenticado
   const authToken = request.cookies.get("auth-token")
-  console.log("Token de autenticação encontrado:", !!authToken)
+  const isAuthenticated = request.cookies.get("is-authenticated")
+
+  console.log("Middleware: Token de autenticação:", !!authToken)
+  console.log("Middleware: Cookie is-authenticated:", isAuthenticated?.value)
 
   // Se não estiver autenticado, redirecionar para login
-  if (!authToken) {
-    console.log("Redirecionando para login")
+  if (!authToken || !isAuthenticated) {
+    console.log("Middleware: Usuário não autenticado, redirecionando para login")
     const loginUrl = new URL("/admin/login", request.url)
     return NextResponse.redirect(loginUrl)
   }
 
   // Usuário autenticado, permitir acesso
-  console.log("Usuário autenticado, permitindo acesso")
+  console.log("Middleware: Usuário autenticado, permitindo acesso")
   return NextResponse.next()
 }
 
