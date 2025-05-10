@@ -89,7 +89,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       // Continuamos mesmo com erro, pois pode não haver notas
     }
 
-    // Agora excluímos o cliente
+    // Agora excluímos o cliente - Corrigido para não usar .select() após delete()
     const { error: deleteError } = await supabase.from("clients").delete().eq("id", id)
 
     if (deleteError) {

@@ -215,14 +215,15 @@ export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps)
 
     try {
       setDeleteLoading(true)
+
+      // Simplificando a chamada de exclusão
       const response = await fetch(`/api/crm/clients/${clientToDelete}`, {
         method: "DELETE",
       })
 
-      const data = await response.json()
-
       if (!response.ok) {
-        throw new Error(data.error || data.details || "Erro ao excluir cliente")
+        const errorData = await response.json()
+        throw new Error(errorData.error || errorData.details || "Erro ao excluir cliente")
       }
 
       toast({
@@ -230,7 +231,8 @@ export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps)
         description: "Cliente foi excluído com sucesso.",
       })
 
-      fetchClients()
+      // Atualizar a lista após exclusão bem-sucedida
+      await fetchClients()
     } catch (error: any) {
       console.error("Error deleting client:", error)
       toast({
