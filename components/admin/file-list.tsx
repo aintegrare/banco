@@ -32,6 +32,7 @@ import {
   Palette,
   FileImage,
   BookOpen,
+  Folder,
 } from "lucide-react"
 import { getBunnyPublicUrl } from "@/lib/bunny"
 import { FolderTaskBadge } from "./folder-task-badge"
@@ -105,6 +106,7 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
   const [showFolderTasks, setShowFolderTasks] = useState(false)
   const [selectedFolderForTasks, setSelectedFolderForTasks] = useState<string>("")
   const [folderTaskCounts, setFolderTaskCounts] = useState<Record<string, number>>({})
+  const [viewMode, setViewMode] = useState<"list" | "grid">("grid")
 
   // Função para carregar automaticamente as contagens de tarefas das pastas
   const loadFolderTaskCounts = useCallback(async (folders: BunnyFile[]) => {
@@ -873,6 +875,38 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     setSelectedFolderForTasks("")
   }
 
+  const truncateFileName = (name: string, maxLength = 25) => {
+    if (name.length <= maxLength) return name
+
+    const extension = name.split(".").pop() || ""
+    const nameWithoutExt = name.substring(0, name.length - extension.length - 1)
+
+    if (nameWithoutExt.length <= maxLength - 3) return name
+
+    return `${nameWithoutExt.substring(0, maxLength - 3)}...${extension ? "." + extension : ""}`
+  }
+
+  const getRelativeTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+
+    const diffSecs = Math.floor(diffMs / 1000)
+    const diffMins = Math.floor(diffSecs / 60)
+    const diffHours = Math.floor(diffMins / 60)
+    const diffDays = Math.floor(diffHours / 24)
+
+    if (diffDays > 0) {
+      return `há ${diffDays} ${diffDays === 1 ? "dia" : "dias"}`
+    } else if (diffHours > 0) {
+      return `há ${diffHours} ${diffHours === 1 ? "hora" : "horas"}`
+    } else if (diffMins > 0) {
+      return `há ${diffMins} ${diffMins === 1 ? "minuto" : "minutos"}`
+    } else {
+      return "agora mesmo"
+    }
+  }
+
   return (
     <>
       <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
@@ -947,6 +981,27 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
           </div>
 
           {renderBreadcrumb()}
+        </div>
+
+        <div className="mb-4 flex flex-wrap items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`px-3 py-1.5 text-sm rounded-md transition-all ${
+                viewMode === "grid" ? "bg-[#4b7bb5] text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              Grade
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`px-3 py-1.5 text-sm rounded-md transition-all ${
+                viewMode === "list" ? "bg-[#4b7bb5] text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              Lista
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6"></div>
@@ -1192,6 +1247,106 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
                 )}
               </button>
             </div>
+          </div>
+        ) : viewMode === "grid" ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {filteredFiles.map((file) => (
+              <div
+                key={file.Guid || file.ObjectName}
+                className="bg-gray-100 rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-all cursor-pointer relative group"
+                onClick={() => handlePreviewFile(file)}
+              >
+                <div className="flex flex-col">
+                  {/* Área de thumbnail */}
+                  <div className="w-full h-40 overflow-hidden bg-white flex items-center justify-center">
+                    {isImage(file.ObjectName) && file.PublicUrl ? (
+                      <img
+                        src={file.PublicUrl || "/placeholder.svg"}
+                        alt={file.ObjectName}
+                        className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none"
+                          const iconContainer = e.currentTarget.parentElement
+                          if (iconContainer) {
+                            const icon = document.createElement("div")
+                            icon.className = "flex items-center justify-center h-full"
+                            icon.innerHTML =
+                              '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="text-green-500"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>'
+                            iconContainer.appendChild(icon)
+                          }
+                        }}
+                      />
+                    ) : file.ObjectName.toLowerCase().endsWith(".pdf") ? (
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="w-10 h-10 bg-red-500 rounded-md flex items-center justify-center mb-2">
+                          <FileText className="h-6 w-6 text-white" />
+                        </div>
+                      </div>
+                    ) : file.IsDirectory ? (
+                      <div className="flex flex-col items-center justify-center">
+                        <Folder className="h-16 w-16 text-[#4b7bb5]" />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center">{getFileIcon(file.ObjectName)}</div>
+                    )}
+                  </div>
+
+                  {/* Área de informações */}
+                  <div className="p-3 bg-gray-200">
+                    {/* Ícone de tipo de arquivo */}
+                    <div className="flex items-center mb-1">
+                      {file.ObjectName.toLowerCase().endsWith(".pdf") && (
+                        <div className="w-6 h-6 bg-red-500 rounded-sm flex items-center justify-center mr-2">
+                          <FileText className="h-4 w-4 text-white" />
+                        </div>
+                      )}
+                      <h3 className="text-sm font-medium text-gray-700 truncate">
+                        {truncateFileName(file.ObjectName, 25)}
+                      </h3>
+                    </div>
+                    <div className="flex items-center text-xs text-gray-500">
+                      <span>
+                        {file.IsDirectory
+                          ? "Pasta"
+                          : file.ObjectName.toLowerCase().endsWith(".pdf")
+                            ? "PDF"
+                            : file.ObjectName.split(".").pop()?.toUpperCase() || "Arquivo"}
+                      </span>
+                      <span className="mx-1">•</span>
+                      <span>{getRelativeTime(file.LastChanged)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ações rápidas no hover */}
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex space-x-1">
+                    {!file.IsDirectory && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          window.open(file.PublicUrl, "_blank")
+                        }}
+                        className="p-1.5 bg-white rounded-full shadow-sm text-gray-600 hover:text-blue-600"
+                        title="Abrir"
+                      >
+                        <ExternalLink size={14} />
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDelete(file.Path)
+                      }}
+                      className="p-1.5 bg-white rounded-full shadow-sm text-gray-600 hover:text-red-600"
+                      title="Excluir"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="overflow-hidden rounded-lg border border-gray-200">

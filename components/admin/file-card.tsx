@@ -22,6 +22,7 @@ import {
   ExternalLink,
   Loader2,
   Check,
+  MoveIcon,
 } from "lucide-react"
 import { useState } from "react"
 import { RenameWarningDialog } from "./rename-warning-dialog"
@@ -30,8 +31,7 @@ import { ToastNotification } from "./toast-notification"
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
-// Adicionar importação para o badge de tarefas
-import { FolderTaskBadge } from "./folder-task-badge"
+import { DocumentPreview } from "./document-preview"
 
 // Modificar a interface FileCardProps para incluir a contagem de tarefas
 interface FileCardProps {
@@ -56,6 +56,7 @@ interface FileCardProps {
   taskCount?: number
   overdueCount?: number
   onOpenTasks?: () => void
+  onMove?: () => void
 }
 
 export function FileCard({
@@ -70,6 +71,7 @@ export function FileCard({
   taskCount,
   overdueCount,
   onOpenTasks,
+  onMove,
 }: FileCardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
@@ -86,6 +88,7 @@ export function FileCard({
     type: "success",
   })
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
+  const [showDocumentPreview, setShowDocumentPreview] = useState(false)
 
   // Função para formatar bytes em unidades legíveis
   const formatBytes = (bytes = 0) => {
@@ -121,6 +124,28 @@ export function FileCard({
     }
   }
 
+  // Função para obter o tempo relativo (ex: "há 23 horas")
+  const getRelativeTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+
+    const diffSecs = Math.floor(diffMs / 1000)
+    const diffMins = Math.floor(diffSecs / 60)
+    const diffHours = Math.floor(diffMins / 60)
+    const diffDays = Math.floor(diffHours / 24)
+
+    if (diffDays > 0) {
+      return `há ${diffDays} ${diffDays === 1 ? "dia" : "dias"}`
+    } else if (diffHours > 0) {
+      return `há ${diffHours} ${diffHours === 1 ? "hora" : "horas"}`
+    } else if (diffMins > 0) {
+      return `há ${diffMins} ${diffMins === 1 ? "minuto" : "minutos"}`
+    } else {
+      return "agora mesmo"
+    }
+  }
+
   const handleClick = () => {
     if (onToggleSelect) {
       onToggleSelect()
@@ -133,6 +158,8 @@ export function FileCard({
       // Para imagens, mostrar preview
       if (isImage()) {
         setShowPreview(true)
+      } else if (isPdf()) {
+        setShowDocumentPreview(true)
       } else {
         // Para outros arquivos, abrir
         if (file.url) {
@@ -150,6 +177,11 @@ export function FileCard({
   const isImage = () => {
     const fileType = file.fileType?.toLowerCase() || ""
     return ["jpg", "jpeg", "png", "gif", "webp"].includes(fileType)
+  }
+
+  const isPdf = () => {
+    const fileType = file.fileType?.toLowerCase() || ""
+    return fileType === "pdf"
   }
 
   // Função para compartilhar arquivo ou pasta
@@ -272,10 +304,22 @@ export function FileCard({
     }
   }
 
+  // Truncar o nome do arquivo se for muito longo
+  const truncateFileName = (name: string, maxLength = 25) => {
+    if (name.length <= maxLength) return name
+
+    const extension = name.split(".").pop() || ""
+    const nameWithoutExt = name.substring(0, name.length - extension.length - 1)
+
+    if (nameWithoutExt.length <= maxLength - 3) return name
+
+    return `${nameWithoutExt.substring(0, maxLength - 3)}...${extension ? "." + extension : ""}`
+  }
+
   return (
     <>
       <div
-        className={`bg-white rounded-lg border ${
+        className={`bg-gray-100 rounded-lg border ${
           isSelected ? "border-[#4b7bb5] bg-blue-50" : "border-gray-200"
         } overflow-hidden hover:shadow-md transition-all cursor-pointer relative group`}
         onClick={handleClick}
@@ -302,16 +346,15 @@ export function FileCard({
           </div>
         )}
 
-        <div className="p-4 flex flex-col items-center">
-          {/* Mostrar thumbnail para imagens */}
-          {isImage() && file.url ? (
-            <div className="w-full h-32 mb-2 overflow-hidden rounded-md bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col">
+          {/* Área de thumbnail */}
+          <div className="w-full h-40 overflow-hidden bg-white flex items-center justify-center">
+            {isImage() && file.url ? (
               <img
                 src={file.url || "/placeholder.svg"}
                 alt={file.name}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
                 onError={(e) => {
-                  // Fallback para ícone se a imagem falhar
                   e.currentTarget.style.display = "none"
                   const iconContainer = e.currentTarget.parentElement
                   if (iconContainer) {
@@ -323,26 +366,38 @@ export function FileCard({
                   }
                 }}
               />
-            </div>
-          ) : (
-            <div className="w-16 h-16 flex items-center justify-center bg-gray-50 rounded-full mb-3 group-hover:bg-[#f0f4f9] transition-colors">
-              {getFileIcon()}
-            </div>
-          )}
-          <h3 className="mt-2 text-sm font-medium text-gray-700 text-center truncate w-full group-hover:text-[#4b7bb5] transition-colors">
-            {file.name}
-            {/* Adicionar o badge de tarefas no componente */}
-            {/* Localizar a div que contém o nome do arquivo (geralmente após o ícone) */}
-            {/* Adicionar após o nome do arquivo, dentro da mesma div */}
-            {file.type === "folder" && taskCount && taskCount > 0 && (
-              <div className="absolute top-1 right-1">
-                <FolderTaskBadge count={taskCount} overdueCount={overdueCount} />
+            ) : isPdf() ? (
+              <div className="flex flex-col items-center justify-center">
+                <div className="w-10 h-10 bg-red-500 rounded-md flex items-center justify-center mb-2">
+                  <FileText className="h-6 w-6 text-white" />
+                </div>
               </div>
+            ) : file.type === "folder" ? (
+              <div className="flex flex-col items-center justify-center">
+                <Folder className="h-16 w-16 text-[#4b7bb5]" />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center">{getFileIcon()}</div>
             )}
-          </h3>
-          <p className="text-xs text-gray-500 mt-1">
-            {file.type === "folder" ? "Pasta" : file.size ? formatBytes(file.size) : ""}
-          </p>
+          </div>
+
+          {/* Área de informações */}
+          <div className="p-3 bg-gray-200">
+            {/* Ícone de tipo de arquivo */}
+            <div className="flex items-center mb-1">
+              {isPdf() && (
+                <div className="w-6 h-6 bg-red-500 rounded-sm flex items-center justify-center mr-2">
+                  <FileText className="h-4 w-4 text-white" />
+                </div>
+              )}
+              <h3 className="text-sm font-medium text-gray-700 truncate">{truncateFileName(file.name)}</h3>
+            </div>
+            <div className="flex items-center text-xs text-gray-500">
+              <span>{isPdf() ? "PDF" : file.fileType?.toUpperCase() || "Arquivo"}</span>
+              <span className="mx-1">•</span>
+              <span>{getRelativeTime(file.modified)}</span>
+            </div>
+          </div>
         </div>
 
         {/* Overlay de ações para hover */}
@@ -358,6 +413,18 @@ export function FileCard({
                     }}
                     className="p-2 bg-white rounded-full text-gray-700 hover:text-[#4b7bb5] transition-colors"
                     title="Visualizar"
+                  >
+                    <Eye size={18} />
+                  </button>
+                )}
+                {isPdf() && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowDocumentPreview(true)
+                    }}
+                    className="p-2 bg-white rounded-full text-gray-700 hover:text-[#4b7bb5] transition-colors"
+                    title="Visualizar PDF"
                   >
                     <Eye size={18} />
                   </button>
@@ -442,6 +509,19 @@ export function FileCard({
                   <Eye size={16} className="mr-2 text-blue-500" />
                   <span>Visualizar</span>
                 </button>
+                {file.type === "file" && isPdf() && (
+                  <button
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowMenu(false)
+                      setShowDocumentPreview(true)
+                    }}
+                  >
+                    <Eye className="h-4 w-4 mr-2 text-blue-500" />
+                    <span>Visualizar PDF</span>
+                  </button>
+                )}
                 <button
                   className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
                   onClick={(e) => {
@@ -469,6 +549,17 @@ export function FileCard({
             >
               <Share2 size={16} className="mr-2 text-purple-500" />
               <span>Compartilhar</span>
+            </button>
+            <button
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowMenu(false)
+                onMove && onMove()
+              }}
+            >
+              <MoveIcon className="h-4 w-4 mr-2 text-purple-500" />
+              <span>Mover</span>
             </button>
             <button
               className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
@@ -643,6 +734,15 @@ export function FileCard({
           message={toast.message}
           type={toast.type}
           onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
+        />
+      )}
+      {/* Preview de documento */}
+      {showDocumentPreview && (
+        <DocumentPreview
+          fileUrl={file.url || ""}
+          fileName={file.name}
+          fileType={file.fileType || ""}
+          onClose={() => setShowDocumentPreview(false)}
         />
       )}
     </>
