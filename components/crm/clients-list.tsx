@@ -216,14 +216,24 @@ export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps)
     try {
       setDeleteLoading(true)
 
-      // Simplificando a chamada de exclusão
+      // Abordagem mais robusta para exclusão
       const response = await fetch(`/api/crm/clients/${clientToDelete}`, {
         method: "DELETE",
       })
 
+      // Verificar se a resposta é ok, independentemente do conteúdo
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || errorData.details || "Erro ao excluir cliente")
+        let errorMessage = "Erro ao excluir cliente"
+
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorData.details || errorMessage
+        } catch (e) {
+          // Se não conseguir analisar o JSON, usa a mensagem padrão
+          console.error("Error parsing error response:", e)
+        }
+
+        throw new Error(errorMessage)
       }
 
       toast({

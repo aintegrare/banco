@@ -70,31 +70,43 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
     console.log(`Attempting to delete client with ID: ${id}`)
 
-    // Primeiro, verificamos se existem registros relacionados nas tabelas dependentes
-    // e os excluímos para evitar violações de chave estrangeira
+    // Primeiro, verificamos se o cliente existe
+    const { data: clientExists, error: checkError } = await supabase.from("clients").select("id").eq("id", id).single()
+
+    if (checkError || !clientExists) {
+      console.error("Client not found:", checkError)
+      return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 })
+    }
 
     // Excluir interações do cliente
-    const { error: interactionsError } = await supabase.from("client_interactions").delete().eq("client_id", id)
-
-    if (interactionsError) {
+    try {
+      await supabase.from("client_interactions").delete().eq("client_id", id)
+    } catch (interactionsError) {
       console.error("Error deleting client interactions:", interactionsError)
       // Continuamos mesmo com erro, pois pode não haver interações
     }
 
     // Excluir notas do cliente
-    const { error: notesError } = await supabase.from("client_notes").delete().eq("client_id", id)
-
-    if (notesError) {
+    try {
+      await supabase.from("client_notes").delete().eq("client_id", id)
+    } catch (notesError) {
       console.error("Error deleting client notes:", notesError)
       // Continuamos mesmo com erro, pois pode não haver notas
     }
 
-    // Agora excluímos o cliente - Corrigido para não usar .select() após delete()
-    const { error: deleteError } = await supabase.from("clients").delete().eq("id", id)
+    // Agora excluímos o cliente usando a função RPC que criamos
+    const { error: deleteError } = await supabase.rpc("delete_client", { client_id: id })
 
     if (deleteError) {
-      console.error("Error deleting client:", deleteError)
-      return NextResponse.json({ error: deleteError.message }, { status: 500 })
+      console.error("Error deleting client using RPC:", deleteError)
+
+      // Se o RPC falhar, tentamos uma abordagem alternativa com SQL bruto
+      const { error: rawError } = await supabase.from("clients").delete().eq("id", id)
+
+      if (rawError) {
+        console.error("Error deleting client with raw query:", rawError)
+        return NextResponse.json({ error: rawError.message }, { status: 500 })
+      }
     }
 
     console.log(`Successfully deleted client with ID: ${id}`)
