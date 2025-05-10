@@ -35,7 +35,9 @@ export default function Home() {
   }
 
   return (
-    <div className={`flex min-h-screen flex-col ${isPageLoaded ? "animate-fadeIn" : "opacity-0"}`}>
+    <div
+      className={`flex min-h-screen flex-col ${isPageLoaded ? "opacity-100 transition-opacity duration-500" : "opacity-0"}`}
+    >
       <Header isScrolled={isScrolled} />
       <main className="flex-1">
         <HeroSection />
@@ -50,7 +52,11 @@ export default function Home() {
       <Footer />
 
       {showScrollTop && (
-        <button onClick={scrollToTop} className="scroll-top-button" aria-label="Voltar ao topo">
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-8 right-8 p-3 rounded-full bg-[#4072b0] text-white shadow-lg hover:bg-[#3d649e] transition-all duration-300 z-50"
+          aria-label="Voltar ao topo"
+        >
           <ArrowUp className="h-5 w-5" />
         </button>
       )}
