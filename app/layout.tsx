@@ -11,6 +11,18 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Integrare - Agência de Marketing",
   description: "Plataforma de gestão de projetos e documentos da Integrare",
+  metadataBase: new URL("https://www.redeintegrare.com"),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Integrare - Agência de Marketing",
+    description: "Marketing Estratégico para Resultados Reais",
+    url: "https://www.redeintegrare.com",
+    siteName: "Integrare",
+    locale: "pt_BR",
+    type: "website",
+  },
     generator: 'v0.dev'
 }
 

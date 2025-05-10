@@ -42,7 +42,9 @@ export function Header({ isScrolled }: HeaderProps) {
     >
       <div className="container flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/logo-integrare.png" alt="Integrare Logo" className="h-10" />
+          <a href="https://www.redeintegrare.com">
+            <img src="/logo-integrare.png" alt="Integrare Logo" className="h-10" />
+          </a>
         </div>
 
         <nav className="hidden md:flex items-center gap-8">
@@ -82,7 +84,7 @@ export function Header({ isScrolled }: HeaderProps) {
             <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#4b7bb5] group-hover:w-full transition-all duration-300"></span>
           </button>
           <a
-            href="/blog"
+            href="https://www.redeintegrare.com/blog"
             className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors relative group"
           >
             Blog
@@ -133,7 +135,9 @@ export function Header({ isScrolled }: HeaderProps) {
         <div className="container py-4">
           <div className="flex justify-between items-center mb-8">
             <div className="flex items-center gap-2">
-              <img src="/logo-integrare.png" alt="Integrare Logo" className="h-10" />
+              <a href="https://www.redeintegrare.com">
+                <img src="/logo-integrare.png" alt="Integrare Logo" className="h-10" />
+              </a>
             </div>
             <button
               onClick={closeMenu}
@@ -181,7 +185,7 @@ export function Header({ isScrolled }: HeaderProps) {
               <span className="text-[#4b7bb5]/50">05</span>
             </button>
             <a
-              href="/blog"
+              href="https://www.redeintegrare.com/blog"
               className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors flex items-center justify-between"
             >
               <span>Blog</span>

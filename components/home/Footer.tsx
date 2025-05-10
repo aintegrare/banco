@@ -82,7 +82,7 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="/blog" className="hover:text-white transition-colors">
+                <a href="https://www.redeintegrare.com/blog" className="hover:text-white transition-colors">
                   Blog
                 </a>
               </li>
@@ -109,7 +109,7 @@ export function Footer() {
             <ul className="space-y-3 text-sm text-white/80 dark:text-white/70">
               <li className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
-                <span>contato@redeintegrare.com.br</span>
+                <span>contato@redeintegrare.com</span>
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />
@@ -129,6 +129,11 @@ export function Footer() {
         </div>
         <div className="mt-12 pt-8 border-t border-white/20 text-center text-sm text-white/60 dark:text-white/50">
           <p>© {new Date().getFullYear()} Integrare. Todos os direitos reservados.</p>
+          <p className="mt-2">
+            <a href="https://www.redeintegrare.com" className="hover:text-white transition-colors">
+              www.redeintegrare.com
+            </a>
+          </p>
         </div>
       </div>
     </footer>
