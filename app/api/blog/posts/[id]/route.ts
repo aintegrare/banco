@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    console.log(`Buscando post com ID/slug: ${params.id}`)
     const supabase = createClient()
 
     // Verificar se é um ID numérico ou um slug
@@ -23,12 +24,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const { data: post, error } = await query.single()
 
     if (error) {
+      console.error(`Erro ao buscar post: ${error.message}`)
       if (error.code === "PGRST116") {
         return NextResponse.json({ error: "Post não encontrado" }, { status: 404 })
       }
       throw error
     }
 
+    console.log(`Post encontrado: ${post.title}`)
     return NextResponse.json(post)
   } catch (error) {
     console.error("Erro ao buscar post:", error)
@@ -73,12 +76,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         featured_image: data.featured_image,
         author_id: data.author_id,
         category_id: data.category_id,
-        status: data.status,
+        published: data.published,
         published_at: data.published_at,
-        tags: data.tags,
-        meta_title: data.meta_title,
-        meta_description: data.meta_description,
-        featured: data.featured || false,
         updated_at: new Date().toISOString(),
       })
       .eq("id", params.id)

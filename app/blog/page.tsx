@@ -16,6 +16,7 @@ export const metadata: Metadata = {
 // Função para buscar posts do banco de dados
 async function getPosts() {
   try {
+    console.log("Buscando posts do blog...")
     const supabase = createClient()
 
     const { data, error } = await supabase
@@ -34,6 +35,7 @@ async function getPosts() {
       return []
     }
 
+    console.log(`${data?.length || 0} posts encontrados`)
     return data || []
   } catch (error) {
     console.error("Erro ao buscar posts:", error)

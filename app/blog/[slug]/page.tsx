@@ -16,6 +16,7 @@ function calculateReadTime(content: string): string {
 // Função para buscar o post pelo slug
 async function getPostBySlug(slug: string) {
   try {
+    console.log(`Buscando post com slug: ${slug}`)
     const supabase = createClient()
 
     const { data, error } = await supabase
@@ -33,6 +34,8 @@ async function getPostBySlug(slug: string) {
       return null
     }
 
+    console.log(`Post encontrado:`, data)
+
     // Adicionar tempo de leitura
     if (data) {
       data.read_time = calculateReadTime(data.content)
@@ -46,7 +49,7 @@ async function getPostBySlug(slug: string) {
 }
 
 // Função para buscar posts relacionados
-async function getRelatedPosts(categoryId: string, currentPostId: string) {
+async function getRelatedPosts(categoryId: number, currentPostId: number) {
   try {
     const supabase = createClient()
 
@@ -105,11 +108,14 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 }
 
 export default async function BlogPostPage({ params }: { params: { slug: string } }) {
+  console.log(`Renderizando página para slug: ${params.slug}`)
+
   // Buscar o post pelo slug
   const post = await getPostBySlug(params.slug)
 
   // Se o post não foi encontrado, mostrar página 404
   if (!post) {
+    console.log(`Post não encontrado para slug: ${params.slug}`)
     notFound()
   }
 

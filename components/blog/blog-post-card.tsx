@@ -42,6 +42,9 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
   // Calcular tempo de leitura se não for fornecido
   const readTime = post.read_time || "5 min"
 
+  // Garantir que o slug seja válido
+  const slug = post.slug || `post-${post.id}`
+
   if (variant === "compact") {
     return (
       <div className={`group ${className}`}>
@@ -55,7 +58,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
           </div>
           <div>
             <Link
-              href={`/blog/${post.slug}`}
+              href={`/blog/${slug}`}
               className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] line-clamp-2 group-hover:underline"
             >
               {post.title}
@@ -86,7 +89,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
 
           <div className="md:w-2/3 p-6 flex flex-col">
             <div className="flex-grow">
-              <Link href={`/blog/${post.slug}`}>
+              <Link href={`/blog/${slug}`}>
                 <h3 className="text-xl font-bold text-[#4072b0] mb-2 group-hover:text-[#3d649e] line-clamp-2">
                   {post.title}
                 </h3>
@@ -113,7 +116,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
               </div>
 
               <Link
-                href={`/blog/${post.slug}`}
+                href={`/blog/${slug}`}
                 className="text-[#4b7bb5] hover:text-[#3d649e] text-sm font-medium flex items-center"
               >
                 Ler mais
@@ -151,7 +154,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
           <span>{readTime}</span>
         </div>
 
-        <Link href={`/blog/${post.slug}`}>
+        <Link href={`/blog/${slug}`}>
           <h3 className="text-xl font-bold text-[#4072b0] mb-3 group-hover:text-[#3d649e] line-clamp-2">
             {post.title}
           </h3>
@@ -170,7 +173,7 @@ export function BlogPostCard({ post, variant = "default", className = "" }: Blog
           </div>
 
           <Link
-            href={`/blog/${post.slug}`}
+            href={`/blog/${slug}`}
             className="text-[#4b7bb5] hover:text-[#3d649e] text-sm font-medium flex items-center"
           >
             Ler mais
