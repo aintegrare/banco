@@ -117,6 +117,7 @@ export function AppDock() {
     // Verificações específicas para projetos e tarefas
     if (path === "/projetos" && pathname.startsWith("/projetos")) return true
     if (path === "/tarefas" && pathname.startsWith("/tarefas")) return true
+    if (path === "/admin/clientes" && pathname.startsWith("/admin/clientes")) return true
 
     return pathname.startsWith(path)
   }

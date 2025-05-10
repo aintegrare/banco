@@ -48,7 +48,7 @@ export function ClientCard({ client }) {
   }
 
   return (
-    <Link href={`/clientes/${client.id}`}>
+    <Link href={`/admin/clientes/${client.id}`} className="block">
       <Card className="h-full hover:shadow-md transition-shadow cursor-pointer border-gray-200">
         <CardHeader className="pb-2">
           <div className="flex justify-between items-start">
