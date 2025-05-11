@@ -112,8 +112,16 @@ export default function Home() {
       <main className="flex-1">
         {/* Hero Section */}
         <section className="relative overflow-hidden bg-black text-white py-0">
-          <div className="absolute inset-0 z-0 opacity-30">
-            <Image src="/hero-elegant-blue.png" alt="Marketing Digital" fill className="object-cover" priority />
+          <div className="absolute inset-0 z-0">
+            <Image
+              src="/hero-background-cloud.jpg"
+              alt="Marketing Digital"
+              fill
+              className="object-cover"
+              priority
+              quality={100}
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-transparent"></div>
           </div>
           <div className="container relative z-10 hero-container">
             <div className="mx-auto max-w-3xl text-center py-16 md:py-20">

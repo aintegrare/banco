@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { ChevronRight } from "lucide-react"
+import Image from "next/image"
 
 export function HeroSection() {
   const [isVisible, setIsVisible] = useState(false)
@@ -43,19 +44,26 @@ export function HeroSection() {
   }
 
   return (
-    <section
-      ref={sectionRef}
-      className="relative py-24 md:py-32 lg:py-40 overflow-hidden bg-gradient-to-br from-[#4b7bb5] to-[#3d649e] dark:from-[#3d649e] dark:to-[#1e3c64] text-white"
-    >
+    <section ref={sectionRef} className="relative py-24 md:py-32 lg:py-40 overflow-hidden text-white">
+      {/* Nova imagem de fundo com nuvem */}
+      <div className="absolute inset-0 z-0">
+        <Image
+          src="/hero-background-cloud.jpg"
+          alt="Marketing Digital"
+          fill
+          className="object-cover"
+          priority
+          quality={100}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-transparent"></div>
+      </div>
+
       {/* Elementos decorativos flutuantes */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#6b91c1]/20 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute top-1/2 -left-32 w-80 h-80 bg-[#4072b0]/20 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-[#527eb7]/20 rounded-full blur-3xl animate-pulse"></div>
       </div>
-
-      <div className="absolute inset-0 bg-[url('/pattern-bg.png')] opacity-10 bg-cover bg-center mix-blend-overlay"></div>
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20 dark:to-black/40"></div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
