@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { Loader2, Plus, Search, ClipboardList, Grid, List, Filter } from "lucide-react"
+import { Loader2, Plus, Search, ClipboardList, Grid, List, Filter, Columns } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { ProjectTaskNav } from "@/components/shared/ProjectTaskNav"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { TasksKanbanView } from "@/components/tasks/tasks-kanban-view"
 
 interface Task {
   id: string | number
@@ -43,7 +44,7 @@ export default function TasksPage() {
   const [priorityFilter, setPriorityFilter] = useState("all")
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editTaskId, setEditTaskId] = useState<string | number | null>(null)
-  const [viewMode, setViewMode] = useState<"list" | "grid" | "byProject">("list")
+  const [viewMode, setViewMode] = useState<"list" | "grid" | "byProject" | "kanban">("list")
   const [showFilters, setShowFilters] = useState(false)
   const { toast } = useToast()
 
@@ -247,6 +248,37 @@ export default function TasksPage() {
     })
   }
 
+  const handleTaskStatusChanged = async (taskId: string | number, newStatus: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Falha ao atualizar status da tarefa")
+      }
+
+      const updatedTask = await response.json()
+      setTasks((prevTasks) => prevTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task)))
+
+      toast({
+        title: "Status atualizado",
+        description: "O status da tarefa foi atualizado com sucesso!",
+      })
+    } catch (error) {
+      console.error("Erro ao atualizar status da tarefa:", error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o status da tarefa",
+        variant: "destructive",
+      })
+    }
+  }
+
   const getProjectName = (projectId: string | number) => {
     const project = projects.find((p) => p.id.toString() === projectId.toString())
     return project ? project.name : "Projeto Desconhecido"
@@ -280,6 +312,13 @@ export default function TasksPage() {
             >
               <Filter size={18} />
             </button>
+            <button
+              onClick={() => setViewMode("kanban")}
+              className={`p-2 rounded-md ${viewMode === "kanban" ? "bg-white shadow-sm" : ""}`}
+              title="Visualização Kanban"
+            >
+              <Columns size={18} />
+            </button>
           </div>
           <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-[#4b7bb5] hover:bg-[#3d649e]">
             <Plus size={16} className="mr-2" />
@@ -288,71 +327,75 @@ export default function TasksPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-              <Input
-                placeholder="Buscar tarefas..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="md:hidden">
-              <Filter size={16} className="mr-2" />
-              Filtros
-            </Button>
-            <div className={`flex-col sm:flex-row gap-2 ${showFilters ? "flex" : "hidden md:flex"}`}>
-              <div className="w-full sm:w-40">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os status</SelectItem>
-                    <SelectItem value="backlog">Backlog</SelectItem>
-                    <SelectItem value="todo">A Fazer</SelectItem>
-                    <SelectItem value="in-progress">Em Progresso</SelectItem>
-                    <SelectItem value="review">Em Revisão</SelectItem>
-                    <SelectItem value="done">Concluído</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="w-full sm:w-40">
-                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Prioridade" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as prioridades</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
-                    <SelectItem value="medium">Média</SelectItem>
-                    <SelectItem value="low">Baixa</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="w-full sm:w-48">
-                <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Projeto" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os projetos</SelectItem>
-                    {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id.toString()}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+      <div
+        className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6 ${viewMode === "kanban" ? "p-0" : ""}`}
+      >
+        {viewMode !== "kanban" && (
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                <Input
+                  placeholder="Buscar tarefas..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
             </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="md:hidden">
+                <Filter size={16} className="mr-2" />
+                Filtros
+              </Button>
+              <div className={`flex-col sm:flex-row gap-2 ${showFilters ? "flex" : "hidden md:flex"}`}>
+                <div className="w-full sm:w-40">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os status</SelectItem>
+                      <SelectItem value="backlog">Backlog</SelectItem>
+                      <SelectItem value="todo">A Fazer</SelectItem>
+                      <SelectItem value="in-progress">Em Progresso</SelectItem>
+                      <SelectItem value="review">Em Revisão</SelectItem>
+                      <SelectItem value="done">Concluído</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-full sm:w-40">
+                  <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Prioridade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as prioridades</SelectItem>
+                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="medium">Média</SelectItem>
+                      <SelectItem value="low">Baixa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-full sm:w-48">
+                  <Select value={projectFilter} onValueChange={setProjectFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Projeto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os projetos</SelectItem>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id.toString()}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
         {isLoading ? (
           <div className="flex flex-col justify-center items-center py-12">
@@ -361,6 +404,17 @@ export default function TasksPage() {
           </div>
         ) : filteredTasks.length > 0 ? (
           <>
+            {/* Visualização Kanban */}
+            {viewMode === "kanban" && (
+              <TasksKanbanView
+                tasks={filteredTasks}
+                onTaskEdit={setEditTaskId}
+                onTaskStatusChange={handleTaskStatusChanged}
+                onTaskUpdated={handleTaskUpdated}
+                projects={projects}
+              />
+            )}
+
             {/* Visualização em Lista */}
             {viewMode === "list" && (
               <div className="overflow-x-auto">
