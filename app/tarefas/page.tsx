@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSearchParams } from "next/navigation"
-import { Loader2, Plus, Search, ClipboardList } from "lucide-react"
+import { useSearchParams, useRouter } from "next/navigation"
+import { Loader2, Plus, Search, ClipboardList, Grid, List, Filter } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -10,6 +10,8 @@ import { CreateTaskDialog } from "@/components/tasks/create-task-dialog"
 import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { ProjectTaskNav } from "@/components/shared/ProjectTaskNav"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
 interface Task {
   id: string | number
@@ -28,6 +30,7 @@ interface Project {
 }
 
 export default function TasksPage() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const projectIdParam = searchParams.get("projeto")
 
@@ -40,7 +43,18 @@ export default function TasksPage() {
   const [priorityFilter, setPriorityFilter] = useState("all")
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editTaskId, setEditTaskId] = useState<string | number | null>(null)
+  const [viewMode, setViewMode] = useState<"list" | "grid" | "byProject">("list")
+  const [showFilters, setShowFilters] = useState(false)
   const { toast } = useToast()
+
+  // Atualizar a URL quando o filtro de projeto mudar
+  useEffect(() => {
+    if (projectFilter !== "all") {
+      router.push(`/tarefas?projeto=${projectFilter}`)
+    } else if (projectIdParam) {
+      router.push("/tarefas")
+    }
+  }, [projectFilter, router, projectIdParam])
 
   // Buscar tarefas e projetos
   useEffect(() => {
@@ -134,6 +148,19 @@ export default function TasksPage() {
     return matchesSearch && matchesStatus && matchesProject && matchesPriority
   })
 
+  // Agrupar tarefas por projeto para a visualização por projeto
+  const tasksByProject = filteredTasks.reduce(
+    (acc, task) => {
+      const projectId = task.project_id?.toString() || "sem-projeto"
+      if (!acc[projectId]) {
+        acc[projectId] = []
+      }
+      acc[projectId].push(task)
+      return acc
+    },
+    {} as Record<string, Task[]>,
+  )
+
   const getStatusLabel = (status: string) => {
     switch (status) {
       case "backlog":
@@ -220,15 +247,45 @@ export default function TasksPage() {
     })
   }
 
+  const getProjectName = (projectId: string | number) => {
+    const project = projects.find((p) => p.id.toString() === projectId.toString())
+    return project ? project.name : "Projeto Desconhecido"
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <ProjectTaskNav />
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Tarefas</h1>
-        <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-[#4b7bb5] hover:bg-[#3d649e]">
-          <Plus size={16} className="mr-2" />
-          Nova Tarefa
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="hidden md:flex bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode("list")}
+              className={`p-2 rounded-md ${viewMode === "list" ? "bg-white shadow-sm" : ""}`}
+              title="Visualização em lista"
+            >
+              <List size={18} />
+            </button>
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`p-2 rounded-md ${viewMode === "grid" ? "bg-white shadow-sm" : ""}`}
+              title="Visualização em grade"
+            >
+              <Grid size={18} />
+            </button>
+            <button
+              onClick={() => setViewMode("byProject")}
+              className={`p-2 rounded-md ${viewMode === "byProject" ? "bg-white shadow-sm" : ""}`}
+              title="Visualização por projeto"
+            >
+              <Filter size={18} />
+            </button>
+          </div>
+          <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-[#4b7bb5] hover:bg-[#3d649e]">
+            <Plus size={16} className="mr-2" />
+            Nova Tarefa
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
@@ -244,49 +301,55 @@ export default function TasksPage() {
               />
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="w-full sm:w-40">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os status</SelectItem>
-                  <SelectItem value="backlog">Backlog</SelectItem>
-                  <SelectItem value="todo">A Fazer</SelectItem>
-                  <SelectItem value="in-progress">Em Progresso</SelectItem>
-                  <SelectItem value="review">Em Revisão</SelectItem>
-                  <SelectItem value="done">Concluído</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-full sm:w-40">
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Prioridade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as prioridades</SelectItem>
-                  <SelectItem value="high">Alta</SelectItem>
-                  <SelectItem value="medium">Média</SelectItem>
-                  <SelectItem value="low">Baixa</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-full sm:w-48">
-              <Select value={projectFilter} onValueChange={setProjectFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Projeto" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os projetos</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id.toString()}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="md:hidden">
+              <Filter size={16} className="mr-2" />
+              Filtros
+            </Button>
+            <div className={`flex-col sm:flex-row gap-2 ${showFilters ? "flex" : "hidden md:flex"}`}>
+              <div className="w-full sm:w-40">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os status</SelectItem>
+                    <SelectItem value="backlog">Backlog</SelectItem>
+                    <SelectItem value="todo">A Fazer</SelectItem>
+                    <SelectItem value="in-progress">Em Progresso</SelectItem>
+                    <SelectItem value="review">Em Revisão</SelectItem>
+                    <SelectItem value="done">Concluído</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-full sm:w-40">
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Prioridade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as prioridades</SelectItem>
+                    <SelectItem value="high">Alta</SelectItem>
+                    <SelectItem value="medium">Média</SelectItem>
+                    <SelectItem value="low">Baixa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-full sm:w-48">
+                <Select value={projectFilter} onValueChange={setProjectFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Projeto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os projetos</SelectItem>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id.toString()}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </div>
@@ -297,51 +360,164 @@ export default function TasksPage() {
             <p className="text-gray-500">Carregando suas tarefas...</p>
           </div>
         ) : filteredTasks.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Título</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Prioridade</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Projeto</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Responsável</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Data</th>
-                </tr>
-              </thead>
-              <tbody>
+          <>
+            {/* Visualização em Lista */}
+            {viewMode === "list" && (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Título</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Prioridade</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Projeto</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Responsável</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Data</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTasks.map((task) => (
+                      <tr
+                        key={task.id}
+                        className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer"
+                        onClick={() => setEditTaskId(task.id)}
+                      >
+                        <td className="py-3 px-4">
+                          <div className="font-medium text-gray-800">{task.title}</div>
+                          <div className="text-sm text-gray-500 line-clamp-1">{task.description}</div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center">
+                            <div className={`w-2 h-2 rounded-full ${getStatusColor(task.status)} mr-2`}></div>
+                            <span>{getStatusLabel(task.status)}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center">
+                            <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)} mr-2`}></div>
+                            <span>{getPriorityLabel(task.priority)}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          {projects.find((p) => p.id.toString() === task.project_id.toString())?.name || "Projeto"}
+                        </td>
+                        <td className="py-3 px-4">{task.assignee || "Não atribuído"}</td>
+                        <td className="py-3 px-4">{formatDate(task.due_date)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Visualização em Grade */}
+            {viewMode === "grid" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredTasks.map((task) => (
-                  <tr
+                  <Card
                     key={task.id}
-                    className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer"
+                    className="cursor-pointer hover:shadow-md transition-shadow"
                     onClick={() => setEditTaskId(task.id)}
                   >
-                    <td className="py-3 px-4">
-                      <div className="font-medium text-gray-800">{task.title}</div>
-                      <div className="text-sm text-gray-500 line-clamp-1">{task.description}</div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center">
-                        <div className={`w-2 h-2 rounded-full ${getStatusColor(task.status)} mr-2`}></div>
-                        <span>{getStatusLabel(task.status)}</span>
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <CardTitle className="text-lg">{task.title}</CardTitle>
+                        <Badge
+                          className={getPriorityColor(task.priority)
+                            .replace("bg-", "bg-opacity-20 text-")
+                            .replace("500", "700")}
+                        >
+                          {getPriorityLabel(task.priority)}
+                        </Badge>
                       </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center">
-                        <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)} mr-2`}></div>
-                        <span>{getPriorityLabel(task.priority)}</span>
+                      <CardDescription className="line-clamp-2">{task.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="pb-2">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-500">Status:</span>
+                          <span className="text-sm font-medium flex items-center">
+                            <div className={`w-2 h-2 rounded-full ${getStatusColor(task.status)} mr-2`}></div>
+                            {getStatusLabel(task.status)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-500">Projeto:</span>
+                          <span className="text-sm font-medium">
+                            {projects.find((p) => p.id.toString() === task.project_id.toString())?.name || "Projeto"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-500">Data:</span>
+                          <span className="text-sm font-medium">{formatDate(task.due_date)}</span>
+                        </div>
                       </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      {projects.find((p) => p.id.toString() === task.project_id.toString())?.name || "Projeto"}
-                    </td>
-                    <td className="py-3 px-4">{task.assignee || "Não atribuído"}</td>
-                    <td className="py-3 px-4">{formatDate(task.due_date)}</td>
-                  </tr>
+                    </CardContent>
+                    <CardFooter className="pt-2 border-t">
+                      <span className="text-sm text-gray-500">Responsável: {task.assignee || "Não atribuído"}</span>
+                    </CardFooter>
+                  </Card>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            )}
+
+            {/* Visualização por Projeto */}
+            {viewMode === "byProject" && (
+              <div className="space-y-8">
+                {Object.entries(tasksByProject).map(([projectId, projectTasks]) => (
+                  <div key={projectId} className="border rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 p-4 border-b">
+                      <h3 className="font-medium text-lg">
+                        {projectId === "sem-projeto" ? "Tarefas sem projeto" : getProjectName(projectId)}
+                        <span className="ml-2 text-sm text-gray-500">({projectTasks.length} tarefas)</span>
+                      </h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="text-left py-3 px-4 font-medium text-gray-600">Título</th>
+                            <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
+                            <th className="text-left py-3 px-4 font-medium text-gray-600">Prioridade</th>
+                            <th className="text-left py-3 px-4 font-medium text-gray-600">Responsável</th>
+                            <th className="text-left py-3 px-4 font-medium text-gray-600">Data</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {projectTasks.map((task) => (
+                            <tr
+                              key={task.id}
+                              className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer"
+                              onClick={() => setEditTaskId(task.id)}
+                            >
+                              <td className="py-3 px-4">
+                                <div className="font-medium text-gray-800">{task.title}</div>
+                                <div className="text-sm text-gray-500 line-clamp-1">{task.description}</div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center">
+                                  <div className={`w-2 h-2 rounded-full ${getStatusColor(task.status)} mr-2`}></div>
+                                  <span>{getStatusLabel(task.status)}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center">
+                                  <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)} mr-2`}></div>
+                                  <span>{getPriorityLabel(task.priority)}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">{task.assignee || "Não atribuído"}</td>
+                              <td className="py-3 px-4">{formatDate(task.due_date)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         ) : (
           <div className="text-center py-12">
             <div className="mb-4 text-gray-400">
