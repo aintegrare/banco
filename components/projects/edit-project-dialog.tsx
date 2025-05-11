@@ -253,7 +253,7 @@ export function EditProjectDialog({ project, isOpen, onClose, onSuccess }: EditP
         if (!open && !isLoading) onClose()
       }}
     >
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 border dark:border-gray-700">
         <DialogHeader>
           <DialogTitle>Editar Projeto</DialogTitle>
         </DialogHeader>

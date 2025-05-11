@@ -224,3 +224,35 @@ button {
 .dark p {
   color: rgb(229 231 235) !important;
 }
+
+/* Garantir que os diálogos e modais tenham fundos opacos */
+.DialogContent,
+.DialogOverlay,
+[role="dialog"],
+[data-state="open"] {
+  @apply bg-white dark:bg-gray-800;
+}
+
+/* Corrigir transparência em modais e diálogos */
+.dark [role="dialog"],
+.dark [data-state="open"] {
+  background-color: rgb(31 41 55) !important;
+  backdrop-filter: blur(8px);
+}
+
+/* Garantir que o conteúdo do diálogo seja visível */
+.dark [role="dialog"] *,
+.dark [data-state="open"] * {
+  color: rgb(229 231 235);
+}
+
+/* Melhorar visibilidade de inputs em diálogos no modo escuro */
+.dark [role="dialog"] input,
+.dark [role="dialog"] textarea,
+.dark [role="dialog"] select,
+.dark [data-state="open"] input,
+.dark [data-state="open"] textarea,
+.dark [data-state="open"] select {
+  background-color: rgb(55 65 81) !important;
+  border-color: rgb(75 85 99) !important;
+}
