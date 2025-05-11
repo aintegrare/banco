@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { X, Calendar, Paperclip, Loader2 } from "lucide-react"
+import { X, Calendar, Paperclip, Loader2, AlertCircle } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 
 interface Project {
@@ -57,6 +57,8 @@ export function CreateTaskDialog({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
+  const [debugVisible, setDebugVisible] = useState(false)
   const { toast } = useToast()
 
   // Buscar projetos disponíveis
@@ -87,6 +89,26 @@ export function CreateTaskDialog({
     }
   }, [isOpen, toast])
 
+  // Buscar informações de depuração da tabela tasks
+  useEffect(() => {
+    if (isOpen && debugVisible) {
+      const fetchDebugInfo = async () => {
+        try {
+          const response = await fetch("/api/debug-tasks-table")
+          if (!response.ok) {
+            throw new Error("Falha ao buscar informações de depuração")
+          }
+          const data = await response.json()
+          setDebugInfo(data)
+        } catch (error) {
+          console.error("Erro ao buscar informações de depuração:", error)
+        }
+      }
+
+      fetchDebugInfo()
+    }
+  }, [isOpen, debugVisible])
+
   // Se o diálogo não estiver aberto, não renderize nada
   if (!isOpen) {
     return null
@@ -109,22 +131,26 @@ export function CreateTaskDialog({
     setError(null)
 
     try {
+      // Remover o campo status para evitar problemas de validação
+      const taskData = {
+        title: taskTitle,
+        description: taskDescription,
+        // Remover o status para depender do valor padrão do banco
+        // status: status,
+        project_id: projectId,
+        due_date: dueDate || null,
+        color: taskColor,
+        creator: creator || null,
+        assignee: assignee || null,
+      }
+
       // Criar nova tarefa via API
       const response = await fetch("/api/tasks", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          title: taskTitle,
-          description: taskDescription,
-          status: status,
-          project_id: projectId,
-          due_date: dueDate || null,
-          color: taskColor,
-          creator: creator || null,
-          assignee: assignee || null,
-        }),
+        body: JSON.stringify(taskData),
       })
 
       if (!response.ok) {
@@ -157,6 +183,10 @@ export function CreateTaskDialog({
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const toggleDebugInfo = () => {
+    setDebugVisible(!debugVisible)
   }
 
   return (
@@ -225,7 +255,7 @@ export function CreateTaskDialog({
 
             <div>
               <label htmlFor="status-select" className="block text-sm font-medium text-gray-700 mb-1">
-                Status
+                Status (visual apenas)
               </label>
               <select
                 id="status-select"
@@ -239,6 +269,10 @@ export function CreateTaskDialog({
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-amber-600 mt-1 flex items-center">
+                <AlertCircle size={12} className="mr-1" />
+                Este campo é apenas visual e não será salvo no banco de dados
+              </p>
             </div>
           </div>
 
@@ -260,7 +294,7 @@ export function CreateTaskDialog({
 
           <div className="mb-4">
             <label htmlFor="task-color" className="block text-sm font-medium text-gray-700 mb-1">
-              Cor da Tarefa
+              Cor da Tarefa (visual apenas)
             </label>
             <div className="grid grid-cols-5 gap-2">
               {COLOR_OPTIONS.map((color) => (
@@ -276,16 +310,22 @@ export function CreateTaskDialog({
                 />
               ))}
             </div>
-            <div className="mt-2 text-xs text-gray-500">
-              Cor selecionada:{" "}
-              <span className="font-medium">{COLOR_OPTIONS.find((c) => c.id === taskColor)?.name}</span>
+            <div className="mt-2 text-xs text-gray-500 flex items-center">
+              <span>
+                Cor selecionada:{" "}
+                <span className="font-medium">{COLOR_OPTIONS.find((c) => c.id === taskColor)?.name}</span>
+              </span>
+              <span className="text-amber-600 ml-2 flex items-center">
+                <AlertCircle size={12} className="mr-1" />
+                Visual apenas
+              </span>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label htmlFor="task-creator" className="block text-sm font-medium text-gray-700 mb-1">
-                Criador da Tarefa
+                Criador da Tarefa (visual apenas)
               </label>
               <input
                 type="text"
@@ -295,10 +335,14 @@ export function CreateTaskDialog({
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
                 placeholder="Nome do criador"
               />
+              <p className="text-xs text-amber-600 mt-1 flex items-center">
+                <AlertCircle size={12} className="mr-1" />
+                Visual apenas
+              </p>
             </div>
             <div>
               <label htmlFor="task-assignee" className="block text-sm font-medium text-gray-700 mb-1">
-                Responsável
+                Responsável (visual apenas)
               </label>
               <input
                 type="text"
@@ -308,8 +352,31 @@ export function CreateTaskDialog({
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
                 placeholder="Nome do responsável"
               />
+              <p className="text-xs text-amber-600 mt-1 flex items-center">
+                <AlertCircle size={12} className="mr-1" />
+                Visual apenas
+              </p>
             </div>
           </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-red-600 text-sm flex items-start">
+                <AlertCircle size={16} className="mr-2 mt-0.5 flex-shrink-0" />
+                <span>{error}</span>
+              </p>
+              <button type="button" onClick={toggleDebugInfo} className="text-xs text-blue-600 hover:underline mt-2">
+                {debugVisible ? "Ocultar informações de depuração" : "Mostrar informações de depuração"}
+              </button>
+
+              {debugVisible && debugInfo && (
+                <div className="mt-2 text-xs overflow-auto max-h-40 bg-gray-100 p-2 rounded">
+                  <p className="font-semibold">Informações da tabela tasks:</p>
+                  <pre className="whitespace-pre-wrap break-all">{JSON.stringify(debugInfo, null, 2)}</pre>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="mb-4">
             <button type="button" className="flex items-center text-sm text-[#4b7bb5] hover:text-[#3d649e]">
@@ -317,8 +384,6 @@ export function CreateTaskDialog({
               <span>Anexar arquivo</span>
             </button>
           </div>
-
-          {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
 
           <div className="flex justify-end space-x-3">
             <button

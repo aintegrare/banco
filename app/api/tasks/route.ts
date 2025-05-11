@@ -38,7 +38,7 @@ export async function GET(request: Request) {
   }
 }
 
-// Modificar a função POST para usar uma abordagem mais simples
+// Modificar a função POST para resolver o problema com o status
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -50,100 +50,214 @@ export async function POST(request: Request) {
 
     const supabase = createClient()
 
-    // Mapear os status do frontend para valores provavelmente permitidos no banco
-    // Baseado em valores comuns para status em bancos PostgreSQL
-    const statusMap: { [key: string]: string } = {
-      backlog: "pending",
-      todo: "pending",
-      "in-progress": "in_progress",
-      review: "review",
-      done: "completed",
+    // Primeiro, vamos verificar se existem tarefas no banco e obter os valores de status existentes
+    const { data: existingTasks, error: tasksError } = await supabase.from("tasks").select("status").limit(10)
+
+    if (tasksError) {
+      console.error("Erro ao buscar tarefas existentes:", tasksError)
     }
 
-    // Tentar obter um status válido do mapeamento ou usar um valor padrão
-    const mappedStatus = status ? statusMap[status] || "pending" : "pending"
+    let knownStatusValues: string[] = []
 
-    console.log(`Mapeando status: ${status} -> ${mappedStatus}`)
+    if (existingTasks && existingTasks.length > 0) {
+      // Extrair valores de status únicos
+      knownStatusValues = [...new Set(existingTasks.map((task) => task.status).filter(Boolean))]
+      console.log("Valores de status conhecidos:", knownStatusValues)
+    }
 
-    // Criar objeto com os dados da tarefa
-    // Remover campos que não existem na tabela (color, creator, assignee)
-    const taskData = {
+    // Se não encontramos valores de status existentes, tentaremos buscar a coluna status na definição da tabela
+    if (knownStatusValues.length === 0) {
+      try {
+        // Executar uma consulta direta à tabela tasks sem filtro para ver se há erro
+        const { data: sampleTask, error: sampleError } = await supabase
+          .from("tasks")
+          .select("status")
+          .limit(1)
+          .maybeSingle()
+
+        if (!sampleError && sampleTask) {
+          console.log("Exemplo de tarefa obtido:", sampleTask)
+        }
+      } catch (err) {
+        console.error("Erro ao buscar exemplo de tarefa:", err)
+      }
+    }
+
+    // Verificar se o banco permite inserir sem especificar o status
+    let shouldTryWithoutStatus = true
+
+    // Criar versão do taskData sem status explícito
+    const taskDataWithoutStatus = {
       title,
       description: description || null,
-      status: mappedStatus,
       priority: priority || "medium",
       project_id,
       due_date: due_date || null,
       created_at: new Date().toISOString(),
     }
 
-    // Tentar inserir a tarefa com o status mapeado
-    let result = await supabase.from("tasks").insert(taskData).select().single()
+    // Tentar criar tarefa sem especificar um status (deixar o valor padrão do banco)
+    console.log("Tentando criar tarefa sem especificar status")
+    const { data: createdWithoutStatus, error: withoutStatusError } = await supabase
+      .from("tasks")
+      .insert(taskDataWithoutStatus)
+      .select()
+      .single()
 
-    // Se houver erro, tentar com outros valores possíveis de status
-    if (
-      result.error &&
-      result.error.message.includes("violates check constraint") &&
-      result.error.message.includes("status")
-    ) {
-      console.warn(`Erro ao usar status '${mappedStatus}'. Tentando alternativas...`)
+    if (!withoutStatusError) {
+      console.log("Tarefa criada com sucesso sem especificar status:", createdWithoutStatus)
 
-      // Lista de possíveis valores de status para tentar
-      const possibleStatuses = [
-        "pending",
-        "in_progress",
-        "review",
-        "completed",
-        "cancelled",
-        "open",
-        "closed",
-        "new",
-        "active",
-        "inactive",
-        "on_hold",
-        "todo",
-        "doing",
-        "done",
-        "to_do",
-        "in_review",
-        "approved",
-        "rejected",
-      ]
+      // Adicionar os campos removidos de volta à resposta
+      const responseData = {
+        ...createdWithoutStatus,
+        color: color || "#4b7bb5",
+        creator: creator || null,
+        assignee: assignee || null,
+      }
 
-      for (const altStatus of possibleStatuses) {
-        if (altStatus === mappedStatus) continue // Pular o que já tentamos
+      return NextResponse.json(responseData)
+    } else {
+      console.error("Erro ao criar tarefa sem status:", withoutStatusError)
+      shouldTryWithoutStatus = false
+    }
 
-        console.log(`Tentando status alternativo: ${altStatus}`)
-        const altTaskData = { ...taskData, status: altStatus }
+    // Se temos valores de status conhecidos, tentaremos criar com eles
+    if (knownStatusValues.length > 0) {
+      for (const knownStatus of knownStatusValues) {
+        const taskDataWithKnownStatus = {
+          ...taskDataWithoutStatus,
+          status: knownStatus,
+        }
 
-        result = await supabase.from("tasks").insert(altTaskData).select().single()
+        console.log(`Tentando criar tarefa com status conhecido: ${knownStatus}`)
+        const { data: createdWithKnownStatus, error: knownStatusError } = await supabase
+          .from("tasks")
+          .insert(taskDataWithKnownStatus)
+          .select()
+          .single()
 
-        if (!result.error) {
-          console.log(`Status '${altStatus}' aceito pelo banco de dados!`)
-          // Atualizar o mapeamento para uso futuro
-          statusMap[status] = altStatus
-          break
+        if (!knownStatusError) {
+          console.log(`Tarefa criada com sucesso usando status conhecido: ${knownStatus}`)
+
+          // Adicionar os campos removidos de volta à resposta
+          const responseData = {
+            ...createdWithKnownStatus,
+            color: color || "#4b7bb5",
+            creator: creator || null,
+            assignee: assignee || null,
+          }
+
+          return NextResponse.json(responseData)
+        } else {
+          console.error(`Erro ao criar tarefa com status conhecido ${knownStatus}:`, knownStatusError)
         }
       }
     }
 
-    // Se ainda houver erro, retornar o erro
-    if (result.error) {
-      console.error("Erro ao criar tarefa após tentar múltiplos status:", result.error)
-      return NextResponse.json({ error: result.error.message }, { status: 500 })
+    // Tentativa com valores padrão de status
+    const defaultStatusValues = [
+      null, // Alguns bancos permitem NULL se o campo for nullable
+      "", // String vazia pode funcionar se o campo aceitar
+      "pending",
+      "to_do",
+      "todo",
+      "new",
+      "open",
+      "active",
+      "backlog",
+    ]
+
+    for (const defaultStatus of defaultStatusValues) {
+      if (defaultStatus === null) {
+        // Já tentamos sem status acima
+        if (shouldTryWithoutStatus) continue
+      }
+
+      const taskDataWithDefaultStatus = {
+        ...taskDataWithoutStatus,
+        status: defaultStatus,
+      }
+
+      console.log(`Tentando criar tarefa com status padrão: ${defaultStatus}`)
+      const { data: createdWithDefaultStatus, error: defaultStatusError } = await supabase
+        .from("tasks")
+        .insert(taskDataWithDefaultStatus)
+        .select()
+        .single()
+
+      if (!defaultStatusError) {
+        console.log(`Tarefa criada com sucesso usando status padrão: ${defaultStatus}`)
+
+        // Adicionar os campos removidos de volta à resposta
+        const responseData = {
+          ...createdWithDefaultStatus,
+          color: color || "#4b7bb5",
+          creator: creator || null,
+          assignee: assignee || null,
+        }
+
+        return NextResponse.json(responseData)
+      } else {
+        console.error(`Erro ao criar tarefa com status padrão ${defaultStatus}:`, defaultStatusError)
+      }
     }
 
-    // Adicionar os campos removidos de volta à resposta para uso no frontend
-    const responseData = {
-      ...result.data,
-      color: color || "#4b7bb5",
-      creator: creator || null,
-      assignee: assignee || null,
-      // Manter o status original do frontend para consistência na UI
-      status: status || "todo",
+    // Se chegarmos aqui, todas as tentativas falharam
+    // Vamos tentar criar uma tarefa com o mínimo possível de campos
+    const bareMinimumData = {
+      title,
+      project_id,
+      created_at: new Date().toISOString(),
     }
 
-    return NextResponse.json(responseData)
+    console.log("Tentando criar tarefa com o mínimo de campos")
+    const { data: minimalTask, error: minimalError } = await supabase
+      .from("tasks")
+      .insert(bareMinimumData)
+      .select()
+      .single()
+
+    if (!minimalError) {
+      console.log("Tarefa criada com sucesso usando o mínimo de campos:", minimalTask)
+
+      // Adicionar os campos removidos de volta à resposta
+      const responseData = {
+        ...minimalTask,
+        color: color || "#4b7bb5",
+        creator: creator || null,
+        assignee: assignee || null,
+        description: description || null,
+        priority: priority || "medium",
+        due_date: due_date || null,
+      }
+
+      return NextResponse.json(responseData)
+    } else {
+      console.error("Erro ao criar tarefa com o mínimo de campos:", minimalError)
+    }
+
+    // Se todas as tentativas falharem, recuperar mais informações sobre a estrutura da tabela
+    try {
+      const { data: tableInfo, error: infoError } = await supabase.rpc("get_table_info", { table_name: "tasks" })
+
+      if (!infoError && tableInfo) {
+        console.log("Informações da tabela tasks:", tableInfo)
+      } else {
+        console.error("Erro ao obter informações da tabela:", infoError)
+      }
+    } catch (err) {
+      console.error("Exceção ao tentar obter informações da tabela:", err)
+    }
+
+    // Se tudo falhar, retornar um erro detalhado
+    return NextResponse.json(
+      {
+        error: "Não foi possível criar a tarefa. Nenhum valor de status aceito pelo banco de dados.",
+        details:
+          "Tentativas de criar a tarefa com diferentes valores de status falharam. Verifique os requisitos do esquema do banco de dados.",
+      },
+      { status: 500 },
+    )
   } catch (error: any) {
     console.error("Erro ao processar requisição de criação de tarefa:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
