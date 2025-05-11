@@ -33,6 +33,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
+      <head>
+        <link rel="icon" href="/favicon.png" />
+      </head>
       <body className={`${inter.className} pb-20 w-full mx-auto`}>
         <ThemeProvider attribute="class" defaultTheme="light">
           {children}
