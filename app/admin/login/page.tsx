@@ -48,7 +48,12 @@ export default function LoginPage() {
       console.log("Dados da resposta:", data)
 
       if (!response.ok) {
-        throw new Error(data.error || "Falha ao fazer login")
+        // Mensagem de erro mais detalhada
+        if (response.status === 500 && data.error?.includes("Configuração do Supabase")) {
+          throw new Error("Erro de configuração do servidor. Por favor, contate o administrador.")
+        } else {
+          throw new Error(data.error || "Falha ao fazer login")
+        }
       }
 
       // Marcar login como bem-sucedido para acionar o redirecionamento

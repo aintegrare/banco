@@ -7,9 +7,9 @@ BEGIN
         regexp_replace(
             regexp_replace(
                 pg_get_constraintdef(c.oid),
-                '.*CHECK $$\(status = ANY \(ARRAY\[(.*)\]$$\)\).*', '\1'
+                '.*CHECK $$$$status = ANY \(ARRAY\[(.*)\]$$$$\).*', '\1'
             ),
-            '.*CHECK $$\(.*::\w+ = ANY \(ARRAY\[(.*)\]$$\)\).*', '\1'
+            '.*CHECK $$$$.*::\w+ = ANY \(ARRAY\[(.*)\]$$$$\).*', '\1'
         ),
         ', '
     ))) AS allowed_value

@@ -1,13 +1,10 @@
-CREATE OR REPLACE FUNCTION get_table_definition(table_name TEXT)
-RETURNS TEXT AS $$
-DECLARE
-  definition TEXT;
+CREATE OR REPLACE FUNCTION get_table_definition(table_name text)
+RETURNS TABLE (
+  table_definition text
+) AS $$
 BEGIN
+  RETURN QUERY
   SELECT 
-    pg_get_tabledef(table_name::regclass) INTO definition;
-  
-  RETURN definition;
-EXCEPTION WHEN OTHERS THEN
-  RETURN 'Erro ao obter definição: ' || SQLERRM;
+    pg_get_tabledef(table_name::regclass)::text;
 END;
 $$ LANGUAGE plpgsql;

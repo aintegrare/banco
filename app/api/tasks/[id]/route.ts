@@ -1,135 +1,122 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getTaskById, updateTask, deleteTask, updateTaskStatus } from "@/lib/unified-task-manager"
+import type { UpdateTaskInput } from "@/lib/unified-task-manager"
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const { id } = params
+    const taskId = Number.parseInt(params.id)
 
-    const supabase = createClient()
-    const { data, error } = await supabase.from("tasks").select("*").eq("id", id).single()
-
-    if (error) {
-      console.error("Erro ao buscar tarefa:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (isNaN(taskId)) {
+      return NextResponse.json({ error: "ID de tarefa inválido" }, { status: 400 })
     }
 
-    if (!data) {
-      return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 })
-    }
+    const task = await getTaskById(taskId)
 
-    return NextResponse.json(data)
+    return NextResponse.json(task)
   } catch (error: any) {
-    console.error("Erro ao processar requisição:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error(`Erro ao buscar tarefa:`, error)
+    return NextResponse.json({ error: error.message || "Erro ao buscar tarefa" }, { status: 500 })
   }
 }
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const { id } = params
+    const taskId = Number.parseInt(params.id)
+
+    if (isNaN(taskId)) {
+      return NextResponse.json({ error: "ID de tarefa inválido" }, { status: 400 })
+    }
+
     const body = await request.json()
 
-    // Desestruturar os dados recebidos do corpo da requisição
-    const { title, description, status, priority, project_id, due_date, color, assignee } = body
-
-    // Verificar dados obrigatórios
-    if (!title) {
-      return NextResponse.json({ error: "Título é obrigatório" }, { status: 400 })
-    }
-
-    const supabase = createClient()
-
-    // Mapear os status do frontend para valores comuns em bancos de dados
-    const statusMap: { [key: string]: string } = {
-      backlog: "backlog",
-      todo: "to_do",
-      "in-progress": "in_progress",
-      review: "review",
-      done: "done",
-    }
-
-    // Tentar atualizar a tarefa com o status mapeado
-    const mappedStatus = statusMap[status || "todo"] || "to_do"
-
-    // Objeto com dados para atualização (excluindo campos que não existem na tabela)
-    const taskData = {
+    const {
       title,
       description,
-      status: mappedStatus,
+      status,
       priority,
       project_id,
+      assigned_to,
       due_date,
-      updated_at: new Date().toISOString(),
-    }
+      estimated_hours,
+      actual_hours,
+      tags,
+      order_position,
+      subtasks,
+      color,
+      creator,
+      assignee,
+    } = body
 
-    // Primeira tentativa com o status mapeado
-    let response = await tryUpdateTask(supabase, id, taskData, body)
-    if (response) return response
+    const updates: UpdateTaskInput = {}
 
-    // Segunda tentativa com um conjunto de valores alternativos comuns
-    const commonStatuses = ["pending", "open", "new", "active", "to_do", "todo", "backlog"]
+    // Adicionar apenas os campos fornecidos
+    if (title !== undefined) updates.title = title
+    if (description !== undefined) updates.description = description
+    if (status !== undefined) updates.status = status
+    if (priority !== undefined) updates.priority = priority
+    if (project_id !== undefined) updates.project_id = project_id
+    if (assigned_to !== undefined) updates.assigned_to = assigned_to
+    if (due_date !== undefined) updates.due_date = due_date
+    if (estimated_hours !== undefined) updates.estimated_hours = estimated_hours
+    if (actual_hours !== undefined) updates.actual_hours = actual_hours
+    if (tags !== undefined) updates.tags = tags
+    if (order_position !== undefined) updates.order_position = order_position
+    if (subtasks !== undefined) updates.subtasks = subtasks
 
-    for (const altStatus of commonStatuses) {
-      console.log(`Tentando atualizar tarefa com status alternativo: ${altStatus}`)
-      const altTaskData = { ...taskData, status: altStatus }
-      response = await tryUpdateTask(supabase, id, altTaskData, body)
-      if (response) return response
-    }
+    const updatedTask = await updateTask(taskId, updates)
 
-    // Se todas as tentativas falharem, retornar erro
-    return NextResponse.json(
-      {
-        error: "Não foi possível atualizar a tarefa. Nenhum valor de status aceito pelo banco de dados.",
-      },
-      { status: 500 },
-    )
-  } catch (error: any) {
-    console.error("Erro ao processar requisição:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-}
-
-// Função auxiliar para tentar atualizar tarefa com um determinado status
-async function tryUpdateTask(supabase: any, id: string, taskData: any, originalBody: any) {
-  try {
-    const { data, error } = await supabase.from("tasks").update(taskData).eq("id", id).select().single()
-
-    if (error) {
-      console.log(`Tentativa de atualização com status '${taskData.status}' falhou:`, error.message)
-      return null
-    }
-
-    // Sucesso - adicionar os campos removidos de volta à resposta
-    const { color, assignee } = originalBody
+    // Adicionar campos virtuais para o frontend
     const responseData = {
-      ...data,
+      ...updatedTask,
       color: color || "#4b7bb5",
+      creator: creator || null,
       assignee: assignee || null,
     }
 
-    console.log(`Tarefa atualizada com sucesso usando status '${taskData.status}'`)
     return NextResponse.json(responseData)
-  } catch (err) {
-    console.error(`Erro ao tentar atualizar tarefa com status '${taskData.status}':`, err)
-    return null
+  } catch (error: any) {
+    console.error(`Erro ao atualizar tarefa:`, error)
+    return NextResponse.json({ error: error.message || "Erro ao atualizar tarefa" }, { status: 500 })
   }
 }
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const { id } = params
+    const taskId = Number.parseInt(params.id)
 
-    const supabase = createClient()
-    const { error } = await supabase.from("tasks").delete().eq("id", id)
-
-    if (error) {
-      console.error("Erro ao excluir tarefa:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (isNaN(taskId)) {
+      return NextResponse.json({ error: "ID de tarefa inválido" }, { status: 400 })
     }
 
-    return NextResponse.json({ message: "Tarefa excluída com sucesso" })
+    await deleteTask(taskId)
+
+    return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error("Erro ao processar requisição:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error(`Erro ao excluir tarefa:`, error)
+    return NextResponse.json({ error: error.message || "Erro ao excluir tarefa" }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+  try {
+    const taskId = Number.parseInt(params.id)
+
+    if (isNaN(taskId)) {
+      return NextResponse.json({ error: "ID de tarefa inválido" }, { status: 400 })
+    }
+
+    const body = await request.json()
+    const { status } = body
+
+    if (!status) {
+      return NextResponse.json({ error: "Status é obrigatório" }, { status: 400 })
+    }
+
+    const updatedTask = await updateTaskStatus(taskId, status)
+
+    return NextResponse.json(updatedTask)
+  } catch (error: any) {
+    console.error(`Erro ao atualizar status da tarefa:`, error)
+    return NextResponse.json({ error: error.message || "Erro ao atualizar status da tarefa" }, { status: 500 })
   }
 }

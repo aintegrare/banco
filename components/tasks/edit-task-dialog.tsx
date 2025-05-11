@@ -12,7 +12,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { CalendarIcon, Loader2 } from "lucide-react"
+import { CalendarIcon, Loader2, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -40,6 +40,15 @@ const COLOR_OPTIONS = [
   { id: "#64748b", name: "Cinza" },
 ]
 
+// Lista de status disponíveis - mantemos os mesmos IDs para a UI
+const STATUSES = [
+  { id: "backlog", name: "Backlog" },
+  { id: "todo", name: "A Fazer" },
+  { id: "in-progress", name: "Em Progresso" },
+  { id: "review", name: "Em Revisão" },
+  { id: "done", name: "Concluído" },
+]
+
 export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDialogProps) {
   const [task, setTask] = useState<any>(null)
   const [date, setDate] = useState<Date | undefined>(undefined)
@@ -47,6 +56,8 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
+  const [debugVisible, setDebugVisible] = useState(false)
   const { toast } = useToast()
 
   // Buscar dados da tarefa
@@ -103,6 +114,26 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
     fetchTaskData()
   }, [isOpen, taskId, toast])
 
+  // Buscar informações de depuração da tabela tasks
+  useEffect(() => {
+    if (isOpen && debugVisible) {
+      const fetchDebugInfo = async () => {
+        try {
+          const response = await fetch("/api/debug-tasks-table")
+          if (!response.ok) {
+            throw new Error("Falha ao buscar informações de depuração")
+          }
+          const data = await response.json()
+          setDebugInfo(data)
+        } catch (error) {
+          console.error("Erro ao buscar informações de depuração:", error)
+        }
+      }
+
+      fetchDebugInfo()
+    }
+  }, [isOpen, debugVisible])
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setTask((prev: any) => ({ ...prev, [name]: value }))
@@ -122,6 +153,11 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
     }
   }
 
+  const toggleDebugInfo = () => {
+    setDebugVisible(!debugVisible)
+  }
+
+  // Modificar a função handleSubmit para remover o campo status ao enviar os dados
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -137,8 +173,8 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
 
     try {
       // Preparar dados para envio
-      // Remover o campo color para não enviá-lo ao banco de dados
-      const { color, ...updateData } = task
+      // Remover campos que são apenas visuais ou que não existem na tabela
+      const { color, creator, assignee, status, ...updateData } = task
 
       const dataToSend = {
         ...updateData,
@@ -161,10 +197,13 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
 
       const updatedTask = await response.json()
 
-      // Adicionar a cor de volta ao objeto retornado para manter a consistência no frontend
-      const updatedTaskWithColor = {
+      // Adicionar os campos visuais de volta ao objeto retornado
+      const updatedTaskWithVisualFields = {
         ...updatedTask,
-        color: color,
+        color: color || "#4b7bb5",
+        creator: creator || null,
+        assignee: assignee || null,
+        status: status || "todo", // Manter o status visual
       }
 
       toast({
@@ -174,7 +213,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
 
       // Notificar o componente pai sobre a atualização
       if (onSave) {
-        onSave(updatedTaskWithColor)
+        onSave(updatedTaskWithVisualFields)
       }
 
       // Fechar o diálogo após sucesso
@@ -234,20 +273,24 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="status" className="text-sm font-medium">
-                  Status
+                  Status (visual apenas)
                 </label>
                 <Select value={task.status} onValueChange={(value) => handleSelectChange("status", value)}>
                   <SelectTrigger className="border-[#4b7bb5]">
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="backlog">Backlog</SelectItem>
-                    <SelectItem value="todo">A Fazer</SelectItem>
-                    <SelectItem value="in-progress">Em Progresso</SelectItem>
-                    <SelectItem value="review">Em Revisão</SelectItem>
-                    <SelectItem value="done">Concluído</SelectItem>
+                    {STATUSES.map((status) => (
+                      <SelectItem key={status.id} value={status.id}>
+                        {status.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-amber-600 mt-1 flex items-center">
+                  <AlertCircle size={12} className="mr-1" />
+                  Este campo é apenas visual e não será salvo no banco de dados
+                </p>
               </div>
               <div className="space-y-2">
                 <label htmlFor="priority" className="text-sm font-medium">
@@ -313,7 +356,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Cor da Tarefa</label>
+              <label className="text-sm font-medium">Cor da Tarefa (visual apenas)</label>
               <div className="grid grid-cols-5 gap-2">
                 {COLOR_OPTIONS.map((color) => (
                   <button
@@ -328,15 +371,23 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                   />
                 ))}
               </div>
-              <div className="text-xs text-gray-500">
-                Cor selecionada:{" "}
-                <span className="font-medium">{COLOR_OPTIONS.find((c) => c.id === task.color)?.name || "Padrão"}</span>
+              <div className="text-xs text-gray-500 flex items-center">
+                <span>
+                  Cor selecionada:{" "}
+                  <span className="font-medium">
+                    {COLOR_OPTIONS.find((c) => c.id === task.color)?.name || "Padrão"}
+                  </span>
+                </span>
+                <span className="text-amber-600 ml-2 flex items-center">
+                  <AlertCircle size={12} className="mr-1" />
+                  Visual apenas
+                </span>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="creator" className="text-sm font-medium">
-                  Criador da Tarefa
+                  Criador da Tarefa (visual apenas)
                 </label>
                 <Input
                   id="creator"
@@ -346,10 +397,14 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                   className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
                   placeholder="Nome do criador"
                 />
+                <p className="text-xs text-amber-600 mt-1 flex items-center">
+                  <AlertCircle size={12} className="mr-1" />
+                  Visual apenas
+                </p>
               </div>
               <div className="space-y-2">
                 <label htmlFor="assignee" className="text-sm font-medium">
-                  Responsável
+                  Responsável (visual apenas)
                 </label>
                 <Input
                   id="assignee"
@@ -359,10 +414,31 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                   className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
                   placeholder="Nome do responsável"
                 />
+                <p className="text-xs text-amber-600 mt-1 flex items-center">
+                  <AlertCircle size={12} className="mr-1" />
+                  Visual apenas
+                </p>
               </div>
             </div>
 
-            {error && <p className="text-red-600 text-sm">{error}</p>}
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-red-600 text-sm flex items-start">
+                  <AlertCircle size={16} className="mr-2 mt-0.5 flex-shrink-0" />
+                  <span>{error}</span>
+                </p>
+                <button type="button" onClick={toggleDebugInfo} className="text-xs text-blue-600 hover:underline mt-2">
+                  {debugVisible ? "Ocultar informações de depuração" : "Mostrar informações de depuração"}
+                </button>
+
+                {debugVisible && debugInfo && (
+                  <div className="mt-2 text-xs overflow-auto max-h-40 bg-gray-100 p-2 rounded">
+                    <p className="font-semibold">Informações da tabela tasks:</p>
+                    <pre className="whitespace-pre-wrap break-all">{JSON.stringify(debugInfo, null, 2)}</pre>
+                  </div>
+                )}
+              </div>
+            )}
 
             <DialogFooter className="mt-6">
               <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>

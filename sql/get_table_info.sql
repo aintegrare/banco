@@ -1,32 +1,32 @@
-CREATE OR REPLACE FUNCTION get_table_info(table_name TEXT)
-RETURNS JSONB AS $$
-DECLARE
-  result JSONB;
+CREATE OR REPLACE FUNCTION get_table_info(table_name text)
+RETURNS TABLE (
+  column_name text,
+  data_type text,
+  is_nullable boolean,
+  column_default text,
+  constraint_name text,
+  constraint_type text,
+  constraint_definition text
+) AS $$
 BEGIN
+  RETURN QUERY
   SELECT 
-    jsonb_build_object(
-      'columns', (
-        SELECT jsonb_agg(jsonb_build_object(
-          'name', column_name,
-          'type', data_type,
-          'nullable', is_nullable,
-          'default', column_default
-        ))
-        FROM information_schema.columns
-        WHERE table_name = get_table_info.table_name
-      ),
-      'constraints', (
-        SELECT jsonb_agg(jsonb_build_object(
-          'name', constraint_name,
-          'type', constraint_type
-        ))
-        FROM information_schema.table_constraints
-        WHERE table_name = get_table_info.table_name
-      )
-    ) INTO result;
-  
-  RETURN result;
-EXCEPTION WHEN OTHERS THEN
-  RETURN jsonb_build_object('error', SQLERRM);
+    c.column_name::text,
+    c.data_type::text,
+    (c.is_nullable = 'YES')::boolean,
+    c.column_default::text,
+    tc.constraint_name::text,
+    tc.constraint_type::text,
+    pgc.consrc::text AS constraint_definition
+  FROM 
+    information_schema.columns c
+  LEFT JOIN 
+    information_schema.constraint_column_usage ccu ON c.table_name = ccu.table_name AND c.column_name = ccu.column_name
+  LEFT JOIN 
+    information_schema.table_constraints tc ON ccu.constraint_name = tc.constraint_name
+  LEFT JOIN 
+    pg_constraint pgc ON tc.constraint_name = pgc.conname
+  WHERE 
+    c.table_name = table_name;
 END;
 $$ LANGUAGE plpgsql;

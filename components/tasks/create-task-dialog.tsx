@@ -114,6 +114,7 @@ export function CreateTaskDialog({
     return null
   }
 
+  // Modificar a função handleSubmit para remover o campo status ao enviar os dados
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -131,17 +132,17 @@ export function CreateTaskDialog({
     setError(null)
 
     try {
-      // Remover o campo status para evitar problemas de validação
+      // Criar objeto de dados sem incluir o status
       const taskData = {
         title: taskTitle,
         description: taskDescription,
-        // Remover o status para depender do valor padrão do banco
-        // status: status,
+        // Não enviar o status para o backend
         project_id: projectId,
         due_date: dueDate || null,
         color: taskColor,
         creator: creator || null,
         assignee: assignee || null,
+        priority: "medium", // Valor padrão
       }
 
       // Criar nova tarefa via API
@@ -167,7 +168,11 @@ export function CreateTaskDialog({
 
       // Notificar o componente pai sobre a nova tarefa
       if (onTaskCreated) {
-        onTaskCreated(newTask)
+        // Adicionar o status visual do frontend
+        onTaskCreated({
+          ...newTask,
+          status: status, // Usar o status selecionado no frontend
+        })
       }
 
       // Fechar o diálogo após sucesso
