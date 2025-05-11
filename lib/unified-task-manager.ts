@@ -112,6 +112,7 @@ export async function getTasks(filters: TaskFilter = {}): Promise<Task[]> {
 
     // Aplicar filtros
     if (filters.project_id) {
+      console.log("Filtrando tarefas pelo projeto ID:", filters.project_id)
       query = query.eq("project_id", filters.project_id)
     }
 
@@ -315,6 +316,8 @@ function mapDbTaskToFrontend(dbTask: any): Task {
     status: frontendStatus,
     priority: frontendPriority,
     color: "#4b7bb5", // Cor padrão
+    // Garantir que project_id seja preservado
+    project_id: dbTask.project_id,
   }
 }
 

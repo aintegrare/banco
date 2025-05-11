@@ -8,6 +8,7 @@ export async function GET(request: Request) {
 
     // Extrair parâmetros de consulta
     const projectId = searchParams.get("project_id") ? Number.parseInt(searchParams.get("project_id")!) : undefined
+    console.log("Buscando tarefas para o projeto:", projectId)
 
     const status = searchParams.get("status") as TaskStatus | undefined
 

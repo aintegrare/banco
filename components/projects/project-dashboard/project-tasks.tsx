@@ -41,7 +41,7 @@ export function ProjectTasks({ tasks: initialTasks, projectId }: ProjectTasksPro
 
       setIsLoading(true)
       try {
-        const response = await fetch(`/api/tasks?projectId=${projectId}`)
+        const response = await fetch(`/api/tasks?project_id=${projectId}`)
         if (!response.ok) {
           throw new Error("Falha ao buscar tarefas")
         }

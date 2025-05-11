@@ -125,7 +125,7 @@ export function FileExplorer() {
   const [currentPath, setCurrentPath] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<"grid" | "list" | "details">("grid")
-  const [showUploader, setShowUploader] = useState(showUploader)
+  const [showUploader, setShowUploader] = useState(false)
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false)
   const [newFolderName, setNewFolderName] = useState("")
   const [isCreatingFolder, setIsCreatingFolder] = useState(false)

@@ -58,7 +58,7 @@ export default function TasksPage() {
         // Buscar tarefas
         let url = "/api/tasks"
         if (projectIdParam) {
-          url += `?projectId=${projectIdParam}`
+          url += `?project_id=${projectIdParam}`
         }
 
         console.log("Buscando tarefas de:", url)
@@ -126,7 +126,7 @@ export default function TasksPage() {
     const matchesStatus = statusFilter === "all" || task.status === statusFilter
 
     // Filtro de projeto
-    const matchesProject = projectFilter === "all" || task.project_id.toString() === projectFilter
+    const matchesProject = projectFilter === "all" || (task.project_id && task.project_id.toString() === projectFilter)
 
     // Filtro de prioridade
     const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter
