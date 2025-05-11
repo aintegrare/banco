@@ -248,9 +248,9 @@ export function FileExplorer() {
 
       // Normalizar o caminho da pasta para busca
       const normalizedPath = folderPath.endsWith("/") ? folderPath : `${folderPath}`
-      const pathWithSlash = folderPath.endsWith("/") ? folderPath.endsWith("/") ? folderPath : `${folderPath}/`
+      const pathWithSlash = folderPath.endsWith("/") ? folderPath : `${folderPath}/`
 
-      // Buscar tarefas com path exato e também com / no final\
+      // Buscar tarefas com path exato e também com / no final
       const { data, error } = await supabase
         .from("folder_tasks")
         .select("*")
@@ -1398,7 +1398,7 @@ export function FileExplorer() {
                               <DropdownMenuItem onClick={() => handleShare(file)}>
                                 <Share2 className="h-4 w-4 mr-2" />
                                 Compartilhar
-                              DropdownMenuItem>
+                              </DropdownMenuItem>
                               <DropdownMenuItem asChild>
                                 <a href={file.url} download>
                                   <Download className="h-4 w-4 mr-2" />
@@ -2274,7 +2274,6 @@ export function FileExplorer() {
           </div>
         )}
       </div>
-
       {/* Modal de upload */}
       <Dialog open={showUploader} onOpenChange={setShowUploader}>
         <DialogContent className="sm:max-w-[600px]">
@@ -2289,7 +2288,6 @@ export function FileExplorer() {
           />
         </DialogContent>
       </Dialog>
-
       {/* Modal de criar pasta */}
       <Dialog open={showCreateFolderDialog} onOpenChange={setShowCreateFolderDialog}>
         <DialogContent className="sm:max-w-[425px]">
@@ -2338,18 +2336,19 @@ export function FileExplorer() {
           </form>
         </DialogContent>
       </Dialog>
-
-      // Vamos melhorar o modal de mover arquivo para garantir uma melhor experiência
-
-      // Substitua o Dialog de mover arquivo por este:
+      // Vamos melhorar o modal de mover arquivo para garantir uma melhor experiência // Substitua o Dialog de mover
+      arquivo por este:
       {/* Modal de mover arquivo */}
-      <Dialog open={showMoveFileModal} onOpenChange={(open) => {
-        setShowMoveFileModal(open);
-        if (!open) {
-          // Limpar estado quando o modal for fechado
-          setMoveFileError(null);
-        }
-      }}>
+      <Dialog
+        open={showMoveFileModal}
+        onOpenChange={(open) => {
+          setShowMoveFileModal(open)
+          if (!open) {
+            // Limpar estado quando o modal for fechado
+            setMoveFileError(null)
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Mover Arquivo</DialogTitle>
@@ -2363,12 +2362,14 @@ export function FileExplorer() {
                 <div className="h-60 border rounded-md overflow-hidden bg-white">
                   <FolderSelector
                     onSelect={(path) => {
-                      console.log(`Pasta selecionada: "${path}"`);
-                      setDestinationPath(path);
-                      setMoveFileError(null);
+                      console.log(`Pasta selecionada: "${path}"`)
+                      setDestinationPath(path)
+                      setMoveFileError(null)
                     }}
                     currentPath={destinationPath}
-                    excludePaths={itemToMove ? [itemToMove.path.substring(0, itemToMove.path.lastIndexOf("/") || 0)] : []}
+                    excludePaths={
+                      itemToMove ? [itemToMove.path.substring(0, itemToMove.path.lastIndexOf("/") || 0)] : []
+                    }
                   />
                 </div>
                 <div className="mt-2 text-sm">
@@ -2415,7 +2416,6 @@ export function FileExplorer() {
           </form>
         </DialogContent>
       </Dialog>
-
       {/* Diálogo de confirmação de exclusão */}
       {showDeleteConfirmation && itemToDelete && (
         <DeleteConfirmationDialog
@@ -2426,7 +2426,6 @@ export function FileExplorer() {
           isFolder={itemToDelete.type === "folder"}
         />
       )}
-
       {/* Diálogo de compartilhamento */}
       {showShareDialog && itemToShare && (
         <ShareLinkDialog
@@ -2436,7 +2435,6 @@ export function FileExplorer() {
           fileName={itemToShare.name}
         />
       )}
-
       {/* Diálogo de detalhes da tarefa */}
       <Dialog open={showTaskDetails} onOpenChange={setShowTaskDetails}>
         <DialogContent className="sm:max-w-[500px]">
@@ -2509,7 +2507,6 @@ export function FileExplorer() {
           )}
         </DialogContent>
       </Dialog>
-
       {/* Diálogo de ajuda */}
       <Dialog open={showHelp} onOpenChange={setShowHelp}>
         <DialogContent className="sm:max-w-[600px]">
@@ -2604,7 +2601,6 @@ export function FileExplorer() {
           </div>
         </DialogContent>
       </Dialog>
-
       {/* Toast de notificação */}
     </div>
   )
