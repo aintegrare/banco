@@ -89,6 +89,7 @@ import { fetchFolderTaskCounts } from "@/lib/folder-tasks-manager"
 // Importar o novo sistema de notificações
 import { useNotification } from "./notification-manager"
 import { logger } from "@/lib/logger"
+import { FolderSelector } from "./folder-selector"
 
 interface FileItem {
   id: string
@@ -247,9 +248,9 @@ export function FileExplorer() {
 
       // Normalizar o caminho da pasta para busca
       const normalizedPath = folderPath.endsWith("/") ? folderPath : `${folderPath}`
-      const pathWithSlash = folderPath.endsWith("/") ? folderPath : `${folderPath}/`
+      const pathWithSlash = folderPath.endsWith("/") ? folderPath.endsWith("/") ? folderPath : `${folderPath}/`
 
-      // Buscar tarefas com path exato e também com / no final
+      // Buscar tarefas com path exato e também com / no final\
       const { data, error } = await supabase
         .from("folder_tasks")
         .select("*")
@@ -614,7 +615,12 @@ export function FileExplorer() {
   const handleMoveFile = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!itemToMove || !destinationPath) {
+    if (!itemToMove) {
+      setMoveFileError("Nenhum arquivo selecionado para mover")
+      return
+    }
+
+    if (destinationPath === undefined || destinationPath === null) {
       setMoveFileError("Selecione um destino para mover o arquivo")
       return
     }
@@ -626,9 +632,12 @@ export function FileExplorer() {
 
     try {
       const fileName = itemToMove.name
-      const newPath = `${destinationPath}${destinationPath.endsWith("/") ? "" : "/"}${fileName}`
+      // Garantir que o caminho de destino esteja formatado corretamente
+      const formattedDestPath = destinationPath.trim()
+      const newPath = formattedDestPath ? `${formattedDestPath}/${fileName}` : fileName
 
       logger.info(`FileExplorer: Movendo arquivo: ${itemToMove.path} para ${newPath}`)
+      console.log(`Movendo de "${itemToMove.path}" para "${newPath}"`)
 
       const response = await fetch("/api/files/move", {
         method: "POST",
@@ -657,10 +666,14 @@ export function FileExplorer() {
       notification.removeNotification(loadingId)
 
       // Mostrar notificação de sucesso
-      notification.success("Arquivo movido com sucesso!", `"${fileName}" foi movido para "${destinationPath}".`, {
-        actionLabel: "Ir para o destino",
-        onAction: () => navigateToFolder(destinationPath),
-      })
+      notification.success(
+        "Arquivo movido com sucesso!",
+        `"${fileName}" foi movido para "${formattedDestPath || "pasta raiz"}".`,
+        {
+          actionLabel: "Ir para o destino",
+          onAction: () => navigateToFolder(formattedDestPath),
+        },
+      )
 
       // Verificar se o arquivo foi realmente movido
       setTimeout(async () => {
@@ -1385,7 +1398,7 @@ export function FileExplorer() {
                               <DropdownMenuItem onClick={() => handleShare(file)}>
                                 <Share2 className="h-4 w-4 mr-2" />
                                 Compartilhar
-                              </DropdownMenuItem>
+                              DropdownMenuItem>
                               <DropdownMenuItem asChild>
                                 <a href={file.url} download>
                                   <Download className="h-4 w-4 mr-2" />
@@ -2326,26 +2339,53 @@ export function FileExplorer() {
         </DialogContent>
       </Dialog>
 
+      // Vamos melhorar o modal de mover arquivo para garantir uma melhor experiência
+
+      // Substitua o Dialog de mover arquivo por este:
       {/* Modal de mover arquivo */}
-      <Dialog open={showMoveFileModal} onOpenChange={setShowMoveFileModal}>
-        <DialogContent className="sm:max-w-[425px]">
+      <Dialog open={showMoveFileModal} onOpenChange={(open) => {
+        setShowMoveFileModal(open);
+        if (!open) {
+          // Limpar estado quando o modal for fechado
+          setMoveFileError(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Mover Arquivo</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleMoveFile}>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <label htmlFor="destinationPath" className="text-sm font-medium">
-                  Caminho de destino
+                <label className="text-sm font-medium">
+                  Selecione a pasta de destino para mover {itemToMove ? `"${itemToMove.name}"` : "o arquivo"}
                 </label>
-                <Input
-                  id="destinationPath"
-                  value={destinationPath}
-                  onChange={(e) => setDestinationPath(e.target.value)}
-                  placeholder="Ex: documents/pasta1"
-                  autoFocus
-                />
-                {moveFileError && <p className="text-sm text-red-500">{moveFileError}</p>}
+                <div className="h-60 border rounded-md overflow-hidden bg-white">
+                  <FolderSelector
+                    onSelect={(path) => {
+                      console.log(`Pasta selecionada: "${path}"`);
+                      setDestinationPath(path);
+                      setMoveFileError(null);
+                    }}
+                    currentPath={destinationPath}
+                    excludePaths={itemToMove ? [itemToMove.path.substring(0, itemToMove.path.lastIndexOf("/") || 0)] : []}
+                  />
+                </div>
+                <div className="mt-2 text-sm">
+                  <span className="font-medium">Pasta selecionada:</span>{" "}
+                  {destinationPath === "" ? (
+                    <span className="italic text-gray-500">Pasta raiz</span>
+                  ) : destinationPath ? (
+                    <span className="text-[#4b7bb5]">{destinationPath}</span>
+                  ) : (
+                    <span className="text-amber-600 italic">Nenhuma pasta selecionada</span>
+                  )}
+                </div>
+                {moveFileError && (
+                  <div className="p-2 mt-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+                    {moveFileError}
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter>
@@ -2359,7 +2399,7 @@ export function FileExplorer() {
               </Button>
               <Button
                 type="submit"
-                disabled={!destinationPath.trim() || isMovingFile}
+                disabled={isMovingFile || destinationPath === undefined || destinationPath === null}
                 className="bg-[#4b7bb5] hover:bg-[#3d649e]"
               >
                 {isMovingFile ? (

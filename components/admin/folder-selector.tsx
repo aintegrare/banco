@@ -32,44 +32,84 @@ export function FolderSelector({ onSelect, currentPath = "", excludePaths = [] }
     })
   }, [expandedFolders])
 
+  // Modificar a função fetchRootFolders para melhorar o tratamento de erros e logging
   const fetchRootFolders = async () => {
     setIsLoading(true)
     setError(null)
     try {
+      console.log("FolderSelector: Buscando pastas raiz")
       const response = await fetch("/api/files/folders")
-      if (response.ok) {
-        const data = await response.json()
-        setFolders(
-          (data.folders || []).map((folder: any) => ({
-            name: folder.name || folder.ObjectName,
-            path: folder.path || folder.Path,
-          })),
-        )
-      } else {
-        setError("Erro ao carregar pastas")
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`FolderSelector: Erro na API (${response.status}):`, errorText)
+        throw new Error(`Erro ao carregar pastas: ${response.status}`)
       }
+
+      const data = await response.json()
+      console.log("FolderSelector: Dados recebidos:", data)
+
+      if (!data.folders || !Array.isArray(data.folders)) {
+        console.error("FolderSelector: Formato de resposta inválido:", data)
+        throw new Error("Formato de resposta inválido")
+      }
+
+      const formattedFolders = data.folders.map((folder: any) => ({
+        name: folder.name || folder.ObjectName || "Pasta sem nome",
+        path: folder.path || folder.Path || "",
+      }))
+
+      console.log("FolderSelector: Pastas formatadas:", formattedFolders)
+      setFolders(formattedFolders)
     } catch (error) {
-      setError("Erro ao carregar pastas")
+      console.error("FolderSelector: Erro ao carregar pastas:", error)
+      setError(error instanceof Error ? error.message : "Erro ao carregar pastas")
     } finally {
       setIsLoading(false)
     }
   }
 
+  // Modificar a função fetchSubfolders para melhorar o tratamento de erros e logging
   const fetchSubfolders = async (path: string) => {
     try {
+      console.log(`FolderSelector: Buscando subpastas de "${path}"`)
       const response = await fetch(`/api/files/folders?path=${encodeURIComponent(path)}`)
-      if (response.ok) {
-        const data = await response.json()
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`FolderSelector: Erro na API (${response.status}):`, errorText)
+        throw new Error(`Erro ao carregar subpastas: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log(`FolderSelector: Subpastas recebidas para "${path}":`, data)
+
+      if (!data.folders || !Array.isArray(data.folders)) {
+        console.error("FolderSelector: Formato de resposta inválido para subpastas:", data)
         setSubfolders((prev) => ({
           ...prev,
-          [path]: (data.folders || []).map((folder: any) => ({
-            name: folder.name || folder.ObjectName,
-            path: folder.path || folder.Path,
-          })),
+          [path]: [],
         }))
+        return
       }
+
+      const formattedSubfolders = data.folders.map((folder: any) => ({
+        name: folder.name || folder.ObjectName || "Pasta sem nome",
+        path: folder.path || folder.Path || "",
+      }))
+
+      console.log(`FolderSelector: Subpastas formatadas para "${path}":`, formattedSubfolders)
+      setSubfolders((prev) => ({
+        ...prev,
+        [path]: formattedSubfolders,
+      }))
     } catch (error) {
-      console.error(`Erro ao buscar subpastas de ${path}:`, error)
+      console.error(`FolderSelector: Erro ao buscar subpastas de ${path}:`, error)
+      // Definir um array vazio para evitar tentativas repetidas de carregar a mesma pasta com erro
+      setSubfolders((prev) => ({
+        ...prev,
+        [path]: [],
+      }))
     }
   }
 
