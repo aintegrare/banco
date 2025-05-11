@@ -103,13 +103,15 @@ export function TaskCard({ task, onEdit, onDelete, onStatusChange, showProject =
     onEdit(editedTask)
   }
 
+  const cardStyle = {
+    borderLeft: task.color ? `4px solid ${task.color}` : `4px solid #4b7bb5`,
+  }
+
   return (
     <>
       <Card
         className="w-full shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer"
-        style={{
-          borderLeft: `4px solid ${task.color || "#4b7bb5"}`,
-        }}
+        style={cardStyle}
       >
         <CardContent className="p-4">
           <div className="flex justify-between items-start mb-3">

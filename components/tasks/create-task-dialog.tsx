@@ -92,6 +92,7 @@ export function CreateTaskDialog({
     return null
   }
 
+  // Modificar a função handleSubmit para lidar com os campos que não existem na tabela
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 

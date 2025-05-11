@@ -25,28 +25,37 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
+// Modificar a função PUT para remover campos que não existem na tabela
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
     const taskId = params.id
     const body = await request.json()
 
-    // Remover campos que não devem ser atualizados
-    const { id, created_at, ...updateData } = body
-
-    if (!updateData.title) {
-      return NextResponse.json({ error: "Título da tarefa é obrigatório" }, { status: 400 })
-    }
+    // Remover campos que não existem na tabela (color, creator, assignee)
+    const { color, creator, assignee, ...taskData } = body
 
     const supabase = createClient()
 
-    const { data, error } = await supabase.from("tasks").update(updateData).eq("id", taskId).select().single()
+    const { data, error } = await supabase.from("tasks").update(taskData).eq("id", taskId).select().single()
 
     if (error) {
       console.error(`Erro ao atualizar tarefa ${taskId}:`, error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json(data)
+    if (!data) {
+      return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 })
+    }
+
+    // Adicionar os campos removidos de volta à resposta para uso no frontend
+    const responseData = {
+      ...data,
+      color: color || "#4b7bb5",
+      creator: creator || null,
+      assignee: assignee || null,
+    }
+
+    return NextResponse.json(responseData)
   } catch (error: any) {
     console.error("Erro ao processar requisição de atualização de tarefa:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })

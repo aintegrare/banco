@@ -3,6 +3,10 @@ import { uploadFileToBunny } from "@/lib/bunny"
 import { addDocumentMetadata } from "@/lib/api"
 import { ensureClientFolderInPath } from "@/lib/document-processor"
 
+// Adicionar estas importações no início do arquivo
+import { getRecommendedCacheConfig } from "@/lib/bunny"
+
+// Modificar a função POST para incluir cabeçalhos de cache e verificações
 export async function POST(request: NextRequest) {
   try {
     console.log("API Upload: Iniciando processamento de upload")
@@ -23,6 +27,9 @@ export async function POST(request: NextRequest) {
 
     const folder = (formData.get("folder") as string) || ""
     const clientName = (formData.get("clientName") as string) || ""
+
+    // Nova opção para controlar o cache
+    const cacheControl = (formData.get("cacheControl") as string) || ""
 
     if (!file) {
       console.error("API Upload: Nenhum arquivo enviado")
@@ -110,6 +117,10 @@ export async function POST(request: NextRequest) {
 
     console.log(`API Upload: Arquivo convertido para buffer, tamanho: ${buffer.length} bytes`)
 
+    // Obter configuração de cache recomendada para este tipo de arquivo
+    const cacheConfig = getRecommendedCacheConfig(fileType)
+    console.log(`API Upload: Configuração de cache recomendada:`, cacheConfig)
+
     try {
       // Fazer upload para o Bunny.net
       console.log("API Upload: Iniciando upload para Bunny.net")
@@ -146,6 +157,7 @@ export async function POST(request: NextRequest) {
         fileType,
         documentType,
         timestamp,
+        cacheControl: cacheControl || cacheConfig.cacheControl, // Armazenar a configuração de cache usada
       })
 
       console.log(`API Upload: Metadados armazenados com ID: ${metadata.id}`)
@@ -161,6 +173,7 @@ export async function POST(request: NextRequest) {
         documentId: metadata.id,
         chunksProcessed: 0,
         isImage,
+        cacheControl: cacheControl || cacheConfig.cacheControl,
       })
     } catch (uploadError) {
       console.error("API Upload: Erro específico no upload para Bunny.net:", uploadError)

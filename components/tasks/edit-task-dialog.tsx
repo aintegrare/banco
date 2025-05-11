@@ -137,9 +137,12 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
 
     try {
       // Preparar dados para envio
-      const updateData = {
-        ...task,
-        project_id: task.project_id || task.projectId, // Garantir compatibilidade
+      // Remover o campo color para não enviá-lo ao banco de dados
+      const { color, ...updateData } = task
+
+      const dataToSend = {
+        ...updateData,
+        project_id: updateData.project_id || updateData.projectId, // Garantir compatibilidade
       }
 
       // Atualizar tarefa via API
@@ -148,7 +151,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(updateData),
+        body: JSON.stringify(dataToSend),
       })
 
       if (!response.ok) {
@@ -158,6 +161,12 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
 
       const updatedTask = await response.json()
 
+      // Adicionar a cor de volta ao objeto retornado para manter a consistência no frontend
+      const updatedTaskWithColor = {
+        ...updatedTask,
+        color: color,
+      }
+
       toast({
         title: "Sucesso",
         description: "Tarefa atualizada com sucesso!",
@@ -165,7 +174,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
 
       // Notificar o componente pai sobre a atualização
       if (onSave) {
-        onSave(updatedTask)
+        onSave(updatedTaskWithColor)
       }
 
       // Fechar o diálogo após sucesso

@@ -79,13 +79,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ShareLinkDialog } from "./share-link-dialog"
-import { ToastNotification } from "./toast-notification"
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { getSupabaseClient } from "@/lib/supabase/client"
 
 // Adicionar importações para os componentes de tarefas
 import { fetchFolderTaskCounts } from "@/lib/folder-tasks-manager"
+
+// Importar o novo sistema de notificações
+import { useNotification } from "./notification-manager"
+import { logger } from "@/lib/logger"
 
 interface FileItem {
   id: string
@@ -114,6 +117,7 @@ interface TaskCount {
 }
 
 export function FileExplorer() {
+  const notification = useNotification()
   const [files, setFiles] = useState<FileItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -133,11 +137,6 @@ export function FileExplorer() {
   const [itemToDelete, setItemToDelete] = useState<FileItem | null>(null)
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [itemToShare, setItemToShare] = useState<FileItem | null>(null)
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: "success" | "error" }>({
-    visible: false,
-    message: "",
-    type: "success",
-  })
   const [favorites, setFavorites] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<"all" | "recent" | "favorites" | "shared">("all")
   const [recentFiles, setRecentFiles] = useState<FileItem[]>([])
@@ -340,6 +339,8 @@ export function FileExplorer() {
   const confirmDelete = async () => {
     if (!itemToDelete) return
 
+    const loadingId = notification.loading(`Excluindo ${itemToDelete.type === "folder" ? "pasta" : "arquivo"}...`)
+
     try {
       let cleanPath = itemToDelete.path
       if (cleanPath.startsWith("http")) {
@@ -347,36 +348,65 @@ export function FileExplorer() {
         cleanPath = url.pathname.replace(/^\//, "")
       }
 
+      logger.info(`FileExplorer: Excluindo ${itemToDelete.type}: ${cleanPath}`)
+
       const response = await fetch(`/api/files/${encodeURIComponent(cleanPath)}`, {
         method: "DELETE",
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const data = await response.json()
         throw new Error(data.message || data.error || `Erro ao excluir: ${response.status}`)
       }
 
       // Remover o arquivo da lista
       setFiles((prev) => prev.filter((file) => file.path !== itemToDelete.path))
 
-      // Mostrar toast de sucesso
-      setToast({
-        visible: true,
-        message: `${itemToDelete.type === "folder" ? "Pasta" : "Arquivo"} excluído com sucesso!`,
-        type: "success",
-      })
+      // Remover a notificação de carregamento
+      notification.removeNotification(loadingId)
 
-      // Esconder o toast após 3 segundos
-      setTimeout(() => {
-        setToast((prev) => ({ ...prev, visible: false }))
-      }, 3000)
+      // Mostrar notificação de sucesso
+      notification.success(
+        `${itemToDelete.type === "folder" ? "Pasta" : "Arquivo"} excluído com sucesso!`,
+        `${itemToDelete.name} foi excluído permanentemente.`,
+      )
+
+      // Verificar se o arquivo foi realmente excluído
+      setTimeout(async () => {
+        try {
+          const verifyResponse = await fetch(`/api/check-file?path=${encodeURIComponent(cleanPath)}`)
+          const verifyData = await verifyResponse.json()
+
+          if (verifyData.exists) {
+            notification.warning(
+              "Verificação pós-exclusão falhou",
+              `O arquivo ainda aparece no servidor. Pode ser necessário atualizar a lista manualmente.`,
+              {
+                actionLabel: "Atualizar Agora",
+                onAction: () => fetchFiles(),
+              },
+            )
+          }
+        } catch (verifyError) {
+          logger.error("Erro na verificação pós-exclusão:", { data: verifyError })
+        }
+      }, 2000)
     } catch (err) {
-      console.error("Erro ao excluir:", err)
-      setToast({
-        visible: true,
-        message: err instanceof Error ? err.message : "Erro ao excluir",
-        type: "error",
-      })
+      logger.error("Erro ao excluir:", { data: err })
+
+      // Remover a notificação de carregamento
+      notification.removeNotification(loadingId)
+
+      // Mostrar notificação de erro
+      notification.error(
+        "Erro ao excluir",
+        err instanceof Error ? err.message : "Erro desconhecido ao excluir o arquivo",
+        {
+          actionLabel: "Tentar Novamente",
+          onAction: () => confirmDelete(),
+        },
+      )
     } finally {
       setShowDeleteConfirmation(false)
       setItemToDelete(null)
@@ -385,7 +415,11 @@ export function FileExplorer() {
 
   // Renomear um arquivo ou pasta
   const handleRename = async (oldPath: string, newName: string) => {
+    const loadingId = notification.loading(`Renomeando arquivo...`)
+
     try {
+      logger.info(`FileExplorer: Renomeando arquivo: ${oldPath} para ${newName}`)
+
       // Atualizar a UI imediatamente para feedback rápido
       setFiles((prev) =>
         prev.map((file) => {
@@ -405,29 +439,88 @@ export function FileExplorer() {
         }),
       )
 
+      // Fazer a chamada à API para renomear o arquivo
+      const response = await fetch("/api/files/rename", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          oldPath,
+          newName,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || "Erro ao renomear arquivo")
+      }
+
+      // Remover a notificação de carregamento
+      notification.removeNotification(loadingId)
+
+      // Mostrar notificação de sucesso
+      notification.success("Arquivo renomeado com sucesso!", `O arquivo foi renomeado para "${newName}".`)
+
       // Buscar arquivos novamente para garantir que tudo esteja atualizado
       setTimeout(() => {
         fetchFiles()
-      }, 500)
+      }, 1000)
 
-      // Mostrar toast de sucesso
-      setToast({
-        visible: true,
-        message: "Item renomeado com sucesso!",
-        type: "success",
-      })
+      // Verificar se o arquivo foi realmente renomeado
+      setTimeout(async () => {
+        try {
+          // Extrair o diretório e construir o novo caminho
+          const lastSlashIndex = oldPath.lastIndexOf("/")
+          const directory = lastSlashIndex >= 0 ? oldPath.substring(0, lastSlashIndex + 1) : ""
+          const newPath = directory + newName
 
-      // Esconder o toast após 3 segundos
-      setTimeout(() => {
-        setToast((prev) => ({ ...prev, visible: false }))
-      }, 3000)
+          const verifyOldResponse = await fetch(`/api/check-file?path=${encodeURIComponent(oldPath)}`)
+          const verifyNewResponse = await fetch(`/api/check-file?path=${encodeURIComponent(newPath)}`)
+
+          const verifyOldData = await verifyOldResponse.json()
+          const verifyNewData = await verifyNewResponse.json()
+
+          if (verifyOldData.exists) {
+            notification.warning(
+              "Arquivo original ainda existe",
+              `O arquivo original "${oldPath}" ainda existe no servidor.`,
+              {
+                actionLabel: "Atualizar Agora",
+                onAction: () => fetchFiles(),
+              },
+            )
+          }
+
+          if (!verifyNewData.exists) {
+            notification.error(
+              "Novo arquivo não encontrado",
+              `O arquivo renomeado "${newPath}" não foi encontrado no servidor.`,
+              {
+                actionLabel: "Atualizar Agora",
+                onAction: () => fetchFiles(),
+              },
+            )
+          }
+        } catch (verifyError) {
+          logger.error("Erro na verificação pós-renomeação:", { data: verifyError })
+        }
+      }, 2000)
     } catch (err) {
-      console.error("Erro ao renomear:", err)
-      setToast({
-        visible: true,
-        message: err instanceof Error ? err.message : "Erro ao renomear",
-        type: "error",
-      })
+      logger.error("Erro ao renomear:", { data: err })
+
+      // Remover a notificação de carregamento
+      notification.removeNotification(loadingId)
+
+      // Mostrar notificação de erro
+      notification.error(
+        "Erro ao renomear arquivo",
+        err instanceof Error ? err.message : "Erro desconhecido ao renomear o arquivo",
+      )
+
+      // Reverter a alteração local
+      fetchFiles()
     }
   }
 
@@ -440,11 +533,7 @@ export function FileExplorer() {
     }
 
     if (/[\\/:*?"<>|]/.test(newFolderName)) {
-      setToast({
-        visible: true,
-        message: "O nome da pasta contém caracteres inválidos",
-        type: "error",
-      })
+      notification.error("O nome da pasta contém caracteres inválidos")
       return
     }
 
@@ -487,23 +576,15 @@ export function FileExplorer() {
       }, 500)
 
       // Mostrar toast de sucesso
-      setToast({
-        visible: true,
-        message: "Pasta criada com sucesso!",
-        type: "success",
-      })
+      notification.success("Pasta criada com sucesso!")
 
       // Esconder o toast após 3 segundos
       setTimeout(() => {
-        setToast((prev) => ({ ...prev, visible: false }))
+        //setToast((prev) => ({ ...prev, visible: false }))
       }, 3000)
     } catch (err) {
       console.error("Erro ao criar pasta:", err)
-      setToast({
-        visible: true,
-        message: err instanceof Error ? err.message : "Erro ao criar pasta",
-        type: "error",
-      })
+      notification.error(err instanceof Error ? err.message : "Erro ao criar pasta")
     } finally {
       setIsCreatingFolder(false)
     }
@@ -541,11 +622,13 @@ export function FileExplorer() {
     setIsMovingFile(true)
     setMoveFileError(null)
 
+    const loadingId = notification.loading(`Movendo arquivo...`)
+
     try {
       const fileName = itemToMove.name
       const newPath = `${destinationPath}${destinationPath.endsWith("/") ? "" : "/"}${fileName}`
 
-      console.log(`Movendo arquivo: ${itemToMove.path} para ${newPath}`)
+      logger.info(`FileExplorer: Movendo arquivo: ${itemToMove.path} para ${newPath}`)
 
       const response = await fetch("/api/files/move", {
         method: "POST",
@@ -564,27 +647,69 @@ export function FileExplorer() {
         throw new Error(data.message || data.error || "Erro ao mover arquivo")
       }
 
-      console.log("Resposta da API:", data)
+      logger.info("Resposta da API:", { data })
 
       setFiles((prevFiles) => prevFiles.filter((file) => file.path !== itemToMove.path))
 
       setShowMoveFileModal(false)
 
-      // Mostrar toast de sucesso
-      setToast({
-        visible: true,
-        message: "Arquivo movido com sucesso!",
-        type: "success",
+      // Remover a notificação de carregamento
+      notification.removeNotification(loadingId)
+
+      // Mostrar notificação de sucesso
+      notification.success("Arquivo movido com sucesso!", `"${fileName}" foi movido para "${destinationPath}".`, {
+        actionLabel: "Ir para o destino",
+        onAction: () => navigateToFolder(destinationPath),
       })
 
-      // Esconder o toast após 3 segundos
-      setTimeout(() => {
-        setToast((prev) => ({ ...prev, visible: false }))
-      }, 3000)
+      // Verificar se o arquivo foi realmente movido
+      setTimeout(async () => {
+        try {
+          const verifySourceResponse = await fetch(`/api/check-file?path=${encodeURIComponent(itemToMove.path)}`)
+          const verifyDestResponse = await fetch(`/api/check-file?path=${encodeURIComponent(newPath)}`)
+
+          const verifySourceData = await verifySourceResponse.json()
+          const verifyDestData = await verifyDestResponse.json()
+
+          if (verifySourceData.exists) {
+            notification.warning(
+              "Arquivo original ainda existe",
+              `O arquivo original "${itemToMove.path}" ainda existe no servidor.`,
+              {
+                actionLabel: "Atualizar Agora",
+                onAction: () => fetchFiles(),
+              },
+            )
+          }
+
+          if (!verifyDestData.exists) {
+            notification.error(
+              "Arquivo movido não encontrado",
+              `O arquivo movido "${newPath}" não foi encontrado no servidor.`,
+              {
+                actionLabel: "Atualizar Agora",
+                onAction: () => fetchFiles(),
+              },
+            )
+          }
+        } catch (verifyError) {
+          logger.error("Erro na verificação pós-movimentação:", { data: verifyError })
+        }
+      }, 2000)
 
       await fetchFiles()
     } catch (error) {
-      console.error("Erro ao mover arquivo:", error)
+      logger.error("Erro ao mover arquivo:", { data: error })
+
+      // Remover a notificação de carregamento
+      notification.removeNotification(loadingId)
+
+      // Mostrar notificação de erro
+      notification.error(
+        "Erro ao mover arquivo",
+        error instanceof Error ? error.message : "Erro desconhecido ao mover o arquivo",
+      )
+
       setMoveFileError(error instanceof Error ? error.message : "Erro ao mover arquivo")
     } finally {
       setIsMovingFile(false)
@@ -611,15 +736,11 @@ export function FileExplorer() {
     )
 
     // Mostrar toast
-    setToast({
-      visible: true,
-      message: favorites.includes(file.path) ? "Removido dos favoritos" : "Adicionado aos favoritos",
-      type: "success",
-    })
+    notification.success(favorites.includes(file.path) ? "Removido dos favoritos" : "Adicionado aos favoritos")
 
     // Esconder o toast após 3 segundos
     setTimeout(() => {
-      setToast((prev) => ({ ...prev, visible: false }))
+      //setToast((prev) => ({ ...prev, visible: false }))
     }, 3000)
   }
 
@@ -710,23 +831,15 @@ export function FileExplorer() {
       setNewTaskDescription("")
 
       // Mostrar toast de sucesso
-      setToast({
-        visible: true,
-        message: "Tarefa adicionada com sucesso!",
-        type: "success",
-      })
+      notification.success("Tarefa adicionada com sucesso!")
 
       // Esconder o toast após 3 segundos
       setTimeout(() => {
-        setToast((prev) => ({ ...prev, visible: false }))
+        //setToast((prev) => ({ ...prev, visible: false }))
       }, 3000)
     } catch (err) {
       console.error("Erro ao adicionar tarefa:", err)
-      setToast({
-        visible: true,
-        message: "Erro ao adicionar tarefa",
-        type: "error",
-      })
+      notification.error("Erro ao adicionar tarefa")
     } finally {
       setIsAddingTask(false)
     }
@@ -763,11 +876,7 @@ export function FileExplorer() {
       }))
     } catch (err) {
       console.error("Erro ao atualizar status da tarefa:", err)
-      setToast({
-        visible: true,
-        message: "Erro ao atualizar status da tarefa",
-        type: "error",
-      })
+      notification.error("Erro ao atualizar status da tarefa")
     }
   }
 
@@ -798,23 +907,15 @@ export function FileExplorer() {
       }
 
       // Mostrar toast de sucesso
-      setToast({
-        visible: true,
-        message: "Tarefa excluída com sucesso!",
-        type: "success",
-      })
+      notification.success("Tarefa excluída com sucesso!")
 
       // Esconder o toast após 3 segundos
       setTimeout(() => {
-        setToast((prev) => ({ ...prev, visible: false }))
+        //setToast((prev) => ({ ...prev, visible: false }))
       }, 3000)
     } catch (err) {
       console.error("Erro ao excluir tarefa:", err)
-      setToast({
-        visible: true,
-        message: "Erro ao excluir tarefa",
-        type: "error",
-      })
+      notification.error("Erro ao excluir tarefa")
     }
   }
 
@@ -850,23 +951,15 @@ export function FileExplorer() {
       setEditDescription("")
 
       // Mostrar toast de sucesso
-      setToast({
-        visible: true,
-        message: "Tarefa atualizada com sucesso!",
-        type: "success",
-      })
+      notification.success("Tarefa atualizada com sucesso!")
 
       // Esconder o toast após 3 segundos
       setTimeout(() => {
-        setToast((prev) => ({ ...prev, visible: false }))
+        //setToast((prev) => ({ ...prev, visible: false }))
       }, 3000)
     } catch (err) {
       console.error("Erro ao atualizar tarefa:", err)
-      setToast({
-        visible: true,
-        message: "Erro ao atualizar tarefa",
-        type: "error",
-      })
+      notification.error("Erro ao atualizar tarefa")
     }
   }
 
@@ -2473,13 +2566,6 @@ export function FileExplorer() {
       </Dialog>
 
       {/* Toast de notificação */}
-      {toast.visible && (
-        <ToastNotification
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
-        />
-      )}
     </div>
   )
 }

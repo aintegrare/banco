@@ -23,6 +23,8 @@ import {
   Loader2,
   Check,
   MoveIcon,
+  Clock,
+  RefreshCw,
 } from "lucide-react"
 import { useState } from "react"
 import { RenameWarningDialog } from "./rename-warning-dialog"
@@ -32,6 +34,10 @@ import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { DocumentPreview } from "./document-preview"
+
+// Adicionar estas importações no início do arquivo
+import { checkCacheStatus, purgeBunnyCache } from "@/lib/bunny"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 // Modificar a interface FileCardProps para incluir a contagem de tarefas
 interface FileCardProps {
@@ -89,6 +95,11 @@ export function FileCard({
   })
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
   const [showDocumentPreview, setShowDocumentPreview] = useState(false)
+
+  // Adicionar estes estados dentro da função FileCard
+  const [isCached, setIsCached] = useState<boolean | null>(null)
+  const [isCheckingCache, setIsCheckingCache] = useState(false)
+  const [isPurgingCache, setIsPurgingCache] = useState(false)
 
   // Função para formatar bytes em unidades legíveis
   const formatBytes = (bytes = 0) => {
@@ -316,6 +327,83 @@ export function FileCard({
     return `${nameWithoutExt.substring(0, maxLength - 3)}...${extension ? "." + extension : ""}`
   }
 
+  // Adicionar esta função dentro do componente FileCard
+  const checkCache = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!file.url) return
+
+    setIsCheckingCache(true)
+    try {
+      const status = await checkCacheStatus(file.url)
+      setIsCached(status.cached)
+
+      // Mostrar toast com o status
+      setToast({
+        visible: true,
+        message: status.cached
+          ? `Arquivo em cache. Idade: ${status.age ? Math.floor(status.age / 60) + " minutos" : "desconhecida"}`
+          : "Arquivo não está em cache",
+        type: "success",
+      })
+    } catch (error) {
+      console.error("Erro ao verificar cache:", error)
+      setToast({
+        visible: true,
+        message: "Erro ao verificar status de cache",
+        type: "error",
+      })
+    } finally {
+      setIsCheckingCache(false)
+    }
+  }
+
+  // Adicionar esta função dentro do componente FileCard
+  const purgeCache = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!file.url) return
+
+    if (!confirm("Tem certeza que deseja purgar o cache deste arquivo?")) {
+      return
+    }
+
+    setIsPurgingCache(true)
+    try {
+      // Extrair o caminho da URL
+      let path = file.path
+
+      if (file.url.startsWith("http")) {
+        try {
+          const url = new URL(file.url)
+          path = url.pathname.replace(/^\//, "")
+        } catch (e) {
+          throw new Error("URL inválida")
+        }
+      }
+
+      const success = await purgeBunnyCache(path)
+
+      if (success) {
+        setIsCached(false)
+        setToast({
+          visible: true,
+          message: "Cache purgado com sucesso",
+          type: "success",
+        })
+      } else {
+        throw new Error("Falha ao purgar cache")
+      }
+    } catch (error) {
+      console.error("Erro ao purgar cache:", error)
+      setToast({
+        visible: true,
+        message: "Erro ao purgar cache",
+        type: "error",
+      })
+    } finally {
+      setIsPurgingCache(false)
+    }
+  }
+
   return (
     <>
       <div
@@ -396,6 +484,28 @@ export function FileCard({
               <span>{isPdf() ? "PDF" : file.fileType?.toUpperCase() || "Arquivo"}</span>
               <span className="mx-1">•</span>
               <span>{getRelativeTime(file.modified)}</span>
+              {isCached !== null && (
+                <>
+                  <span className="mx-1">•</span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className={`flex items-center ${isCached ? "text-green-500" : "text-gray-400"}`}>
+                          <Clock className="h-3 w-3 mr-0.5" />
+                          {isCached ? "Em cache" : "Sem cache"}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          {isCached
+                            ? "Este arquivo está armazenado em cache no CDN"
+                            : "Este arquivo não está em cache ou foi purgado"}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -575,6 +685,32 @@ export function FileCard({
               <span>Renomear</span>
             </button>
             <DropdownMenuSeparator />
+            {/* Adicionar estes botões ao menu dropdown, antes do botão de exclusão */}
+            <button
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+              onClick={checkCache}
+              disabled={isCheckingCache}
+            >
+              {isCheckingCache ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin text-blue-500" />
+              ) : (
+                <Clock className="h-4 w-4 mr-2 text-blue-500" />
+              )}
+              <span>Verificar Cache</span>
+            </button>
+
+            <button
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+              onClick={purgeCache}
+              disabled={isPurgingCache}
+            >
+              {isPurgingCache ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin text-orange-500" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2 text-orange-500" />
+              )}
+              <span>Purgar Cache</span>
+            </button>
             {/* Modificar o botão de exclusão para mostrar o diálogo de confirmação */}
             <button
               className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"

@@ -38,6 +38,7 @@ export async function GET(request: Request) {
   }
 }
 
+// Modificar a função POST para remover campos que não existem na tabela
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -67,6 +68,7 @@ export async function POST(request: Request) {
     }
 
     // Criar objeto com os dados da tarefa
+    // Remover campos que não existem na tabela (color, creator, assignee)
     const taskData = {
       title,
       description: description || null,
@@ -74,9 +76,6 @@ export async function POST(request: Request) {
       priority: priority || "medium",
       project_id,
       due_date: due_date || null,
-      color: color || "#4b7bb5",
-      creator: creator || null,
-      assignee: assignee || null,
       created_at: new Date().toISOString(),
     }
 
@@ -87,7 +86,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json(data)
+    // Adicionar os campos removidos de volta à resposta para uso no frontend
+    const responseData = {
+      ...data,
+      color: color || "#4b7bb5",
+      creator: creator || null,
+      assignee: assignee || null,
+    }
+
+    return NextResponse.json(responseData)
   } catch (error: any) {
     console.error("Erro ao processar requisição de criação de tarefa:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })

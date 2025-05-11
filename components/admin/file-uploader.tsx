@@ -3,9 +3,12 @@
 import type React from "react"
 
 import { useState, useRef } from "react"
-import { Upload, File, Loader2, X, CheckCircle, AlertTriangle, ImageIcon, Trash2, FolderTree } from "lucide-react"
+import { Upload, File, Loader2, X, CheckCircle, AlertTriangle, ImageIcon, Trash2, FolderTree, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FolderBrowser } from "./folder-browser"
+import { getRecommendedCacheConfig } from "@/lib/bunny"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface FileUploaderProps {
   onUploadSuccess?: () => void
@@ -24,6 +27,8 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
   const [selectedFolder, setSelectedFolder] = useState<string>("") // Pasta raiz por padrão
   const [showFolderBrowser, setShowFolderBrowser] = useState(false)
   const [isDraggingOver, setIsDraggingOver] = useState(false)
+  const [cacheOption, setCacheOption] = useState<"default" | "custom" | "none">("default")
+  const [customCacheControl, setCustomCacheControl] = useState("")
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -130,6 +135,19 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
     }
   }
 
+  const getCacheControlForFile = (file: File): string => {
+    if (cacheOption === "none") {
+      return "no-store, no-cache, must-revalidate"
+    }
+
+    if (cacheOption === "custom" && customCacheControl) {
+      return customCacheControl
+    }
+
+    // Usar a configuração recomendada com base no tipo de arquivo
+    return getRecommendedCacheConfig(file.type).cacheControl
+  }
+
   const handleUpload = async () => {
     if (files.length === 0) return
 
@@ -171,6 +189,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
           const formData = new FormData()
           formData.append("file", file)
           formData.append("folder", selectedFolder) // Adicionar a pasta selecionada
+          formData.append("cacheControl", getCacheControlForFile(file)) // Adicionar esta linha
 
           const response = await fetch("/api/upload", {
             method: "POST",
@@ -327,6 +346,61 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
             <FolderBrowser onSelectFolder={handleFolderSelect} initialPath={selectedFolder} showCreateFolder={true} />
           </div>
         )}
+
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Configuração de Cache
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="ml-1 text-gray-400 hover:text-gray-600">
+                    <Info className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>Controla por quanto tempo os arquivos serão armazenados em cache no CDN.</p>
+                  <p className="mt-1">Padrão: Usa a configuração recomendada com base no tipo de arquivo.</p>
+                  <p className="mt-1">Personalizado: Permite definir um cabeçalho Cache-Control específico.</p>
+                  <p className="mt-1">Sem Cache: Desativa o cache para estes arquivos.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </label>
+          <div className="flex gap-2 items-start">
+            <div className="flex-1">
+              <Select
+                value={cacheOption}
+                onValueChange={(value: "default" | "custom" | "none") => setCacheOption(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a configuração de cache" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Padrão (Recomendado)</SelectItem>
+                  <SelectItem value="custom">Personalizado</SelectItem>
+                  <SelectItem value="none">Sem Cache</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {cacheOption === "custom" && (
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={customCacheControl}
+                  onChange={(e) => setCustomCacheControl(e.target.value)}
+                  placeholder="Ex: public, max-age=86400"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5]"
+                />
+              </div>
+            )}
+          </div>
+          {cacheOption === "default" && (
+            <p className="text-xs text-gray-500 mt-1">
+              Imagens: 30 dias, Documentos: 7 dias, Arquivos de design: 1 dia
+            </p>
+          )}
+        </div>
       </div>
 
       <div
