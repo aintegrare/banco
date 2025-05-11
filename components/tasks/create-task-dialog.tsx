@@ -195,16 +195,23 @@ export function CreateTaskDialog({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-between items-center border-b border-gray-200 px-6 py-4">
-          <h2 className="text-xl font-semibold text-gray-800">Nova Tarefa</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600" type="button">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Nova Tarefa</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            type="button"
+          >
             <X size={24} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6">
+        <form onSubmit={handleSubmit} className="p-6 bg-white dark:bg-gray-800">
           <div className="mb-4">
             <label htmlFor="task-title" className="block text-sm font-medium text-gray-700 mb-1">
               Título
@@ -217,7 +224,7 @@ export function CreateTaskDialog({
                 setTaskTitle(e.target.value)
                 setError(null)
               }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               placeholder="Digite o título da tarefa"
               autoFocus
             />
@@ -231,7 +238,7 @@ export function CreateTaskDialog({
               id="task-description"
               value={taskDescription}
               onChange={(e) => setTaskDescription(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               placeholder="Descreva a tarefa brevemente"
               rows={3}
             />
@@ -246,7 +253,7 @@ export function CreateTaskDialog({
                 id="project-select"
                 value={projectId?.toString() || ""}
                 onChange={(e) => setProjectId(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 disabled={isLoadingProjects}
               >
                 <option value="">Selecione um projeto</option>
@@ -266,7 +273,7 @@ export function CreateTaskDialog({
                 id="status-select"
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               >
                 {STATUSES.map((status) => (
                   <option key={status.id} value={status.id}>
@@ -291,7 +298,7 @@ export function CreateTaskDialog({
                 id="due-date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent pl-10"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent pl-10 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               />
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
             </div>
@@ -337,7 +344,7 @@ export function CreateTaskDialog({
                 id="task-creator"
                 value={creator}
                 onChange={(e) => setCreator(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 placeholder="Nome do criador"
               />
               <p className="text-xs text-amber-600 mt-1 flex items-center">
@@ -354,7 +361,7 @@ export function CreateTaskDialog({
                 id="task-assignee"
                 value={assignee}
                 onChange={(e) => setAssignee(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 placeholder="Nome do responsável"
               />
               <p className="text-xs text-amber-600 mt-1 flex items-center">
@@ -394,7 +401,7 @@ export function CreateTaskDialog({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 border border-gray-300 text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
               disabled={isSubmitting}
             >
               Cancelar

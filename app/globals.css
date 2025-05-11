@@ -181,3 +181,46 @@ button {
 .animate-fade-in-up {
   animation: fadeInUp 0.6s ease-out;
 }
+
+/* Estilos para garantir fundos opacos em formulários */
+.dark input,
+.dark textarea,
+.dark select,
+.dark [role="combobox"] {
+  background-color: rgb(55 65 81) !important;
+  border-color: rgb(75 85 99) !important;
+  color: white !important;
+}
+
+.dark [role="dialog"],
+.dark [data-state="open"],
+.dark .popover-content,
+.dark .select-content,
+.dark .dropdown-content {
+  background-color: rgb(31 41 55) !important;
+  border-color: rgb(55 65 81) !important;
+}
+
+/* Garantir que os botões tenham cores adequadas */
+.dark button[type="submit"],
+.dark button[type="button"] {
+  background-color: var(--color-primary-600);
+  color: white;
+}
+
+.dark button[type="submit"]:hover,
+.dark button[type="button"]:hover {
+  background-color: var(--color-primary-700);
+}
+
+/* Melhorar contraste de textos em modo escuro */
+.dark label,
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6,
+.dark p {
+  color: rgb(229 231 235) !important;
+}

@@ -418,9 +418,11 @@ export function FileCard({
         {onToggleSelect && (
           <div className="absolute top-2 left-2 z-10">
             <div
-              className={`w-5 h-5 rounded-full border ${
-                isSelected ? "bg-[#4b7bb5] border-[#4b7bb5] text-white" : "bg-white border-gray-300"
-              } flex items-center justify-center`}
+              className={`w-5 h-5 rounded-md flex items-center justify-center transition-all duration-200 ${
+                isSelected
+                  ? "bg-[#4b7bb5] border-[#4b7bb5] text-white scale-110 shadow-md"
+                  : "bg-white/80 border border-gray-300 hover:border-[#4b7bb5]"
+              }`}
             >
               {isSelected && <Check className="h-3 w-3" />}
             </div>

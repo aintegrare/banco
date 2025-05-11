@@ -233,7 +233,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] bg-white dark:bg-gray-800 border dark:border-gray-700">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-[#4b7bb5]">Editar Tarefa</DialogTitle>
         </DialogHeader>
@@ -254,7 +254,10 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                 value={task.title || ""}
                 onChange={handleChange}
                 required
-                className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
+                className={cn(
+                  "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 dark:text-white",
+                  error && "border-error-500 dark:border-error-500",
+                )}
               />
             </div>
             <div className="space-y-2">
@@ -267,7 +270,10 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                 value={task.description || ""}
                 onChange={handleChange}
                 rows={3}
-                className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
+                className={cn(
+                  "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 dark:text-white",
+                  error && "border-error-500 dark:border-error-500",
+                )}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -276,10 +282,10 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                   Status (visual apenas)
                 </label>
                 <Select value={task.status} onValueChange={(value) => handleSelectChange("status", value)}>
-                  <SelectTrigger className="border-[#4b7bb5]">
+                  <SelectTrigger className="border-[#4b7bb5] bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600">
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white dark:bg-gray-800 border dark:border-gray-700">
                     {STATUSES.map((status) => (
                       <SelectItem key={status.id} value={status.id}>
                         {status.name}
@@ -300,10 +306,10 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                   value={task.priority || "medium"}
                   onValueChange={(value) => handleSelectChange("priority", value)}
                 >
-                  <SelectTrigger className="border-[#4b7bb5]">
+                  <SelectTrigger className="border-[#4b7bb5] bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600">
                     <SelectValue placeholder="Selecione a prioridade" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white dark:bg-gray-800 border dark:border-gray-700">
                     <SelectItem value="low">Baixa</SelectItem>
                     <SelectItem value="medium">Média</SelectItem>
                     <SelectItem value="high">Alta</SelectItem>
@@ -320,10 +326,10 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                   value={task.project_id?.toString() || task.projectId?.toString() || ""}
                   onValueChange={(value) => handleSelectChange("project_id", value)}
                 >
-                  <SelectTrigger className="border-[#4b7bb5]">
+                  <SelectTrigger className="border-[#4b7bb5] bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600">
                     <SelectValue placeholder="Selecione o projeto" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white dark:bg-gray-800 border dark:border-gray-700">
                     {projects.map((project) => (
                       <SelectItem key={project.id} value={project.id.toString()}>
                         {project.name}
@@ -349,7 +355,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                       {date ? format(date, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
+                  <PopoverContent className="w-auto p-0 bg-white dark:bg-gray-800 border dark:border-gray-700">
                     <Calendar mode="single" selected={date} onSelect={handleDateChange} initialFocus locale={ptBR} />
                   </PopoverContent>
                 </Popover>
@@ -394,7 +400,10 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                   name="creator"
                   value={task.creator || ""}
                   onChange={handleChange}
-                  className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
+                  className={cn(
+                    "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 dark:text-white",
+                    error && "border-error-500 dark:border-error-500",
+                  )}
                   placeholder="Nome do criador"
                 />
                 <p className="text-xs text-amber-600 mt-1 flex items-center">
@@ -411,7 +420,10 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                   name="assignee"
                   value={task.assignee || ""}
                   onChange={handleChange}
-                  className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
+                  className={cn(
+                    "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 dark:text-white",
+                    error && "border-error-500 dark:border-error-500",
+                  )}
                   placeholder="Nome do responsável"
                 />
                 <p className="text-xs text-amber-600 mt-1 flex items-center">
@@ -422,7 +434,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
             </div>
 
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 rounded-md">
                 <p className="text-red-600 text-sm flex items-start">
                   <AlertCircle size={16} className="mr-2 mt-0.5 flex-shrink-0" />
                   <span>{error}</span>
@@ -441,10 +453,16 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
             )}
 
             <DialogFooter className="mt-6">
-              <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={isSaving}
+                className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200"
+              >
                 Cancelar
               </Button>
-              <Button type="submit" className="bg-[#4b7bb5] hover:bg-[#3d649e]" disabled={isSaving}>
+              <Button type="submit" className="bg-[#4b7bb5] hover:bg-[#3d649e] text-white" disabled={isSaving}>
                 {isSaving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

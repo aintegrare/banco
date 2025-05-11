@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { ChevronRight, Folder, FolderOpen, Loader2 } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Folder, ChevronRight, ChevronDown, Loader2, RefreshCw, Home } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 interface FolderSelectorProps {
   onSelect: (path: string) => void
@@ -9,165 +10,166 @@ interface FolderSelectorProps {
   excludePaths?: string[]
 }
 
-interface FolderItem {
-  name: string
-  path: string
-  isExpanded?: boolean
-  children?: FolderItem[]
-  isLoading?: boolean
-}
-
-export function FolderSelector({ onSelect, currentPath, excludePaths = [] }: FolderSelectorProps) {
-  const [rootFolders, setRootFolders] = useState<FolderItem[]>([
-    { name: "documents", path: "documents", isExpanded: false },
-    { name: "images", path: "images", isExpanded: false },
-  ])
-  const [selectedFolder, setSelectedFolder] = useState<string>(currentPath || "")
+export function FolderSelector({ onSelect, currentPath = "", excludePaths = [] }: FolderSelectorProps) {
+  const [folders, setFolders] = useState<{ name: string; path: string }[]>([])
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({})
+  const [subfolders, setSubfolders] = useState<Record<string, { name: string; path: string }[]>>({})
   const [isLoading, setIsLoading] = useState(false)
+  const [selectedFolder, setSelectedFolder] = useState<string>(currentPath)
+  const [error, setError] = useState<string | null>(null)
 
-  // Função para buscar subpastas
-  const fetchSubfolders = async (folderPath: string): Promise<FolderItem[]> => {
-    try {
-      const response = await fetch(`/api/files?directory=${folderPath}`)
+  // Carregar pastas raiz
+  useEffect(() => {
+    fetchRootFolders()
+  }, [])
 
-      if (!response.ok) {
-        throw new Error(`Erro ao listar pastas: ${response.status}`)
+  // Carregar subpastas para pastas expandidas
+  useEffect(() => {
+    Object.entries(expandedFolders).forEach(([path, isExpanded]) => {
+      if (isExpanded && !subfolders[path]) {
+        fetchSubfolders(path)
       }
+    })
+  }, [expandedFolders])
 
-      const data = await response.json()
-
-      // Filtrar apenas as pastas
-      const folders = (data.files || [])
-        .filter((file: any) => file.IsDirectory)
-        .map((folder: any) => ({
-          name: folder.ObjectName,
-          path: folder.Path,
-          isExpanded: false,
-          children: [],
-        }))
-
-      return folders
+  const fetchRootFolders = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const response = await fetch("/api/files/folders")
+      if (response.ok) {
+        const data = await response.json()
+        setFolders(
+          (data.folders || []).map((folder: any) => ({
+            name: folder.name || folder.ObjectName,
+            path: folder.path || folder.Path,
+          })),
+        )
+      } else {
+        setError("Erro ao carregar pastas")
+      }
     } catch (error) {
-      console.error("Erro ao buscar subpastas:", error)
-      return []
+      setError("Erro ao carregar pastas")
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  // Função para expandir/colapsar uma pasta
-  const toggleFolder = async (path: string) => {
-    setRootFolders((prevFolders) => {
-      const updateFolders = (folders: FolderItem[]): FolderItem[] => {
-        return folders.map((folder) => {
-          if (folder.path === path) {
-            // Se a pasta já está expandida, apenas colapsa
-            if (folder.isExpanded) {
-              return { ...folder, isExpanded: false }
-            }
-
-            // Se não está expandida e não tem filhos, marca como carregando
-            if (!folder.children || folder.children.length === 0) {
-              // Vamos buscar as subpastas de forma assíncrona
-              fetchSubfolders(folder.path).then((subfolders) => {
-                setRootFolders((prevState) => {
-                  const updateWithChildren = (items: FolderItem[]): FolderItem[] => {
-                    return items.map((item) => {
-                      if (item.path === path) {
-                        return {
-                          ...item,
-                          children: subfolders,
-                          isLoading: false,
-                        }
-                      } else if (item.children && item.children.length > 0) {
-                        return {
-                          ...item,
-                          children: updateWithChildren(item.children),
-                        }
-                      }
-                      return item
-                    })
-                  }
-
-                  return updateWithChildren(prevState)
-                })
-              })
-
-              // Enquanto isso, mostra o indicador de carregamento
-              return { ...folder, isExpanded: true, isLoading: true }
-            }
-
-            // Se já tem filhos, apenas expande
-            return { ...folder, isExpanded: true }
-          } else if (folder.children && folder.children.length > 0) {
-            return {
-              ...folder,
-              children: updateFolders(folder.children),
-            }
-          }
-          return folder
-        })
+  const fetchSubfolders = async (path: string) => {
+    try {
+      const response = await fetch(`/api/files/folders?path=${encodeURIComponent(path)}`)
+      if (response.ok) {
+        const data = await response.json()
+        setSubfolders((prev) => ({
+          ...prev,
+          [path]: (data.folders || []).map((folder: any) => ({
+            name: folder.name || folder.ObjectName,
+            path: folder.path || folder.Path,
+          })),
+        }))
       }
-
-      return updateFolders(prevFolders)
-    })
+    } catch (error) {
+      console.error(`Erro ao buscar subpastas de ${path}:`, error)
+    }
   }
 
-  // Função para selecionar uma pasta
+  const toggleFolder = (path: string) => {
+    setExpandedFolders((prev) => ({
+      ...prev,
+      [path]: !prev[path],
+    }))
+  }
+
   const handleSelectFolder = (path: string) => {
+    if (excludePaths?.includes(path)) return
     setSelectedFolder(path)
     onSelect(path)
   }
 
-  // Renderizar a árvore de pastas
-  const renderFolderTree = (folders: FolderItem[], level = 0) => {
-    return folders
-      .map((folder) => {
-        // Verificar se esta pasta deve ser excluída
-        const isExcluded = excludePaths.some((path) => folder.path === path || folder.path.startsWith(`${path}/`))
-
-        if (isExcluded) return null
-
-        return (
-          <div key={folder.path} style={{ marginLeft: `${level * 16}px` }}>
-            <div
-              className={`flex items-center py-1.5 px-2 rounded-md cursor-pointer ${
-                selectedFolder === folder.path ? "bg-[#4b7bb5] text-white" : "hover:bg-gray-100"
+  const renderFolderTree = (items: { name: string; path: string }[], level = 0) => {
+    return items
+      .filter((folder) => !excludePaths?.includes(folder.path))
+      .map((folder) => (
+        <div key={folder.path} style={{ marginLeft: `${level * 16}px` }}>
+          <div
+            className={`flex items-center py-1 px-2 rounded-md ${
+              selectedFolder === folder.path ? "bg-[#4b7bb5] text-white" : "hover:bg-gray-100 cursor-pointer"
+            }`}
+          >
+            <button
+              onClick={() => toggleFolder(folder.path)}
+              className={`p-1 mr-1 rounded ${
+                selectedFolder === folder.path ? "hover:bg-[#3d649e] text-white" : "hover:bg-gray-200 text-gray-500"
               }`}
+              aria-label={expandedFolders[folder.path] ? "Collapse folder" : "Expand folder"}
             >
-              <button
-                onClick={() => toggleFolder(folder.path)}
-                className="p-1 mr-1 rounded-md hover:bg-gray-200 hover:bg-opacity-20"
-              >
-                <ChevronRight
-                  size={16}
-                  className={`transition-transform ${folder.isExpanded ? "transform rotate-90" : ""}`}
-                />
-              </button>
+              {expandedFolders[folder.path] ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </button>
 
-              <div className="flex items-center flex-1 cursor-pointer" onClick={() => handleSelectFolder(folder.path)}>
-                {folder.isExpanded ? (
-                  <FolderOpen size={18} className="mr-1.5 text-[#4b7bb5]" />
-                ) : (
-                  <Folder size={18} className="mr-1.5 text-[#4b7bb5]" />
-                )}
-                <span className="text-sm">{folder.name}</span>
-              </div>
-
-              {folder.isLoading && <Loader2 size={16} className="animate-spin ml-1 text-gray-400" />}
+            <div className="flex items-center flex-1 py-1" onClick={() => handleSelectFolder(folder.path)}>
+              <Folder className={`h-4 w-4 mr-2 ${selectedFolder === folder.path ? "text-white" : "text-[#4b7bb5]"}`} />
+              <span className="text-sm truncate">{folder.name}</span>
             </div>
-
-            {folder.isExpanded && folder.children && (
-              <div className="mt-1">{renderFolderTree(folder.children, level + 1)}</div>
-            )}
           </div>
-        )
-      })
-      .filter(Boolean) // Filtrar os nulos (pastas excluídas)
+
+          {expandedFolders[folder.path] && subfolders[folder.path] && (
+            <div className="ml-2 pl-2 border-l border-gray-200">
+              {renderFolderTree(subfolders[folder.path], level + 1)}
+            </div>
+          )}
+        </div>
+      ))
   }
 
   return (
-    <div className="border rounded-md p-2 max-h-60 overflow-y-auto bg-white">
-      <div className="mb-2 text-sm text-gray-500">Selecione a pasta de destino:</div>
-      {renderFolderTree(rootFolders)}
+    <div className="border rounded-md p-2 bg-white h-full">
+      <div className="flex items-center justify-between mb-2 pb-2 border-b">
+        <h3 className="text-sm font-medium text-gray-700">Selecionar pasta</h3>
+        <div className="flex space-x-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleSelectFolder("")}
+            title="Pasta raiz"
+            className={selectedFolder === "" ? "bg-[#4b7bb5] text-white" : ""}
+          >
+            <Home className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={fetchRootFolders} disabled={isLoading} title="Atualizar">
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+
+      {error && <div className="text-red-500 text-sm mb-2 p-2 bg-red-50 rounded">{error}</div>}
+
+      <div className="max-h-60 overflow-y-auto">
+        {isLoading && folders.length === 0 ? (
+          <div className="flex justify-center items-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+            <span className="ml-2 text-sm text-gray-500">Carregando pastas...</span>
+          </div>
+        ) : folders.length === 0 ? (
+          <div className="text-center py-4 text-sm text-gray-500">Nenhuma pasta encontrada</div>
+        ) : (
+          <div className="space-y-1">
+            <div
+              className={`flex items-center py-1 px-2 rounded-md hover:bg-gray-100 cursor-pointer ${
+                selectedFolder === "" ? "bg-[#4b7bb5] text-white" : ""
+              }`}
+              onClick={() => handleSelectFolder("")}
+            >
+              <Folder className={`h-4 w-4 mr-2 ${selectedFolder === "" ? "text-white" : "text-[#4b7bb5]"}`} />
+              <span className="text-sm">Pasta raiz</span>
+            </div>
+            {renderFolderTree(folders)}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
