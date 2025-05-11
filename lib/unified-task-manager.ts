@@ -234,12 +234,16 @@ export async function updateTask(id: number, input: UpdateTaskInput): Promise<Ta
     // Adicionar timestamp de atualização
     dbTask.updated_at = new Date().toISOString()
 
+    console.log(`Atualizando tarefa ${id} no banco com dados:`, dbTask)
+
     const { data, error } = await supabase.from("tasks").update(dbTask).eq("id", id).select().single()
 
     if (error) {
       console.error(`Erro ao atualizar tarefa ${id}:`, error)
       throw new Error(error.message)
     }
+
+    console.log(`Tarefa ${id} atualizada com sucesso. Dados retornados:`, data)
 
     // Mapear os dados do banco para o formato do frontend
     return mapDbTaskToFrontend(data)
@@ -275,6 +279,8 @@ export async function updateTaskStatus(id: number, status: string): Promise<Task
     // Converter status do frontend para o formato do banco
     const dbStatus = frontendToDbStatusMap[status] || status
 
+    console.log(`Atualizando status da tarefa ${id} para ${status} (${dbStatus} no banco)`)
+
     const supabase = createClient()
     const { data, error } = await supabase
       .from("tasks")
@@ -290,6 +296,8 @@ export async function updateTaskStatus(id: number, status: string): Promise<Task
       console.error(`Erro ao atualizar status da tarefa ${id}:`, error)
       throw new Error(error.message)
     }
+
+    console.log(`Status da tarefa ${id} atualizado com sucesso. Dados retornados:`, data)
 
     // Mapear os dados do banco para o formato do frontend
     return mapDbTaskToFrontend(data)
@@ -310,6 +318,8 @@ function mapDbTaskToFrontend(dbTask: any): Task {
 
   // Mapear prioridade do banco para o frontend
   const frontendPriority = dbToFrontendPriorityMap[dbTask.priority] || "medium"
+
+  console.log(`Mapeando tarefa do banco para frontend. Status: ${dbTask.status} -> ${frontendStatus}`)
 
   return {
     ...dbTask,
@@ -333,6 +343,7 @@ function mapFrontendTaskToDb(frontendTask: any): any {
   // Mapear status do frontend para o banco
   if (dbTask.status) {
     dbTask.status = frontendToDbStatusMap[dbTask.status] || dbTask.status
+    console.log(`Mapeando status do frontend para banco: ${frontendTask.status} -> ${dbTask.status}`)
   }
 
   // Mapear prioridade do frontend para o banco

@@ -9,15 +9,16 @@ import { ChatWidget } from "@/components/chat/chat-widget"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Integrare - Agência de Marketing",
-  description: "Plataforma de gestão de projetos e documentos da Integrare",
+  title: "Integrare - Agência de Marketing em Maringá, Curitiba e São Paulo",
+  description:
+    "Agência de Marketing Digital especializada em resultados reais para empresas em Maringá, Curitiba e São Paulo",
   metadataBase: new URL("https://www.redeintegrare.com"),
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Integrare - Agência de Marketing",
-    description: "Marketing Estratégico para Resultados Reais",
+    title: "Integrare - Agência de Marketing em Maringá, Curitiba e São Paulo",
+    description: "Marketing Estratégico para Resultados Reais em Maringá, Curitiba e São Paulo",
     url: "https://www.redeintegrare.com",
     siteName: "Integrare",
     locale: "pt_BR",

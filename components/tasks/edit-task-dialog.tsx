@@ -147,7 +147,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
     setDate(date)
     if (date) {
       const formattedDate = format(date, "yyyy-MM-dd")
-      setTask((prev: any) => ({ ...prev, [name]: formattedDate }))
+      setTask((prev: any) => ({ ...prev, due_date: formattedDate }))
     } else {
       setTask((prev: any) => ({ ...prev, due_date: null }))
     }
@@ -200,7 +200,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
     }
   }
 
-  // Modificar a função handleSubmit para remover o campo status ao enviar os dados
+  // Modificar a função handleSubmit para incluir o campo status ao enviar os dados
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -216,13 +216,23 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
 
     try {
       // Preparar dados para envio
-      // Remover campos que são apenas visuais ou que não existem na tabela
-      const { color, creator, assignee, status, ...updateData } = task
-
+      // Incluir o status na atualização
       const dataToSend = {
-        ...updateData,
-        project_id: updateData.project_id || updateData.projectId, // Garantir compatibilidade
+        title: task.title,
+        description: task.description,
+        status: task.status, // Incluir o status
+        priority: task.priority,
+        project_id: task.project_id || task.projectId, // Garantir compatibilidade
+        due_date: task.due_date,
+        estimated_hours: task.estimated_hours,
+        actual_hours: task.actual_hours,
+        tags: task.tags,
+        color: task.color || "#4b7bb5",
+        creator: task.creator || null,
+        assignee: task.assignee || null,
       }
+
+      console.log("Enviando dados para atualização:", dataToSend)
 
       // Atualizar tarefa via API
       const response = await fetch(`/api/tasks/${taskId}`, {
@@ -239,15 +249,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
       }
 
       const updatedTask = await response.json()
-
-      // Adicionar os campos visuais de volta ao objeto retornado
-      const updatedTaskWithVisualFields = {
-        ...updatedTask,
-        color: color || "#4b7bb5",
-        creator: creator || null,
-        assignee: assignee || null,
-        status: status || "todo", // Manter o status visual
-      }
+      console.log("Tarefa atualizada com sucesso:", updatedTask)
 
       toast({
         title: "Sucesso",
@@ -256,7 +258,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
 
       // Notificar o componente pai sobre a atualização
       if (onSave) {
-        onSave(updatedTaskWithVisualFields)
+        onSave(updatedTask)
       }
 
       // Fechar o diálogo após sucesso
@@ -322,7 +324,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="status" className="text-sm font-medium">
-                  Status (visual apenas)
+                  Status
                 </label>
                 <Select value={task.status} onValueChange={(value) => handleSelectChange("status", value)}>
                   <SelectTrigger className="border-[#4b7bb5] bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600">
@@ -336,10 +338,6 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-amber-600 mt-1 flex items-center">
-                  <AlertCircle size={12} className="mr-1" />
-                  Este campo é apenas visual e não será salvo no banco de dados
-                </p>
               </div>
               <div className="space-y-2">
                 <label htmlFor="priority" className="text-sm font-medium">

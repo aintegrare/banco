@@ -126,7 +126,12 @@ export default function Home() {
           <div className="container relative z-10 hero-container">
             <div className="mx-auto max-w-3xl text-center py-16 md:py-20">
               <div className="animate-fade-in-up compact-spacing">
-                <h1 className="mb-4 font-bold tracking-tight">Marketing que entrega resultados reais.</h1>
+                <h1 className="mb-4 font-bold tracking-tight">
+                  Agência Integrare de Marketing{" "}
+                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-[#f2f1ef]">
+                    Maringá Curitiba São Paulo
+                  </span>
+                </h1>
                 <p className="mb-6 text-lg md:text-xl italic">
                   Fundada em 2020, a Integrare nasceu com a missão de levar Marketing de Qualidade, baseado em
                   evidências científicas e casos práticos de sucesso.
