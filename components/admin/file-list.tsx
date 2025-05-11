@@ -833,7 +833,14 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
   const openMultiMoveModal = () => {
     if (selectedFiles.length === 0) {
-      alert("Selecione pelo menos um arquivo para mover")
+      setDragFeedback({
+        message: "Selecione pelo menos um arquivo para mover",
+        type: "error",
+      })
+
+      setTimeout(() => {
+        setDragFeedback(null)
+      }, 3000)
       return
     }
 
@@ -1439,12 +1446,7 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
                   <button
                     onClick={openMultiMoveModal}
-                    className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all 
-                  ${
-                    selectedFiles.length > 0
-                      ? "bg-[#4b7bb5] text-white shadow-sm"
-                      : "bg-white text-gray-400 border border-gray-300 cursor-not-allowed"
-                  }`}
+                    className="flex items-center text-sm px-3 py-1.5 rounded-md transition-all bg-[#4b7bb5] text-white hover:bg-[#3d649e] shadow-sm"
                     disabled={selectedFiles.length === 0}
                   >
                     <MoveIcon className="h-4 w-4 mr-1.5" />
@@ -1976,6 +1978,18 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
               </div>
             )}
           </div>
+          {/* Botão flutuante para mover arquivos quando há seleção */}
+          {isSelectionMode && selectedFiles.length > 0 && (
+            <div className="fixed bottom-6 right-6 z-10">
+              <button
+                onClick={openMultiMoveModal}
+                className="flex items-center justify-center gap-2 bg-[#4b7bb5] text-white p-4 rounded-full shadow-lg hover:bg-[#3d649e] transition-all"
+              >
+                <MoveIcon className="h-5 w-5" />
+                <span className="font-medium">{selectedFiles.length}</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Sidebar direita */}

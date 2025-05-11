@@ -157,6 +157,49 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
     setDebugVisible(!debugVisible)
   }
 
+  const handleDelete = async () => {
+    if (!confirm("Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita.")) {
+      return
+    }
+
+    setIsSaving(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erro ao excluir tarefa")
+      }
+
+      toast({
+        title: "Sucesso",
+        description: "Tarefa excluída com sucesso!",
+      })
+
+      // Notificar o componente pai sobre a exclusão
+      if (onSave) {
+        onSave({ deleted: true, id: taskId })
+      }
+
+      // Fechar o diálogo após sucesso
+      onClose()
+    } catch (err: any) {
+      console.error("Erro ao excluir tarefa:", err)
+      setError(err.message || "Ocorreu um erro ao excluir a tarefa. Por favor, tente novamente.")
+      toast({
+        title: "Erro",
+        description: err.message || "Não foi possível excluir a tarefa",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   // Modificar a função handleSubmit para remover o campo status ao enviar os dados
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -461,6 +504,15 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                 className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200"
               >
                 Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isSaving}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Excluir
               </Button>
               <Button type="submit" className="bg-[#4b7bb5] hover:bg-[#3d649e] text-white" disabled={isSaving}>
                 {isSaving ? (
