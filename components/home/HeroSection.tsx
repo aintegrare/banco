@@ -78,9 +78,9 @@ export function HeroSection() {
               </div>
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-tight">
-              Marketing Estratégico para{" "}
+              Agência Integrare de Marketing{" "}
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-[#f2f1ef]">
-                Resultados Reais
+                Maringá Curitiba São Paulo
               </span>
             </h1>
             <p className="mt-6 text-lg md:text-xl text-white/90 max-w-lg leading-relaxed">

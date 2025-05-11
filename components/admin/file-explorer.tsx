@@ -2339,8 +2339,6 @@ export function FileExplorer() {
           </form>
         </DialogContent>
       </Dialog>
-      // Vamos melhorar o modal de mover arquivo para garantir uma melhor experiência // Substitua o Dialog de mover
-      arquivo por este:
       {/* Modal de mover arquivo */}
       <Dialog
         open={showMoveFileModal}
