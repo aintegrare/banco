@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Menu, X, Sun, Moon } from "lucide-react"
 import { useTheme } from "@/components/theme-provider"
+import Link from "next/link"
 
 interface HeaderProps {
   isScrolled: boolean
@@ -42,9 +43,15 @@ export function Header({ isScrolled }: HeaderProps) {
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <a href="https://www.redeintegrare.com">
-            <img src="/logo-integrare.png" alt="Integrare Logo" className="h-10" />
-          </a>
+          <Link href="/">
+            {/* Logo correta da Integrare */}
+            <img
+              src="/logo-integrare-new.png"
+              alt="Integrare Marketing"
+              className="h-12 w-auto"
+              style={{ display: "block" }}
+            />
+          </Link>
         </div>
 
         <nav className="hidden md:flex items-center gap-8">
@@ -83,13 +90,13 @@ export function Header({ isScrolled }: HeaderProps) {
             Depoimentos
             <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#4b7bb5] group-hover:w-full transition-all duration-300"></span>
           </button>
-          <a
-            href="https://www.redeintegrare.com/blog"
+          <Link
+            href="/blog"
             className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors relative group"
           >
             Blog
             <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#4b7bb5] group-hover:w-full transition-all duration-300"></span>
-          </a>
+          </Link>
         </nav>
 
         <div className="flex items-center gap-4">
@@ -135,9 +142,15 @@ export function Header({ isScrolled }: HeaderProps) {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center mb-8">
             <div className="flex items-center gap-2">
-              <a href="https://www.redeintegrare.com">
-                <img src="/logo-integrare.png" alt="Integrare Logo" className="h-10" />
-              </a>
+              <Link href="/">
+                {/* Logo correta da Integrare no menu mobile */}
+                <img
+                  src="/logo-integrare-new.png"
+                  alt="Integrare Marketing"
+                  className="h-12 w-auto"
+                  style={{ display: "block" }}
+                />
+              </Link>
             </div>
             <button
               onClick={closeMenu}
@@ -184,13 +197,14 @@ export function Header({ isScrolled }: HeaderProps) {
               <span>Depoimentos</span>
               <span className="text-[#4b7bb5]/50">05</span>
             </button>
-            <a
-              href="https://www.redeintegrare.com/blog"
+            <Link
+              href="/blog"
               className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors flex items-center justify-between"
+              onClick={closeMenu}
             >
               <span>Blog</span>
               <span className="text-[#4b7bb5]/50">06</span>
-            </a>
+            </Link>
             <button
               onClick={() => scrollToSection("contato")}
               className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors flex items-center justify-between"

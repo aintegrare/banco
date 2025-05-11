@@ -1,63 +1,34 @@
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/server"
-import { Tag } from "lucide-react"
 
-// Função para buscar categorias
-async function getCategories() {
-  try {
-    const supabase = createClient()
-
-    const { data, error } = await supabase.from("blog_categories").select("*").order("name")
-
-    if (error) {
-      console.error("Erro ao buscar categorias:", error)
-      return []
-    }
-
-    return data || []
-  } catch (error) {
-    console.error("Erro ao buscar categorias:", error)
-    return []
-  }
-}
-
-export async function BlogCategories() {
-  const categories = await getCategories()
-
-  // Categorias padrão caso não haja categorias no banco
-  const defaultCategories = [
-    { id: 1, name: "Marketing Digital", slug: "marketing-digital" },
-    { id: 2, name: "SEO", slug: "seo" },
-    { id: 3, name: "Redes Sociais", slug: "redes-sociais" },
-    { id: 4, name: "Análise de Dados", slug: "analise-de-dados" },
-    { id: 5, name: "E-mail Marketing", slug: "email-marketing" },
-    { id: 6, name: "Tendências", slug: "tendencias" },
+export function BlogCategories() {
+  // Categorias de exemplo - idealmente viriam do banco de dados
+  const categories = [
+    { name: "Marketing Digital", slug: "marketing-digital", count: 12 },
+    { name: "SEO", slug: "seo", count: 8 },
+    { name: "Redes Sociais", slug: "redes-sociais", count: 10 },
+    { name: "E-commerce", slug: "e-commerce", count: 6 },
+    { name: "Estratégia", slug: "estrategia", count: 9 },
+    { name: "Análise de Dados", slug: "analise-de-dados", count: 5 },
   ]
 
-  const displayCategories = categories.length > 0 ? categories : defaultCategories
-
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-      <h3 className="text-lg font-bold text-[#4072b0] mb-4 flex items-center border-b border-gray-100 pb-2">
-        <Tag className="mr-2 h-5 w-5" />
-        Categorias
-      </h3>
-      <div className="flex flex-wrap gap-2">
-        {displayCategories.map((category) => (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+      <h3 className="text-xl font-bold text-[#4072b0] dark:text-[#6b91c1] mb-4">Categorias</h3>
+      <div className="space-y-2">
+        {categories.map((category) => (
           <Link
-            key={category.id}
+            key={category.slug}
             href={`/blog/categoria/${category.slug}`}
-            className="px-3 py-1.5 bg-[#4b7bb5]/10 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors"
+            className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
           >
-            {category.name}
+            <span className="text-gray-700 dark:text-gray-300 group-hover:text-[#4b7bb5] dark:group-hover:text-[#6b91c1] transition-colors">
+              {category.name}
+            </span>
+            <span className="text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded-full">
+              {category.count}
+            </span>
           </Link>
         ))}
-        <Link
-          href="/blog/categorias"
-          className="px-3 py-1.5 bg-[#4b7bb5]/5 text-[#4b7bb5] rounded-full text-sm hover:bg-[#4b7bb5]/20 transition-colors border border-dashed border-[#4b7bb5]/30"
-        >
-          Ver todas
-        </Link>
       </div>
     </div>
   )
