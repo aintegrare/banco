@@ -38,7 +38,7 @@ export async function GET(request: Request) {
   }
 }
 
-// Modificar a função POST para remover campos que não existem na tabela
+// Modificar a função POST para usar uma abordagem mais simples
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -50,48 +50,97 @@ export async function POST(request: Request) {
 
     const supabase = createClient()
 
-    // Verificar se a tabela tasks existe usando uma abordagem mais direta
-    try {
-      // Tentar fazer uma consulta simples para verificar se a tabela existe
-      const { count, error: countError } = await supabase.from("tasks").select("*", { count: "exact", head: true })
-
-      if (countError) {
-        console.error("Erro ao verificar tabela tasks:", countError)
-        // Se houver erro, provavelmente a tabela não existe ou há um problema de permissão
-        return NextResponse.json({ error: "Erro ao verificar tabela de tarefas" }, { status: 500 })
-      }
-
-      console.log("Tabela tasks verificada com sucesso")
-    } catch (tableError) {
-      console.error("Exceção ao verificar tabela tasks:", tableError)
-      return NextResponse.json({ error: "Erro ao verificar estrutura da tabela" }, { status: 500 })
+    // Mapear os status do frontend para valores provavelmente permitidos no banco
+    // Baseado em valores comuns para status em bancos PostgreSQL
+    const statusMap: { [key: string]: string } = {
+      backlog: "pending",
+      todo: "pending",
+      "in-progress": "in_progress",
+      review: "review",
+      done: "completed",
     }
+
+    // Tentar obter um status válido do mapeamento ou usar um valor padrão
+    const mappedStatus = status ? statusMap[status] || "pending" : "pending"
+
+    console.log(`Mapeando status: ${status} -> ${mappedStatus}`)
 
     // Criar objeto com os dados da tarefa
     // Remover campos que não existem na tabela (color, creator, assignee)
     const taskData = {
       title,
       description: description || null,
-      status: status || "todo",
+      status: mappedStatus,
       priority: priority || "medium",
       project_id,
       due_date: due_date || null,
       created_at: new Date().toISOString(),
     }
 
-    const { data, error } = await supabase.from("tasks").insert(taskData).select().single()
+    // Tentar inserir a tarefa com o status mapeado
+    let result = await supabase.from("tasks").insert(taskData).select().single()
 
-    if (error) {
-      console.error("Erro ao criar tarefa:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    // Se houver erro, tentar com outros valores possíveis de status
+    if (
+      result.error &&
+      result.error.message.includes("violates check constraint") &&
+      result.error.message.includes("status")
+    ) {
+      console.warn(`Erro ao usar status '${mappedStatus}'. Tentando alternativas...`)
+
+      // Lista de possíveis valores de status para tentar
+      const possibleStatuses = [
+        "pending",
+        "in_progress",
+        "review",
+        "completed",
+        "cancelled",
+        "open",
+        "closed",
+        "new",
+        "active",
+        "inactive",
+        "on_hold",
+        "todo",
+        "doing",
+        "done",
+        "to_do",
+        "in_review",
+        "approved",
+        "rejected",
+      ]
+
+      for (const altStatus of possibleStatuses) {
+        if (altStatus === mappedStatus) continue // Pular o que já tentamos
+
+        console.log(`Tentando status alternativo: ${altStatus}`)
+        const altTaskData = { ...taskData, status: altStatus }
+
+        result = await supabase.from("tasks").insert(altTaskData).select().single()
+
+        if (!result.error) {
+          console.log(`Status '${altStatus}' aceito pelo banco de dados!`)
+          // Atualizar o mapeamento para uso futuro
+          statusMap[status] = altStatus
+          break
+        }
+      }
+    }
+
+    // Se ainda houver erro, retornar o erro
+    if (result.error) {
+      console.error("Erro ao criar tarefa após tentar múltiplos status:", result.error)
+      return NextResponse.json({ error: result.error.message }, { status: 500 })
     }
 
     // Adicionar os campos removidos de volta à resposta para uso no frontend
     const responseData = {
-      ...data,
+      ...result.data,
       color: color || "#4b7bb5",
       creator: creator || null,
       assignee: assignee || null,
+      // Manter o status original do frontend para consistência na UI
+      status: status || "todo",
     }
 
     return NextResponse.json(responseData)

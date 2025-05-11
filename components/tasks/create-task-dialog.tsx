@@ -11,7 +11,7 @@ interface Project {
   name: string
 }
 
-// Lista de status disponíveis
+// Lista de status disponíveis - mantemos os mesmos IDs para a UI
 const STATUSES = [
   { id: "backlog", name: "Backlog" },
   { id: "todo", name: "A Fazer" },
@@ -92,7 +92,6 @@ export function CreateTaskDialog({
     return null
   }
 
-  // Modificar a função handleSubmit para lidar com os campos que não existem na tabela
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
