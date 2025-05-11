@@ -551,24 +551,24 @@ export function FileCard({
                 >
                   <ExternalLink size={18} />
                 </a>
-                {/* Botão de compartilhamento */}
-                <button
-                  onClick={handleShare}
-                  className="p-2 bg-white rounded-full text-gray-700 hover:text-purple-600 transition-colors"
-                  title="Compartilhar"
-                >
-                  <Share2 size={18} />
-                </button>
-                {/* Botão de favorito */}
-                <button
-                  onClick={handleToggleFavorite}
-                  className="p-2 bg-white rounded-full text-gray-700 hover:text-amber-500 transition-colors"
-                  title={file.isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-                >
-                  {file.isFavorite ? <StarOff size={18} /> : <Star size={18} />}
-                </button>
               </>
             )}
+            {/* Botão de compartilhamento - AGORA DISPONÍVEL PARA TODOS OS TIPOS */}
+            <button
+              onClick={handleShare}
+              className="p-2 bg-white rounded-full text-gray-700 hover:text-purple-600 transition-colors"
+              title="Compartilhar"
+            >
+              <Share2 size={18} />
+            </button>
+            {/* Botão de favorito */}
+            <button
+              onClick={handleToggleFavorite}
+              className="p-2 bg-white rounded-full text-gray-700 hover:text-amber-500 transition-colors"
+              title={file.isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+            >
+              {file.isFavorite ? <StarOff size={18} /> : <Star size={18} />}
+            </button>
           </div>
         )}
 
@@ -585,29 +585,24 @@ export function FileCard({
         {/* Dropdown menu */}
         {showMenu && (
           <div
-            className="absolute bottom-10 right-2 bg-white rounded-md shadow-lg z-10 border border-gray-200 py-1 w-40 animate-fadeIn"
+            className="absolute bottom-10 right-2 bg-white rounded-md shadow-lg z-10 border border-gray-200 py-1 w-auto animate-fadeIn"
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
               onClick={handleToggleFavorite}
+              title={file.isFavorite ? "Remover favorito" : "Favoritar"}
             >
               {file.isFavorite ? (
-                <>
-                  <StarOff size={16} className="mr-2 text-amber-500" />
-                  <span>Remover favorito</span>
-                </>
+                <StarOff size={16} className="text-amber-500" />
               ) : (
-                <>
-                  <Star size={16} className="mr-2 text-amber-500" />
-                  <span>Favoritar</span>
-                </>
+                <Star size={16} className="text-amber-500" />
               )}
             </button>
             {file.type === "file" && (
               <>
                 <button
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
                   onClick={(e) => {
                     e.stopPropagation()
                     setShowMenu(false)
@@ -617,25 +612,25 @@ export function FileCard({
                       window.open(file.url, "_blank")
                     }
                   }}
+                  title="Visualizar"
                 >
-                  <Eye size={16} className="mr-2 text-blue-500" />
-                  <span>Visualizar</span>
+                  <Eye size={16} className="text-blue-500" />
                 </button>
                 {file.type === "file" && isPdf() && (
                   <button
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
                     onClick={(e) => {
                       e.stopPropagation()
                       setShowMenu(false)
                       setShowDocumentPreview(true)
                     }}
+                    title="Visualizar PDF"
                   >
-                    <Eye className="h-4 w-4 mr-2 text-blue-500" />
-                    <span>Visualizar PDF</span>
+                    <Eye className="h-4 w-4 text-blue-500" />
                   </button>
                 )}
                 <button
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
                   onClick={(e) => {
                     e.stopPropagation()
                     if (file.url) {
@@ -648,33 +643,33 @@ export function FileCard({
                     }
                     setShowMenu(false)
                   }}
+                  title="Download"
                 >
-                  <Download size={16} className="mr-2 text-green-500" />
-                  <span>Download</span>
+                  <Download size={16} className="text-green-500" />
                 </button>
               </>
             )}
-            {/* Botão de compartilhamento no menu */}
+            {/* Botão de compartilhamento no menu - AGORA DISPONÍVEL PARA TODOS OS TIPOS */}
             <button
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
               onClick={handleShare}
+              title="Compartilhar"
             >
-              <Share2 size={16} className="mr-2 text-purple-500" />
-              <span>Compartilhar</span>
+              <Share2 size={16} className="text-purple-500" />
             </button>
             <button
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
               onClick={(e) => {
                 e.stopPropagation()
                 setShowMenu(false)
                 onMove && onMove()
               }}
+              title="Mover"
             >
-              <MoveIcon className="h-4 w-4 mr-2 text-purple-500" />
-              <span>Mover</span>
+              <MoveIcon className="h-4 w-4 text-purple-500" />
             </button>
             <button
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
               onClick={(e) => {
                 e.stopPropagation()
                 setShowMenu(false)
@@ -682,48 +677,48 @@ export function FileCard({
                 setRenameError(null)
                 setShowRenameModal(true)
               }}
+              title="Renomear"
             >
-              <Pencil size={16} className="mr-2 text-orange-500" />
-              <span>Renomear</span>
+              <Pencil size={16} className="text-orange-500" />
             </button>
             <DropdownMenuSeparator />
-            {/* Adicionar estes botões ao menu dropdown, antes do botão de exclusão */}
+            {/* Botões de cache */}
             <button
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
               onClick={checkCache}
               disabled={isCheckingCache}
+              title="Verificar Cache"
             >
               {isCheckingCache ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin text-blue-500" />
+                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
               ) : (
-                <Clock className="h-4 w-4 mr-2 text-blue-500" />
+                <Clock className="h-4 w-4 text-blue-500" />
               )}
-              <span>Verificar Cache</span>
             </button>
 
             <button
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
               onClick={purgeCache}
               disabled={isPurgingCache}
+              title="Purgar Cache"
             >
               {isPurgingCache ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin text-orange-500" />
+                <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
               ) : (
-                <RefreshCw className="h-4 w-4 mr-2 text-orange-500" />
+                <RefreshCw className="h-4 w-4 text-orange-500" />
               )}
-              <span>Purgar Cache</span>
             </button>
             {/* Modificar o botão de exclusão para mostrar o diálogo de confirmação */}
             <button
-              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+              className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
               onClick={(e) => {
                 e.stopPropagation()
                 setShowMenu(false)
                 setShowDeleteConfirmation(true)
               }}
+              title="Excluir"
             >
-              <Trash2 size={16} className="mr-2" />
-              <span>Excluir</span>
+              <Trash2 size={16} />
             </button>
           </div>
         )}

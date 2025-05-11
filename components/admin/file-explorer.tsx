@@ -125,7 +125,7 @@ export function FileExplorer() {
   const [currentPath, setCurrentPath] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<"grid" | "list" | "details">("grid")
-  const [showUploader, setShowUploader] = useState(false)
+  const [showUploader, setShowUploader] = useState(showUploader)
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false)
   const [newFolderName, setNewFolderName] = useState("")
   const [isCreatingFolder, setIsCreatingFolder] = useState(false)
@@ -1387,58 +1387,61 @@ export function FileExplorer() {
                         <DropdownMenuGroup>
                           {file.type === "file" && (
                             <>
-                              <DropdownMenuItem onClick={() => window.open(file.url, "_blank")}>
+                              <DropdownMenuItem onClick={() => window.open(file.url, "_blank")} title="Abrir">
                                 <ExternalLink className="h-4 w-4 mr-2" />
-                                Abrir
+                                <span className="sr-only">Abrir</span>
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handlePreview(file)}>
+                              <DropdownMenuItem onClick={() => handlePreview(file)} title="Visualizar">
                                 <Eye className="h-4 w-4 mr-2" />
-                                Visualizar
+                                <span className="sr-only">Visualizar</span>
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleShare(file)}>
+                              <DropdownMenuItem onClick={() => handleShare(file)} title="Compartilhar">
                                 <Share2 className="h-4 w-4 mr-2" />
-                                Compartilhar
+                                <span className="sr-only">Compartilhar</span>
                               </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
+                              <DropdownMenuItem asChild title="Download">
                                 <a href={file.url} download>
                                   <Download className="h-4 w-4 mr-2" />
-                                  Download
+                                  <span className="sr-only">Download</span>
                                 </a>
                               </DropdownMenuItem>
                             </>
                           )}
                           {file.type === "folder" && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                navigateToFolder(file.path)
-                                setViewType("tasks")
-                              }}
-                            >
-                              <ClipboardList className="h-4 w-4 mr-2" />
-                              Ver Tarefas
-                            </DropdownMenuItem>
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  navigateToFolder(file.path)
+                                  setViewType("tasks")
+                                }}
+                                title="Ver Tarefas"
+                              >
+                                <ClipboardList className="h-4 w-4 mr-2" />
+                                <span className="sr-only">Ver Tarefas</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleShare(file)} title="Compartilhar">
+                                <Share2 className="h-4 w-4 mr-2" />
+                                <span className="sr-only">Compartilhar</span>
+                              </DropdownMenuItem>
+                            </>
                           )}
-                          <DropdownMenuItem onClick={() => toggleFavorite(file)}>
-                            {file.isFavorite ? (
-                              <>
-                                <StarOff className="h-4 w-4 mr-2" />
-                                Remover dos favoritos
-                              </>
-                            ) : (
-                              <>
-                                <Star className="h-4 w-4 mr-2" />
-                                Adicionar aos favoritos
-                              </>
-                            )}
+                          <DropdownMenuItem
+                            onClick={() => toggleFavorite(file)}
+                            title={file.isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                          >
+                            {file.isFavorite ? <StarOff className="h-4 w-4 mr-2" /> : <Star className="h-4 w-4 mr-2" />}
+                            <span className="sr-only">
+                              {file.isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                            </span>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleMove(file)}>
+                          <DropdownMenuItem onClick={() => handleMove(file)} title="Mover">
                             <MoveIcon className="h-4 w-4 mr-2" />
-                            Mover
+                            <span className="sr-only">Mover</span>
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDelete(file)} className="text-red-600">
+                          <DropdownMenuItem onClick={() => handleDelete(file)} className="text-red-600" title="Excluir">
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Excluir
+                            <span className="sr-only">Excluir</span>
                           </DropdownMenuItem>
                         </DropdownMenuGroup>
                       </DropdownMenuContent>
