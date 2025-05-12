@@ -5,6 +5,7 @@ import "./globals.css"
 import { AppDock } from "@/components/layout/app-dock"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ChatWidget } from "@/components/chat/chat-widget"
+import { GlobalHeader } from "@/components/layout/global-header"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -39,6 +40,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} pb-20 w-full mx-auto`}>
         <ThemeProvider attribute="class" defaultTheme="light">
+          <GlobalHeader />
           {children}
           <AppDock />
           <ChatWidget />

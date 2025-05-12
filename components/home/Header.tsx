@@ -2,9 +2,10 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, X, Sun, Moon } from "lucide-react"
+import { Menu, X, Sun, Moon, BookOpen } from "lucide-react"
 import { useTheme } from "@/components/theme-provider"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 interface HeaderProps {
   isScrolled: boolean
@@ -13,6 +14,7 @@ interface HeaderProps {
 export function Header({ isScrolled }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { theme, setTheme } = useTheme()
+  const router = useRouter()
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen)
   const closeMenu = () => setIsMenuOpen(false)
@@ -31,6 +33,11 @@ export function Header({ isScrolled }: HeaderProps) {
         behavior: "smooth",
       })
     }
+  }
+
+  const navigateToBlog = () => {
+    closeMenu()
+    router.push("/blog")
   }
 
   return (
@@ -90,13 +97,6 @@ export function Header({ isScrolled }: HeaderProps) {
             Depoimentos
             <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#4b7bb5] group-hover:w-full transition-all duration-300"></span>
           </button>
-          <Link
-            href="/blog"
-            className="text-sm font-medium text-[#4b7bb5] hover:text-[#3d649e] dark:text-[#6b91c1] dark:hover:text-white transition-colors relative group"
-          >
-            Blog
-            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#4b7bb5] group-hover:w-full transition-all duration-300"></span>
-          </Link>
         </nav>
 
         <div className="flex items-center gap-4">
@@ -111,6 +111,14 @@ export function Header({ isScrolled }: HeaderProps) {
               <Moon className="h-5 w-5 text-[#4072b0]" />
             )}
           </button>
+
+          <Button
+            onClick={navigateToBlog}
+            className="hidden md:flex items-center gap-1 bg-[#527eb7] hover:bg-[#3d649e] text-white dark:bg-[#6b91c1] dark:hover:bg-[#4b7bb5] transition-colors"
+          >
+            <BookOpen className="h-4 w-4 mr-1" />
+            Blog
+          </Button>
 
           <Button
             onClick={() => scrollToSection("contato")}
@@ -197,14 +205,16 @@ export function Header({ isScrolled }: HeaderProps) {
               <span>Depoimentos</span>
               <span className="text-[#4b7bb5]/50">05</span>
             </button>
-            <Link
-              href="/blog"
-              className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors flex items-center justify-between"
-              onClick={closeMenu}
+            <button
+              onClick={navigateToBlog}
+              className="py-3 px-4 text-lg font-medium bg-[#527eb7] text-white hover:bg-[#3d649e] dark:bg-[#6b91c1] dark:hover:bg-[#4b7bb5] rounded-md transition-colors flex items-center justify-between"
             >
-              <span>Blog</span>
-              <span className="text-[#4b7bb5]/50">06</span>
-            </Link>
+              <span className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5" />
+                Blog
+              </span>
+              <span className="text-white/50">06</span>
+            </button>
             <button
               onClick={() => scrollToSection("contato")}
               className="py-3 px-4 text-lg font-medium text-[#4b7bb5] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors flex items-center justify-between"
