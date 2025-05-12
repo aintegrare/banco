@@ -1,256 +1,411 @@
 "use client"
 
-import type React from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
+import ReactFlow, {
+  MiniMap,
+  Controls,
+  Background,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  Panel,
+  MarkerType,
+} from "reactflow"
+import "reactflow/dist/style.css"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Plus,
+  Trash2,
+  Save,
+  Download,
+  Share2,
+  ZoomIn,
+  ZoomOut,
+  Target,
+  Lightbulb,
+  Users,
+  MessageCircle,
+  BarChart,
+  Calendar,
+} from "lucide-react"
 
-import { useState, useRef } from "react"
-import { motion } from "framer-motion"
-import { cn } from "@/lib/utils"
-import { Instagram, Facebook, Users, Target, BarChart, MessageCircle, ImageIcon, FileText } from "lucide-react"
-
-interface Node {
-  id: string
-  type: "platform" | "audience" | "content" | "goal" | "metric"
-  label: string
-  position: { x: number; y: number }
-  connections: string[]
-  color: string
-  icon: React.ReactNode
+// Nó personalizado para estratégia
+const StrategyNode = ({ data }) => {
+  return (
+    <Card className="min-w-[180px] border-2 border-[#4b7bb5]">
+      <CardContent className="p-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Target className="h-4 w-4 text-[#4b7bb5]" />
+          <h3 className="text-sm font-medium">{data.label}</h3>
+        </div>
+        <p className="text-xs text-gray-500">{data.description}</p>
+      </CardContent>
+    </Card>
+  )
 }
 
+// Nó personalizado para ideia
+const IdeaNode = ({ data }) => {
+  return (
+    <Card className="min-w-[180px] border-2 border-amber-400">
+      <CardContent className="p-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Lightbulb className="h-4 w-4 text-amber-500" />
+          <h3 className="text-sm font-medium">{data.label}</h3>
+        </div>
+        <p className="text-xs text-gray-500">{data.description}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Nó personalizado para audiência
+const AudienceNode = ({ data }) => {
+  return (
+    <Card className="min-w-[180px] border-2 border-green-400">
+      <CardContent className="p-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Users className="h-4 w-4 text-green-500" />
+          <h3 className="text-sm font-medium">{data.label}</h3>
+        </div>
+        <p className="text-xs text-gray-500">{data.description}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Nó personalizado para conteúdo
+const ContentNode = ({ data }) => {
+  return (
+    <Card className="min-w-[180px] border-2 border-purple-400">
+      <CardContent className="p-3">
+        <div className="flex items-center gap-2 mb-1">
+          <MessageCircle className="h-4 w-4 text-purple-500" />
+          <h3 className="text-sm font-medium">{data.label}</h3>
+        </div>
+        <p className="text-xs text-gray-500">{data.description}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Nó personalizado para métricas
+const MetricsNode = ({ data }) => {
+  return (
+    <Card className="min-w-[180px] border-2 border-red-400">
+      <CardContent className="p-3">
+        <div className="flex items-center gap-2 mb-1">
+          <BarChart className="h-4 w-4 text-red-500" />
+          <h3 className="text-sm font-medium">{data.label}</h3>
+        </div>
+        <p className="text-xs text-gray-500">{data.description}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Nó personalizado para cronograma
+const TimelineNode = ({ data }) => {
+  return (
+    <Card className="min-w-[180px] border-2 border-blue-400">
+      <CardContent className="p-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Calendar className="h-4 w-4 text-blue-500" />
+          <h3 className="text-sm font-medium">{data.label}</h3>
+        </div>
+        <p className="text-xs text-gray-500">{data.description}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Mapeamento de tipos de nós para componentes
+const nodeTypes = {
+  strategy: StrategyNode,
+  idea: IdeaNode,
+  audience: AudienceNode,
+  content: ContentNode,
+  metrics: MetricsNode,
+  timeline: TimelineNode,
+}
+
+// Nós iniciais
+const initialNodes = [
+  {
+    id: "1",
+    type: "strategy",
+    position: { x: 250, y: 0 },
+    data: {
+      label: "Estratégia Principal",
+      description: "Aumentar engajamento nas redes sociais em 30% em 3 meses",
+    },
+  },
+  {
+    id: "2",
+    type: "audience",
+    position: { x: 100, y: 150 },
+    data: {
+      label: "Público-Alvo",
+      description: "Jovens de 18-35 anos interessados em moda sustentável",
+    },
+  },
+  {
+    id: "3",
+    type: "idea",
+    position: { x: 400, y: 150 },
+    data: {
+      label: "Ideia de Campanha",
+      description: "Série de posts mostrando o processo de produção sustentável",
+    },
+  },
+  {
+    id: "4",
+    type: "content",
+    position: { x: 100, y: 300 },
+    data: {
+      label: "Conteúdo Instagram",
+      description: "Reels mostrando bastidores da produção + hashtags de sustentabilidade",
+    },
+  },
+  {
+    id: "5",
+    type: "content",
+    position: { x: 400, y: 300 },
+    data: {
+      label: "Conteúdo Facebook",
+      description: "Artigos longos sobre impacto ambiental da moda fast-fashion",
+    },
+  },
+  {
+    id: "6",
+    type: "metrics",
+    position: { x: 250, y: 450 },
+    data: {
+      label: "Métricas de Sucesso",
+      description: "Aumento de 30% em engajamento, 20% em seguidores, 15% em conversões",
+    },
+  },
+  {
+    id: "7",
+    type: "timeline",
+    position: { x: 550, y: 450 },
+    data: {
+      label: "Cronograma",
+      description: "Lançamento em Junho, avaliação em Julho, ajustes em Agosto",
+    },
+  },
+]
+
+// Conexões iniciais
+const initialEdges = [
+  {
+    id: "e1-2",
+    source: "1",
+    target: "2",
+    animated: true,
+    style: { stroke: "#4b7bb5" },
+    markerEnd: { type: MarkerType.ArrowClosed },
+  },
+  {
+    id: "e1-3",
+    source: "1",
+    target: "3",
+    animated: true,
+    style: { stroke: "#4b7bb5" },
+    markerEnd: { type: MarkerType.ArrowClosed },
+  },
+  {
+    id: "e2-4",
+    source: "2",
+    target: "4",
+    animated: true,
+    style: { stroke: "#4b7bb5" },
+    markerEnd: { type: MarkerType.ArrowClosed },
+  },
+  {
+    id: "e3-5",
+    source: "3",
+    target: "5",
+    animated: true,
+    style: { stroke: "#4b7bb5" },
+    markerEnd: { type: MarkerType.ArrowClosed },
+  },
+  {
+    id: "e4-6",
+    source: "4",
+    target: "6",
+    animated: true,
+    style: { stroke: "#4b7bb5" },
+    markerEnd: { type: MarkerType.ArrowClosed },
+  },
+  {
+    id: "e5-6",
+    source: "5",
+    target: "6",
+    animated: true,
+    style: { stroke: "#4b7bb5" },
+    markerEnd: { type: MarkerType.ArrowClosed },
+  },
+  {
+    id: "e3-7",
+    source: "3",
+    target: "7",
+    animated: true,
+    style: { stroke: "#4b7bb5" },
+    markerEnd: { type: MarkerType.ArrowClosed },
+  },
+]
+
 export function FlowChart() {
-  const [nodes, setNodes] = useState<Node[]>([
-    {
-      id: "instagram",
-      type: "platform",
-      label: "Instagram",
-      position: { x: 200, y: 100 },
-      connections: ["young-audience", "visual-content", "engagement"],
-      color: "#4b7bb5",
-      icon: <Instagram size={20} className="text-white" />,
-    },
-    {
-      id: "facebook",
-      type: "platform",
-      label: "Facebook",
-      position: { x: 450, y: 100 },
-      connections: ["adult-audience", "text-content", "traffic"],
-      color: "#527eb7",
-      icon: <Facebook size={20} className="text-white" />,
-    },
-    {
-      id: "young-audience",
-      type: "audience",
-      label: "Público Jovem",
-      position: { x: 100, y: 250 },
-      connections: ["visual-content"],
-      color: "#3d649e",
-      icon: <Users size={20} className="text-white" />,
-    },
-    {
-      id: "adult-audience",
-      type: "audience",
-      label: "Público Adulto",
-      position: { x: 550, y: 250 },
-      connections: ["text-content"],
-      color: "#3d649e",
-      icon: <Users size={20} className="text-white" />,
-    },
-    {
-      id: "visual-content",
-      type: "content",
-      label: "Conteúdo Visual",
-      position: { x: 100, y: 400 },
-      connections: ["engagement"],
-      color: "#4072b0",
-      icon: <ImageIcon size={20} className="text-white" />,
-    },
-    {
-      id: "text-content",
-      type: "content",
-      label: "Conteúdo Textual",
-      position: { x: 550, y: 400 },
-      connections: ["traffic"],
-      color: "#4072b0",
-      icon: <FileText size={20} className="text-white" />,
-    },
-    {
-      id: "engagement",
-      type: "goal",
-      label: "Engajamento",
-      position: { x: 300, y: 400 },
-      connections: ["likes-comments"],
-      color: "#6b91c1",
-      icon: <MessageCircle size={20} className="text-white" />,
-    },
-    {
-      id: "traffic",
-      type: "goal",
-      label: "Tráfego Site",
-      position: { x: 350, y: 250 },
-      connections: ["clicks"],
-      color: "#6b91c1",
-      icon: <Target size={20} className="text-white" />,
-    },
-    {
-      id: "likes-comments",
-      type: "metric",
-      label: "Likes e Comentários",
-      position: { x: 300, y: 550 },
-      connections: [],
-      color: "#4b7bb5",
-      icon: <BarChart size={20} className="text-white" />,
-    },
-    {
-      id: "clicks",
-      type: "metric",
-      label: "Cliques no Link",
-      position: { x: 550, y: 550 },
-      connections: [],
-      color: "#4b7bb5",
-      icon: <BarChart size={20} className="text-white" />,
-    },
-  ])
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const [selectedNodeType, setSelectedNodeType] = useState("strategy")
+  const reactFlowWrapper = useRef(null)
+  const [reactFlowInstance, setReactFlowInstance] = useState(null)
 
-  const [dragging, setDragging] = useState<string | null>(null)
-  const [offset, setOffset] = useState({ x: 0, y: 0 })
-  const containerRef = useRef<HTMLDivElement>(null)
+  // Função para adicionar conexão
+  const onConnect = useCallback(
+    (params) =>
+      setEdges((eds) =>
+        addEdge(
+          { ...params, animated: true, style: { stroke: "#4b7bb5" }, markerEnd: { type: MarkerType.ArrowClosed } },
+          eds,
+        ),
+      ),
+    [setEdges],
+  )
 
-  const handleMouseDown = (e: React.MouseEvent, id: string) => {
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect()
-      const node = nodes.find((n) => n.id === id)
-      if (node) {
-        setOffset({
-          x: e.clientX - rect.left - node.position.x,
-          y: e.clientY - rect.top - node.position.y,
-        })
-        setDragging(id)
+  // Função para adicionar novo nó
+  const onAddNode = useCallback(() => {
+    const newNode = {
+      id: `${nodes.length + 1}`,
+      type: selectedNodeType,
+      position: {
+        x: Math.random() * 500,
+        y: Math.random() * 500,
+      },
+      data: {
+        label: `Novo ${selectedNodeType.charAt(0).toUpperCase() + selectedNodeType.slice(1)}`,
+        description: "Clique para editar a descrição",
+      },
+    }
+    setNodes((nds) => nds.concat(newNode))
+  }, [nodes.length, selectedNodeType, setNodes])
+
+  // Função para excluir nós selecionados
+  const onDeleteSelected = useCallback(() => {
+    setNodes((nds) => nds.filter((node) => !node.selected))
+    setEdges((eds) => eds.filter((edge) => !edge.selected))
+  }, [setNodes, setEdges])
+
+  // Função para salvar o fluxo
+  const onSave = useCallback(() => {
+    if (reactFlowInstance) {
+      const flow = reactFlowInstance.toObject()
+      localStorage.setItem("mindmap-flow", JSON.stringify(flow))
+      alert("Mindmap salvo com sucesso!")
+    }
+  }, [reactFlowInstance])
+
+  // Função para carregar o fluxo salvo
+  useEffect(() => {
+    const savedFlow = localStorage.getItem("mindmap-flow")
+    if (savedFlow) {
+      const flow = JSON.parse(savedFlow)
+      if (flow.nodes && flow.edges) {
+        setNodes(flow.nodes)
+        setEdges(flow.edges)
       }
     }
-  }
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (dragging && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect()
-      setNodes((prev) =>
-        prev.map((node) => {
-          if (node.id === dragging) {
-            return {
-              ...node,
-              position: {
-                x: e.clientX - rect.left - offset.x,
-                y: e.clientY - rect.top - offset.y,
-              },
-            }
-          }
-          return node
-        }),
-      )
-    }
-  }
-
-  const handleMouseUp = () => {
-    setDragging(null)
-  }
-
-  const getNodeTypeLabel = (type: string) => {
-    const types = {
-      platform: "Plataforma",
-      audience: "Público-alvo",
-      content: "Tipo de Conteúdo",
-      goal: "Objetivo",
-      metric: "Métrica",
-    }
-    return types[type as keyof typeof types] || type
-  }
+  }, [setNodes, setEdges])
 
   return (
-    <div
-      ref={containerRef}
-      className="h-full w-full relative overflow-hidden bg-white"
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-    >
-      <div className="absolute top-4 left-4 z-10 bg-white p-2 rounded-lg shadow-sm border border-gray-200">
-        <h3 className="text-sm font-medium mb-1">Mapa de Estratégia</h3>
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#4b7bb5" }}></div>
-            <span>Plataformas</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#3d649e" }}></div>
-            <span>Público-alvo</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#4072b0" }}></div>
-            <span>Conteúdo</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#6b91c1" }}></div>
-            <span>Objetivos</span>
-          </div>
+    <div className="h-full w-full flex flex-col">
+      <div className="border-b p-2 flex justify-between items-center">
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" size="sm" onClick={onAddNode}>
+            <Plus className="h-4 w-4 mr-1" />
+            Adicionar
+          </Button>
+          <Button variant="outline" size="sm" onClick={onDeleteSelected}>
+            <Trash2 className="h-4 w-4 mr-1" />
+            Excluir
+          </Button>
+          <Button variant="outline" size="sm" onClick={onSave}>
+            <Save className="h-4 w-4 mr-1" />
+            Salvar
+          </Button>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-1" />
+            Exportar
+          </Button>
+          <Button variant="outline" size="sm">
+            <Share2 className="h-4 w-4 mr-1" />
+            Compartilhar
+          </Button>
         </div>
       </div>
 
-      <svg className="absolute inset-0 w-full h-full pointer-events-none">
-        {nodes.map((node) =>
-          node.connections.map((targetId) => {
-            const target = nodes.find((n) => n.id === targetId)
-            if (target) {
-              const startX = node.position.x + 100
-              const startY = node.position.y + 30
-              const endX = target.position.x + 100
-              const endY = target.position.y + 30
-
-              // Calculate control points for curved lines
-              const midY = (startY + endY) / 2
-
-              return (
-                <motion.path
-                  key={`${node.id}-${targetId}`}
-                  d={`M ${startX} ${startY} C ${startX} ${midY}, ${endX} ${midY}, ${endX} ${endY}`}
-                  stroke="#4b7bb5"
-                  strokeWidth={2}
-                  fill="none"
-                  initial={{ pathLength: 0, opacity: 0 }}
-                  animate={{ pathLength: 1, opacity: 1 }}
-                  transition={{ duration: 0.5, delay: 0.2 }}
-                />
-              )
-            }
-            return null
-          }),
-        )}
-      </svg>
-
-      {nodes.map((node) => (
-        <motion.div
-          key={node.id}
-          className={cn(
-            "absolute rounded-lg p-4 w-[200px] cursor-move shadow-md",
-            dragging === node.id ? "z-10 shadow-lg" : "z-0",
-          )}
-          style={{
-            backgroundColor: node.color,
-            left: node.position.x,
-            top: node.position.y,
-          }}
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
-          onMouseDown={(e) => handleMouseDown(e, node.id)}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+      <div className="flex-1 h-full" ref={reactFlowWrapper}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          nodeTypes={nodeTypes}
+          fitView
+          onInit={setReactFlowInstance}
+          className="bg-gray-50"
         >
-          <div className="flex items-center gap-2 mb-1">
-            {node.icon}
-            <div className="text-white font-medium">{node.label}</div>
-          </div>
-          <div className="text-white/80 text-xs">{getNodeTypeLabel(node.type)}</div>
-        </motion.div>
-      ))}
+          <Controls />
+          <MiniMap />
+          <Background variant="dots" gap={12} size={1} />
+
+          <Panel position="top-left" className="bg-white p-2 rounded-md shadow-md">
+            <Tabs defaultValue="strategy" value={selectedNodeType} onValueChange={setSelectedNodeType}>
+              <TabsList className="grid grid-cols-6 h-8">
+                <TabsTrigger value="strategy" className="px-2 py-1">
+                  <Target className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="idea" className="px-2 py-1">
+                  <Lightbulb className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="audience" className="px-2 py-1">
+                  <Users className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="content" className="px-2 py-1">
+                  <MessageCircle className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="metrics" className="px-2 py-1">
+                  <BarChart className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="timeline" className="px-2 py-1">
+                  <Calendar className="h-4 w-4" />
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </Panel>
+
+          <Panel position="bottom-right" className="bg-white p-2 rounded-md shadow-md">
+            <div className="flex space-x-2">
+              <Button variant="outline" size="sm" onClick={() => reactFlowInstance?.zoomIn()}>
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => reactFlowInstance?.zoomOut()}>
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => reactFlowInstance?.fitView()}>
+                <Target className="h-4 w-4" />
+              </Button>
+            </div>
+          </Panel>
+        </ReactFlow>
+      </div>
     </div>
   )
 }

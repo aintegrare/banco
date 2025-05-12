@@ -17,14 +17,21 @@ import {
   Video,
   Clock,
   TrendingUp,
-  Search,
   Settings,
   ChevronRight,
   Zap,
   Star,
   DollarSign,
+  MessageSquare,
+  FileText,
+  Filter,
+  X,
+  ChevronDown,
 } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 // Mapeamento de ícones
 const iconMap: Record<string, any> = {
@@ -40,15 +47,25 @@ const iconMap: Record<string, any> = {
 interface AIModelsProps {
   selectedModel: string
   setSelectedModel: (model: string) => void
+  onGenerateContent?: (modelId: string) => void
+  onAnalyzePost?: (modelId: string) => void
+  onChatPrompt?: (modelId: string) => void
 }
 
-export default function AIModels({ selectedModel, setSelectedModel }: AIModelsProps) {
+export default function AIModels({
+  selectedModel,
+  setSelectedModel,
+  onGenerateContent,
+  onAnalyzePost,
+  onChatPrompt,
+}: AIModelsProps) {
   const [models, setModels] = useState<AIModel[]>([])
   const [filteredModels, setFilteredModels] = useState<AIModel[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [activeCategory, setActiveCategory] = useState("all")
   const [loading, setLoading] = useState(true)
   const [expandedModel, setExpandedModel] = useState<string | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
 
   // Carregar modelos
   useEffect(() => {
@@ -97,7 +114,7 @@ export default function AIModels({ selectedModel, setSelectedModel }: AIModelsPr
   // Selecionar um modelo
   const handleSelectModel = async (modelId: string) => {
     setSelectedModel(modelId)
-    setExpandedModel(modelId)
+    setExpandedModel(modelId === expandedModel ? null : modelId)
     await saveUserPreference("current_user", "selected_model", modelId)
   }
 
@@ -131,139 +148,194 @@ export default function AIModels({ selectedModel, setSelectedModel }: AIModelsPr
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1"
           />
-          <Button variant="outline" size="sm" onClick={() => setSearchQuery("")}>
-            <Search className="h-4 w-4 mr-2" />
-            Limpar
+          <Button variant="outline" size="icon" onClick={() => setShowFilters(!showFilters)} className="h-10 w-10">
+            <Filter className="h-4 w-4" />
           </Button>
+          {searchQuery && (
+            <Button variant="outline" size="icon" onClick={() => setSearchQuery("")} className="h-10 w-10">
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
 
-        <Tabs value={activeCategory} onValueChange={setActiveCategory}>
-          <TabsList className="w-full flex overflow-x-auto pb-1 mb-2">
-            {categories.map((category) => (
-              <TabsTrigger
-                key={category}
-                value={category}
-                className="flex-shrink-0 data-[state=active]:bg-[#4b7bb5] data-[state=active]:text-white"
-              >
-                {category === "all" ? "Todos" : formatCategoryName(category)}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        {showFilters && (
+          <Tabs value={activeCategory} onValueChange={setActiveCategory}>
+            <TabsList className="w-full flex overflow-x-auto pb-1 mb-2">
+              {categories.map((category) => (
+                <TabsTrigger
+                  key={category}
+                  value={category}
+                  className="flex-shrink-0 data-[state=active]:bg-[#4b7bb5] data-[state=active]:text-white"
+                >
+                  {category === "all" ? "Todos" : formatCategoryName(category)}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
-        {filteredModels.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <p>Nenhum modelo encontrado.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredModels.map((model) => (
-              <Card
-                key={model.id}
-                className={`cursor-pointer transition-all hover:border-[#4b7bb5] ${
-                  selectedModel === model.id ? "border-[#4b7bb5] bg-blue-50" : ""
-                } ${model.status !== "active" ? "opacity-70" : ""}`}
-                onClick={() => model.status === "active" && handleSelectModel(model.id)}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center space-x-2">
-                      {renderIcon(model.category)}
-                      <CardTitle className="text-lg">{model.name}</CardTitle>
-                    </div>
-                    <Badge
-                      variant={model.status === "active" ? "outline" : "secondary"}
-                      className={model.status === "active" ? "bg-green-50 text-green-700" : ""}
-                    >
-                      {model.status === "active" ? "Ativo" : "Em breve"}
-                    </Badge>
-                  </div>
-                  <CardDescription>{model.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="pb-2">
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {model.capabilities.slice(0, 3).map((capability: string, index: number) => (
-                      <Badge key={index} variant="outline" className="bg-white">
-                        {capability}
+      <ScrollArea className="flex-1">
+        <div className="p-4">
+          {filteredModels.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>Nenhum modelo encontrado.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {filteredModels.map((model) => (
+                <Card
+                  key={model.id}
+                  className={`cursor-pointer transition-all hover:border-[#4b7bb5] ${
+                    selectedModel === model.id ? "border-[#4b7bb5] bg-blue-50" : ""
+                  } ${model.status !== "active" ? "opacity-70" : ""}`}
+                  onClick={() => model.status === "active" && handleSelectModel(model.id)}
+                >
+                  <CardHeader className="pb-2 px-4 pt-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center space-x-2">
+                        {renderIcon(model.category)}
+                        <CardTitle className="text-base font-semibold">{model.name}</CardTitle>
+                      </div>
+                      <Badge
+                        variant={model.status === "active" ? "outline" : "secondary"}
+                        className={model.status === "active" ? "bg-green-50 text-green-700" : ""}
+                      >
+                        {model.status === "active" ? "Ativo" : "Em breve"}
                       </Badge>
-                    ))}
-                    {model.capabilities.length > 3 && (
-                      <Badge variant="outline" className="bg-white">
-                        +{model.capabilities.length - 3}
-                      </Badge>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="flex items-center">
-                        <Star className="h-3 w-3 mr-1 text-amber-500" />
-                        Precisão
-                      </span>
-                      <span>{model.metrics.accuracy}%</span>
                     </div>
-                    <Progress value={model.metrics.accuracy} className="h-1" />
+                    <CardDescription className="text-xs mt-1 line-clamp-2">{model.description}</CardDescription>
+                  </CardHeader>
 
-                    <div className="flex justify-between text-sm">
-                      <span className="flex items-center">
-                        <Zap className="h-3 w-3 mr-1 text-blue-500" />
-                        Velocidade
-                      </span>
-                      <span>{model.metrics.speed}%</span>
+                  <CardContent className="pb-2 px-4">
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {model.capabilities.slice(0, 2).map((capability: string, index: number) => (
+                        <Badge key={index} variant="outline" className="bg-white text-xs">
+                          {capability}
+                        </Badge>
+                      ))}
+                      {model.capabilities.length > 2 && (
+                        <Badge variant="outline" className="bg-white text-xs">
+                          +{model.capabilities.length - 2}
+                        </Badge>
+                      )}
                     </div>
-                    <Progress value={model.metrics.speed} className="h-1" />
-                  </div>
-                </CardContent>
-                <CardFooter className="pt-2">
-                  <div className="w-full flex justify-between items-center">
-                    <span className="text-xs text-gray-500 flex items-center">
-                      <DollarSign className="h-3 w-3 mr-1" />
-                      Custo: {model.metrics.cost}%
-                    </span>
-                    {selectedModel === model.id && (
+                  </CardContent>
+
+                  <CardFooter className="pt-0 px-4 pb-4 flex justify-between items-center">
+                    {selectedModel === model.id ? (
                       <Badge className="bg-[#4b7bb5]">
                         <Check className="h-3 w-3 mr-1" /> Selecionado
                       </Badge>
+                    ) : (
+                      model.status === "active" && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-7 px-2">
+                                <Zap className="h-3.5 w-3.5 mr-1" />
+                                <span className="text-xs">Aplicar</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Selecionar este modelo</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )
                     )}
-                  </div>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-        )}
 
-        {expandedModel && (
-          <div className="mt-6">
-            <h3 className="text-sm font-medium mb-2">Detalhes do Modelo</h3>
-            {models
-              .filter((m) => m.id === expandedModel)
-              .map((model) => (
-                <div key={model.id} className="space-y-4">
-                  <Card>
-                    <CardHeader className="p-4 pb-2">
-                      <div className="flex justify-between">
-                        <div className="flex items-center gap-2">
-                          {renderIcon(model.category)}
-                          <CardTitle className="text-base">{model.name}</CardTitle>
-                        </div>
-                        <Button variant="outline" size="sm" className="h-8">
-                          <Settings className="h-4 w-4 mr-1" />
-                          Configurar
-                        </Button>
-                      </div>
-                      <CardDescription>{model.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0">
-                      <Accordion type="single" collapsible className="w-full">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setExpandedModel(expandedModel === model.id ? null : model.id)
+                      }}
+                    >
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 transition-transform ${expandedModel === model.id ? "rotate-180" : ""}`}
+                      />
+                      <span className="text-xs ml-1">Detalhes</span>
+                    </Button>
+                  </CardFooter>
+
+                  {expandedModel === model.id && (
+                    <div className="px-4 pb-4 pt-0 border-t">
+                      <Collapsible defaultOpen>
+                        <CollapsibleTrigger className="flex items-center justify-between w-full text-sm font-medium py-2">
+                          <span>Ações Rápidas</span>
+                          <ChevronDown className="h-4 w-4 text-gray-500" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="grid grid-cols-2 gap-2 mt-2">
+                            {onGenerateContent && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onGenerateContent(model.id)
+                                }}
+                              >
+                                <FileText className="h-3 w-3 mr-1" />
+                                Gerar Conteúdo
+                              </Button>
+                            )}
+
+                            {onAnalyzePost && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onAnalyzePost(model.id)
+                                }}
+                              >
+                                <BarChart3 className="h-3 w-3 mr-1" />
+                                Analisar Post
+                              </Button>
+                            )}
+
+                            {onChatPrompt && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onChatPrompt(model.id)
+                                }}
+                              >
+                                <MessageSquare className="h-3 w-3 mr-1" />
+                                Chat
+                              </Button>
+                            )}
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Settings className="h-3 w-3 mr-1" />
+                              Configurar
+                            </Button>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+
+                      <Accordion type="single" collapsible className="w-full mt-2">
                         <AccordionItem value="capabilities">
-                          <AccordionTrigger className="text-sm py-2">Capacidades</AccordionTrigger>
+                          <AccordionTrigger className="text-xs py-2">Capacidades</AccordionTrigger>
                           <AccordionContent>
                             <ul className="space-y-1">
                               {model.capabilities.map((capability, i) => (
-                                <li key={i} className="text-sm flex items-start">
-                                  <ChevronRight className="h-4 w-4 mr-1 text-[#4b7bb5] shrink-0 mt-0.5" />
+                                <li key={i} className="text-xs flex items-start">
+                                  <ChevronRight className="h-3 w-3 mr-1 text-[#4b7bb5] shrink-0 mt-0.5" />
                                   <span>{capability}</span>
                                 </li>
                               ))}
@@ -271,68 +343,51 @@ export default function AIModels({ selectedModel, setSelectedModel }: AIModelsPr
                           </AccordionContent>
                         </AccordionItem>
                         <AccordionItem value="metrics">
-                          <AccordionTrigger className="text-sm py-2">Métricas</AccordionTrigger>
+                          <AccordionTrigger className="text-xs py-2">Métricas</AccordionTrigger>
                           <AccordionContent>
-                            <div className="space-y-3">
+                            <div className="space-y-2">
                               <div className="space-y-1">
-                                <div className="flex justify-between text-sm">
+                                <div className="flex justify-between text-xs">
                                   <span className="flex items-center">
-                                    <Star className="h-4 w-4 mr-1 text-amber-500" />
+                                    <Star className="h-3 w-3 mr-1 text-amber-500" />
                                     Precisão
                                   </span>
                                   <span className="text-[#4b7bb5] font-medium">{model.metrics.accuracy}%</span>
                                 </div>
-                                <Progress value={model.metrics.accuracy} className="h-2" />
+                                <Progress value={model.metrics.accuracy} className="h-1.5" />
                               </div>
                               <div className="space-y-1">
-                                <div className="flex justify-between text-sm">
+                                <div className="flex justify-between text-xs">
                                   <span className="flex items-center">
-                                    <Zap className="h-4 w-4 mr-1 text-blue-500" />
+                                    <Zap className="h-3 w-3 mr-1 text-blue-500" />
                                     Velocidade
                                   </span>
                                   <span className="text-[#4b7bb5] font-medium">{model.metrics.speed}%</span>
                                 </div>
-                                <Progress value={model.metrics.speed} className="h-2" />
+                                <Progress value={model.metrics.speed} className="h-1.5" />
                               </div>
                               <div className="space-y-1">
-                                <div className="flex justify-between text-sm">
+                                <div className="flex justify-between text-xs">
                                   <span className="flex items-center">
-                                    <DollarSign className="h-4 w-4 mr-1 text-green-500" />
+                                    <DollarSign className="h-3 w-3 mr-1 text-green-500" />
                                     Custo
                                   </span>
                                   <span className="text-[#4b7bb5] font-medium">{model.metrics.cost}%</span>
                                 </div>
-                                <Progress value={model.metrics.cost} className="h-2" />
+                                <Progress value={model.metrics.cost} className="h-1.5" />
                               </div>
                             </div>
                           </AccordionContent>
                         </AccordionItem>
-                        <AccordionItem value="settings">
-                          <AccordionTrigger className="text-sm py-2">Configurações</AccordionTrigger>
-                          <AccordionContent>
-                            <div className="space-y-3">
-                              {Object.entries(model.settings).map(([key, value], i) => (
-                                <div key={i} className="flex justify-between items-center">
-                                  <span className="text-sm">{formatSettingName(key)}</span>
-                                  <Badge
-                                    variant={value === true ? "default" : "outline"}
-                                    className={value === true ? "bg-[#4b7bb5]" : ""}
-                                  >
-                                    {value === true ? "Ativo" : "Inativo"}
-                                  </Badge>
-                                </div>
-                              ))}
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
                       </Accordion>
-                    </CardContent>
-                  </Card>
-                </div>
+                    </div>
+                  )}
+                </Card>
               ))}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
     </div>
   )
 }
@@ -347,11 +402,4 @@ function formatCategoryName(category: string): string {
   }
 
   return categoryMap[category] || category.charAt(0).toUpperCase() + category.slice(1)
-}
-
-// Função para formatar nomes de configurações
-function formatSettingName(key: string): string {
-  // Converter camelCase para espaços e capitalizar primeira letra
-  const formatted = key.replace(/([A-Z])/g, " $1").trim()
-  return formatted.charAt(0).toUpperCase() + formatted.slice(1)
 }

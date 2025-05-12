@@ -3,379 +3,309 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { Send, Bot, Info, HelpCircle, Code, Calendar, Loader2, AlertTriangle } from "lucide-react"
-import { AnimatePresence, motion } from "framer-motion"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Send,
+  Paperclip,
+  ImageIcon,
+  Mic,
+  Sparkles,
+  MoreHorizontal,
+  ThumbsUp,
+  MessageCircle,
+  RefreshCw,
+  Save,
+  Copy,
+  Trash2,
+} from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface Message {
   id: string
   text: string
-  role: "user" | "assistant" | "system"
+  role: "user" | "assistant"
   timestamp: Date
-  isError?: boolean
 }
 
-// Respostas pré-definidas para simulação local
-const localResponses: Record<string, string> = {
-  default:
-    "Olá! Sou a Jaque, assistente virtual da Integrare. Como posso ajudar com seu planejamento de mídia social hoje?",
-  marketing:
-    "O marketing digital envolve várias estratégias como SEO, mídia social, email marketing e marketing de conteúdo. Qual área específica você gostaria de explorar?",
-  instagram:
-    "O Instagram é uma plataforma visual excelente para engajamento. Recomendo focar em Stories, Reels e posts com imagens de alta qualidade. A consistência visual é fundamental para sua marca.",
-  facebook:
-    "O Facebook é ideal para construir comunidade e alcançar públicos diversos. Conteúdo de vídeo e posts que incentivam interação tendem a ter melhor desempenho no algoritmo.",
-  linkedin:
-    "Para o LinkedIn, conteúdo profissional e educativo funciona melhor. Artigos de liderança de pensamento, cases de sucesso e atualizações do setor são formatos recomendados.",
-  twitter:
-    "No Twitter, mensagens concisas e oportunas são essenciais. Participar de conversas relevantes e usar hashtags estratégicas pode aumentar significativamente seu alcance.",
-  tiktok:
-    "O TikTok valoriza autenticidade e criatividade. Conteúdo curto, envolvente e que acompanha tendências tem maior chance de viralizar nesta plataforma.",
-  planejamento:
-    "Um bom planejamento de mídia social inclui: definição de objetivos claros, conhecimento do público-alvo, calendário de conteúdo, estratégia para cada plataforma e métricas para acompanhamento de resultados.",
-  hashtags:
-    "Hashtags devem ser relevantes, específicas e em número moderado. Misture hashtags populares com nichos específicos para melhor alcance. Pesquise as tendências do seu setor regularmente.",
-  métricas:
-    "As principais métricas a monitorar incluem: alcance, engajamento (curtidas, comentários, compartilhamentos), taxa de cliques, conversões, crescimento de seguidores e ROI das campanhas pagas.",
-  frequência:
-    "A frequência ideal de postagem varia por plataforma: Instagram (1-2/dia), Facebook (1/dia), LinkedIn (1-2/semana), Twitter (3-5/dia), TikTok (1-3/dia). Teste diferentes frequências para seu público específico.",
-  horário:
-    "Os melhores horários para postar dependem do seu público, mas geralmente: Instagram (meio-dia e 18h), Facebook (13h-16h), LinkedIn (manhã e início da tarde em dias úteis), Twitter (12h-15h), TikTok (19h-21h).",
-  conteúdo:
-    "Diversifique seu conteúdo entre educativo, inspirador, entretenimento e promocional. A regra 80/20 sugere 80% de conteúdo de valor e 20% promocional.",
-  ferramentas:
-    "Algumas ferramentas úteis para gestão de mídia social: Hootsuite, Buffer, Later, Canva, Planoly, Sprout Social e Google Analytics para métricas.",
-  crise:
-    "Para gestão de crise em redes sociais: monitore menções à sua marca, responda rapidamente, seja transparente, não delete críticas válidas e tenha um plano de contingência preparado.",
-  tendências:
-    "Tendências atuais incluem: conteúdo de vídeo curto, realidade aumentada, marketing de influência, conteúdo gerado pelo usuário e maior foco em autenticidade e responsabilidade social.",
-  orgânico:
-    "Para melhorar alcance orgânico: crie conteúdo de alta qualidade, incentive engajamento com perguntas e calls-to-action, use hashtags estrategicamente e mantenha consistência nas postagens.",
-  pago: "Anúncios pagos devem ter objetivos claros, segmentação precisa, criativos atraentes e testes A/B regulares. Comece com orçamentos pequenos e escale conforme os resultados.",
-  engajamento:
-    "Para aumentar engajamento: faça perguntas, crie enquetes, responda comentários prontamente, compartilhe conteúdo dos seguidores e crie conteúdo que ressoe emocionalmente com seu público.",
-  análise:
-    "Analise seus resultados mensalmente, identificando: conteúdos com melhor desempenho, horários mais eficazes, crescimento de seguidores e conversões geradas. Use esses insights para ajustar sua estratégia.",
+interface ChatInterfaceProps {
+  messages: Message[]
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>
+  selectedModule: string
 }
 
 export default function ChatInterface({
   messages: initialMessages = [],
-  setMessages: setParentMessages,
+  setMessages,
   selectedModule,
-  isMobile = false,
-}: {
-  messages: Message[]
-  setMessages: (messages: Message[]) => void
-  selectedModule: string
-  isMobile?: boolean
-}) {
-  const [inputValue, setInputValue] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [localMessages, setLocalMessages] = useState<Message[]>(initialMessages)
+}: ChatInterfaceProps) {
+  const [input, setInput] = useState("")
+  const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [messages, setLocalMessages] = useState<Message[]>(initialMessages)
 
-  // Atualizar as informações do módulo
-  const moduleInfo = {
-    assistant: {
-      name: "Jaque - Assistente",
-      icon: <Bot size={20} />,
-      welcomeMessage:
-        "Olá! Eu sou a Jaque, assistente virtual da Integrare. Como posso ajudar com seu planejamento de mídia social hoje?",
-    },
-  }
+  // Sincronizar mensagens locais com as mensagens do componente pai
+  useEffect(() => {
+    setLocalMessages(initialMessages)
+  }, [initialMessages])
 
-  const currentModule = moduleInfo["assistant"]
+  // Sincronizar mensagens locais com o componente pai
+  useEffect(() => {
+    setMessages(messages)
+  }, [messages, setMessages])
 
-  // Processar comandos especiais
-  const processSpecialCommands = (text: string) => {
-    const command = text.trim().toLowerCase()
+  // Rolar para a última mensagem quando novas mensagens são adicionadas
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
 
-    if (command === "/ajuda") {
-      return "Comandos disponíveis:\n/ajuda - Mostrar esta mensagem de ajuda\n/sobre - Sobre este assistente\n/hora - Mostrar hora atual\n/data - Mostrar data atual\n/dicas - Dicas de mídia social\n/plataformas - Listar plataformas suportadas"
-    } else if (command === "/sobre") {
-      return "Sou a Jaque, assistente virtual da Agência Integrare. Estou aqui para ajudar com informações sobre marketing digital, estratégias de mídia social e planejamento de conteúdo."
-    } else if (command === "/hora") {
-      const now = new Date()
-      return `Hora atual: ${now.toLocaleTimeString()}`
-    } else if (command === "/data") {
-      const now = new Date()
-      return `Data atual: ${now.toLocaleDateString("pt-BR")}`
-    } else if (command === "/dicas") {
-      return "Dicas para mídia social:\n1. Mantenha consistência visual\n2. Engaje com sua audiência\n3. Use hashtags estrategicamente\n4. Analise métricas regularmente\n5. Planeje conteúdo com antecedência"
-    } else if (command === "/plataformas") {
-      return "Plataformas suportadas: Instagram, Facebook, LinkedIn, Twitter, TikTok, YouTube, Pinterest"
-    }
+  // Função para enviar mensagem
+  const handleSendMessage = () => {
+    if (input.trim() === "") return
 
-    return null // Não é um comando especial
-  }
-
-  // Função para gerar resposta local baseada no texto do usuário
-  const generateLocalResponse = (userText: string) => {
-    const text = userText.toLowerCase()
-
-    // Verificar palavras-chave no texto do usuário
-    for (const [keyword, response] of Object.entries(localResponses)) {
-      if (text.includes(keyword.toLowerCase())) {
-        return response
-      }
-    }
-
-    // Se nenhuma palavra-chave for encontrada, usar resposta padrão
-    return localResponses.default
-  }
-
-  // Função para simular envio de mensagem para API (agora local)
-  const sendMessage = async (userMessage: Message) => {
-    try {
-      setIsLoading(true)
-
-      // Simular tempo de resposta
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      // Gerar resposta local
-      const responseText = generateLocalResponse(userMessage.text)
-
-      // Adicionar resposta do assistente
-      const assistantMessage: Message = {
-        id: Date.now().toString(),
-        text: responseText,
-        role: "assistant",
-        timestamp: new Date(),
-      }
-
-      const updatedMessages = [...localMessages, userMessage, assistantMessage]
-      setLocalMessages(updatedMessages)
-      setParentMessages(updatedMessages)
-    } catch (error: any) {
-      console.error("Erro ao processar mensagem:", error)
-
-      // Adicionar mensagem de erro
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        text: `Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente mais tarde.`,
-        role: "assistant",
-        timestamp: new Date(),
-        isError: true,
-      }
-
-      const updatedMessages = [...localMessages, userMessage, errorMessage]
-      setLocalMessages(updatedMessages)
-      setParentMessages(updatedMessages)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Manipular o envio de mensagens
-  const handleSend = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-
-    if (!inputValue.trim()) return
-
-    // Criar mensagem do usuário
+    // Adicionar mensagem do usuário
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputValue.trim(),
+      text: input,
       role: "user",
       timestamp: new Date(),
     }
 
-    // Verificar se é um comando especial
-    const specialResponse = processSpecialCommands(inputValue)
+    setLocalMessages((prev) => [...prev, userMessage])
+    setInput("")
 
-    if (specialResponse) {
-      // É um comando especial, não enviar para a API
+    // Simular resposta do assistente
+    setIsTyping(true)
+    setTimeout(() => {
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: specialResponse,
+        text: getAssistantResponse(input),
         role: "assistant",
         timestamp: new Date(),
       }
-
-      const updatedMessages = [...localMessages, userMessage, assistantMessage]
-      setLocalMessages(updatedMessages)
-      setParentMessages(updatedMessages)
-    } else {
-      // Adicionar mensagem do usuário imediatamente
-      setLocalMessages((prev) => [...prev, userMessage])
-
-      // Enviar para processamento local
-      await sendMessage(userMessage)
-    }
-
-    // Limpar o input
-    setInputValue("")
+      setLocalMessages((prev) => [...prev, assistantMessage])
+      setIsTyping(false)
+    }, 1500)
   }
 
-  // Implementação alternativa simplificada para comandos
-  const handleCommandClick = (command: string) => {
-    setInputValue(command)
+  // Função para gerar resposta do assistente (simulação)
+  const getAssistantResponse = (userInput: string): string => {
+    const responses = [
+      "Baseado na sua estratégia de mídia social, recomendo focar em conteúdo visual para aumentar o engajamento.",
+      "Analisando suas métricas recentes, vejo que os posts com hashtags específicas do setor têm melhor desempenho.",
+      "Para aumentar seu alcance orgânico, considere criar mais conteúdo em formato de carrossel no Instagram.",
+      "Sua audiência parece responder melhor a posts publicados entre 18h e 20h. Recomendo ajustar seu calendário de publicações.",
+      "Baseado nas tendências atuais, recomendo incorporar mais conteúdo em vídeo curto na sua estratégia.",
+      "Analisando seus concorrentes, vejo uma oportunidade para destacar os valores da sua marca através de storytelling.",
+      "Para melhorar a taxa de conversão, sugiro adicionar chamadas para ação mais claras em seus posts.",
+      "Seus seguidores parecem engajar mais com conteúdo educativo. Considere criar uma série de posts informativos sobre seu setor.",
+    ]
+
+    return responses[Math.floor(Math.random() * responses.length)]
   }
 
-  useEffect(() => {
-    // Scroll to bottom when messages change
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [localMessages])
-
-  useEffect(() => {
-    // Focus input when component mounts
-    if (!isMobile) {
-      document.getElementById("chat-input")?.focus()
-    }
-  }, [isMobile])
+  // Formatar data
+  const formatTime = (date: Date): string => {
+    return new Intl.DateTimeFormat("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date)
+  }
 
   return (
-    <div className="bg-white rounded-xl flex flex-col h-full w-full max-w-full overflow-hidden border border-gray-200 shadow-sm">
-      <div className="p-4 md:p-6 flex-shrink-0 border-b border-gray-200">
-        <AnimatePresence>
-          <motion.div
-            className="flex items-center justify-between mb-4"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-[#4b7bb5] flex items-center justify-center text-white">
-                {currentModule.icon}
-              </div>
-              <h2 className="text-lg font-medium text-gray-800">{currentModule.name}</h2>
-            </div>
-            <div className="flex space-x-2 items-center">
-              <span className="h-2 w-2 rounded-full bg-green-500"></span>
-              <span className="text-xs text-gray-500">Ativo</span>
-            </div>
-          </motion.div>
-        </AnimatePresence>
-
-        {/* Command suggestions */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          {["/ajuda", "/sobre", "/hora", "/data", "/dicas", "/plataformas"].map((cmd) => (
-            <button
-              key={cmd}
-              className="px-3 py-1 text-xs rounded-full bg-[#edf2f7] text-[#4b7bb5] hover:bg-[#e2e8f0] transition-colors"
-              onClick={() => handleCommandClick(cmd)}
-            >
-              {cmd}
-            </button>
-          ))}
+    <div className="h-full flex flex-col rounded-md border overflow-hidden">
+      <div className="p-3 border-b bg-[#4b7bb5] text-white flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <Avatar className="h-8 w-8">
+            <AvatarImage src="/abstract-ai-network.png" alt="AI" />
+            <AvatarFallback>AI</AvatarFallback>
+          </Avatar>
+          <div>
+            <h3 className="text-sm font-medium">Assistente de Mídia Social</h3>
+            <p className="text-xs opacity-80">Powered by AI</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-white hover:bg-[#3d649e]">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-white hover:bg-[#3d649e]">
+            <Save className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-white hover:bg-[#3d649e]">
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
-      <div className="border-b border-gray-200 flex-grow overflow-y-auto scrollbar-hide bg-gray-50">
-        <div className="p-4 md:p-6 space-y-6">
-          {localMessages.length === 0 ? (
-            <motion.div
-              className="flex flex-col items-center justify-center h-full py-10 text-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5 }}
-            >
-              <div className="w-16 h-16 bg-[#4b7bb5] rounded-full mb-4 flex items-center justify-center text-white">
-                {currentModule.icon}
-              </div>
-              <h3 className="text-xl font-medium mb-2 text-gray-800">Bem-vindo à Jaque</h3>
-              <p className="text-gray-600 max-w-sm">{currentModule.welcomeMessage}</p>
-
-              <div className="mt-6 grid grid-cols-2 gap-3">
-                <div className="p-3 bg-white rounded-lg flex items-center shadow-sm border border-gray-200">
-                  <HelpCircle size={18} className="mr-2 text-[#4b7bb5]" />
-                  <span className="text-sm text-gray-700">Digite /ajuda para comandos</span>
-                </div>
-                <div className="p-3 bg-white rounded-lg flex items-center shadow-sm border border-gray-200">
-                  <Info size={18} className="mr-2 text-[#4b7bb5]" />
-                  <span className="text-sm text-gray-700">Digite /sobre para informações</span>
-                </div>
-                <div className="p-3 bg-white rounded-lg flex items-center shadow-sm border border-gray-200">
-                  <Code size={18} className="mr-2 text-[#4b7bb5]" />
-                  <span className="text-sm text-gray-700">Pergunte sobre marketing</span>
-                </div>
-                <div className="p-3 bg-white rounded-lg flex items-center shadow-sm border border-gray-200">
-                  <Calendar size={18} className="mr-2 text-[#4b7bb5]" />
-                  <span className="text-sm text-gray-700">Tente /dicas ou /plataformas</span>
-                </div>
-              </div>
-            </motion.div>
-          ) : (
-            localMessages.map((message, index) => (
-              <motion.div
-                key={message.id}
-                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.1 }}
-              >
-                <div
-                  className={`max-w-[80%] p-3 rounded-lg ${
-                    message.role === "user"
-                      ? "bg-[#4b7bb5] text-white rounded-tr-none shadow-sm"
-                      : message.isError
-                        ? "bg-red-50 text-red-800 rounded-tl-none border border-red-200"
-                        : "bg-white text-gray-800 rounded-tl-none shadow-sm border border-gray-200"
-                  }`}
-                >
-                  {message.isError && (
-                    <div className="flex items-center gap-2 mb-2 text-red-600">
-                      <AlertTriangle size={16} />
-                      <span className="text-sm font-medium">Erro</span>
+      <ScrollArea className="flex-1 p-4">
+        <div className="space-y-4">
+          {/* Mensagem de boas-vindas */}
+          {messages.length === 0 && (
+            <div className="flex gap-3">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src="/abstract-ai-network.png" alt="AI" />
+                <AvatarFallback>AI</AvatarFallback>
+              </Avatar>
+              <Card className="max-w-[80%]">
+                <CardContent className="p-3">
+                  <p className="text-sm">
+                    Olá! Sou seu assistente de mídia social. Como posso ajudar com sua estratégia hoje?
+                  </p>
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="text-xs text-gray-500">{formatTime(new Date())}</span>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <ThumbsUp className="h-3 w-3" />
+                      </Button>
                     </div>
-                  )}
-                  <p className="break-words whitespace-pre-line">{message.text}</p>
-                  <div
-                    className={`text-xs mt-1 text-right ${message.role === "user" ? "text-blue-100" : "text-gray-500"}`}
-                  >
-                    {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </div>
-                </div>
-              </motion.div>
-            ))
+                </CardContent>
+              </Card>
+            </div>
           )}
+
+          {/* Mensagens da conversa */}
+          {messages.map((message) => (
+            <div key={message.id} className={`flex gap-3 ${message.role === "user" ? "justify-end" : ""}`}>
+              {message.role === "assistant" && (
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src="/abstract-ai-network.png" alt="AI" />
+                  <AvatarFallback>AI</AvatarFallback>
+                </Avatar>
+              )}
+
+              <Card className={`max-w-[80%] ${message.role === "user" ? "bg-[#4b7bb5]" : ""}`}>
+                <CardContent className="p-3">
+                  <p className={`text-sm ${message.role === "user" ? "text-white" : ""}`}>{message.text}</p>
+                  <div className="flex justify-between items-center mt-2">
+                    <span className={`text-xs ${message.role === "user" ? "text-white/70" : "text-gray-500"}`}>
+                      {formatTime(message.timestamp)}
+                    </span>
+                    {message.role === "assistant" && (
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                          <ThumbsUp className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {message.role === "user" && (
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src="/abstract-geometric-shapes.png" alt="User" />
+                  <AvatarFallback>U</AvatarFallback>
+                </Avatar>
+              )}
+            </div>
+          ))}
 
           {/* Indicador de digitação */}
-          {isLoading && (
-            <motion.div
-              className="flex justify-start"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <div className="max-w-[80%] p-3 rounded-lg bg-white text-gray-800 rounded-tl-none shadow-sm border border-gray-200">
-                <div className="flex items-center gap-2">
-                  <Loader2 size={16} className="animate-spin text-[#4b7bb5]" />
-                  <p className="text-gray-600">Jaque está digitando...</p>
-                </div>
-              </div>
-            </motion.div>
+          {isTyping && (
+            <div className="flex gap-3">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src="/abstract-ai-network.png" alt="AI" />
+                <AvatarFallback>AI</AvatarFallback>
+              </Avatar>
+              <Card className="max-w-[80%]">
+                <CardContent className="p-3">
+                  <div className="flex space-x-1">
+                    <div className="h-2 w-2 bg-gray-400 rounded-full animate-bounce"></div>
+                    <div className="h-2 w-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                    <div className="h-2 w-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
 
-          <div ref={messagesEndRef} className="h-4" />
+          <div ref={messagesEndRef} />
         </div>
-      </div>
+      </ScrollArea>
 
-      {/* Input field */}
-      <div className="p-4 md:p-6 flex-shrink-0 bg-white">
-        <form onSubmit={handleSend} className="relative">
-          <input
-            id="chat-input"
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Digite uma mensagem ou comando (tente /ajuda)..."
-            className="w-full py-3 pl-4 pr-12 bg-white border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent text-gray-800"
-            disabled={isLoading}
+      <div className="p-3 border-t">
+        <div className="flex gap-2">
+          <Textarea
+            placeholder="Digite sua mensagem..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault()
+                handleSendMessage()
+              }
+            }}
+            className="min-h-[60px] resize-none"
           />
-          <button
-            type="submit"
-            className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full ${
-              isLoading || !inputValue.trim() ? "bg-gray-300 text-gray-500" : "bg-[#4b7bb5] text-white"
-            }`}
-            disabled={isLoading || !inputValue.trim()}
-          >
-            {isLoading ? (
-              <div className="w-4 h-4 border-2 border-gray-300 border-t-white rounded-full animate-spin"></div>
-            ) : (
-              <Send size={16} className="text-white" />
-            )}
-          </button>
-        </form>
+          <div className="flex flex-col justify-between">
+            <div className="flex gap-1">
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Paperclip className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <ImageIcon className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Mic className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button
+              onClick={handleSendMessage}
+              className="bg-[#4b7bb5] hover:bg-[#3d649e]"
+              disabled={input.trim() === ""}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex justify-between items-center mt-2">
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs flex items-center gap-1">
+              <Sparkles className="h-3 w-3" />
+              Sugerir ideias
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs flex items-center gap-1">
+              <MessageCircle className="h-3 w-3" />
+              Analisar conteúdo
+            </Button>
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Opções</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>Salvar conversa</DropdownMenuItem>
+              <DropdownMenuItem>Exportar como PDF</DropdownMenuItem>
+              <DropdownMenuItem>Compartilhar</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-red-600">Limpar conversa</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </div>
   )

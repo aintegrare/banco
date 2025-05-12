@@ -512,3 +512,16 @@ export async function uploadPostImage(file: File): Promise<string> {
     throw new Error("Não foi possível fazer upload da imagem")
   }
 }
+
+// Função para verificar a conexão com o Supabase
+export async function checkSupabaseConnection(): Promise<boolean> {
+  try {
+    // Simulação de verificação de conexão
+    // Em um ambiente real, isso faria uma chamada leve ao Supabase
+    // para verificar se a conexão está ativa
+    return true
+  } catch (error) {
+    console.error("Erro ao verificar conexão com o Supabase:", error)
+    return false
+  }
+}

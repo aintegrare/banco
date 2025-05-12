@@ -22,12 +22,18 @@ import {
   Users,
   FileText,
   MessageCircle,
-  Search,
   Settings,
   Calendar,
   ChevronRight,
+  Zap,
+  Filter,
+  X,
+  ChevronDown,
 } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 // Mapeamento de ícones
 const iconMap: Record<string, any> = {
@@ -49,15 +55,25 @@ const iconMap: Record<string, any> = {
 interface ModulesTabProps {
   selectedModule: string
   setSelectedModule: (module: string) => void
+  onApplyToPost?: (moduleId: string) => void
+  onApplyToTimeline?: (moduleId: string) => void
+  onApplyToMindmap?: (moduleId: string) => void
 }
 
-export default function ModulesTab({ selectedModule, setSelectedModule }: ModulesTabProps) {
+export default function ModulesTab({
+  selectedModule,
+  setSelectedModule,
+  onApplyToPost,
+  onApplyToTimeline,
+  onApplyToMindmap,
+}: ModulesTabProps) {
   const [modules, setModules] = useState<Module[]>([])
   const [filteredModules, setFilteredModules] = useState<Module[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [activeCategory, setActiveCategory] = useState("all")
   const [loading, setLoading] = useState(true)
   const [expandedModule, setExpandedModule] = useState<string | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
 
   // Carregar módulos
   useEffect(() => {
@@ -106,7 +122,7 @@ export default function ModulesTab({ selectedModule, setSelectedModule }: Module
   // Selecionar um módulo
   const handleSelectModule = async (moduleId: string) => {
     setSelectedModule(moduleId)
-    setExpandedModule(moduleId)
+    setExpandedModule(moduleId === expandedModule ? null : moduleId)
     await saveUserPreference("current_user", "selected_module", moduleId)
   }
 
@@ -140,133 +156,194 @@ export default function ModulesTab({ selectedModule, setSelectedModule }: Module
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1"
           />
-          <Button variant="outline" size="sm" onClick={() => setSearchQuery("")}>
-            <Search className="h-4 w-4 mr-2" />
-            Limpar
+          <Button variant="outline" size="icon" onClick={() => setShowFilters(!showFilters)} className="h-10 w-10">
+            <Filter className="h-4 w-4" />
           </Button>
+          {searchQuery && (
+            <Button variant="outline" size="icon" onClick={() => setSearchQuery("")} className="h-10 w-10">
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
 
-        <Tabs value={activeCategory} onValueChange={setActiveCategory}>
-          <TabsList className="w-full flex overflow-x-auto pb-1 mb-2">
-            {categories.map((category) => (
-              <TabsTrigger
-                key={category}
-                value={category}
-                className="flex-shrink-0 data-[state=active]:bg-[#4b7bb5] data-[state=active]:text-white"
-              >
-                {category === "all" ? "Todos" : category === "social" ? "Redes Sociais" : "Planejamento"}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        {showFilters && (
+          <Tabs value={activeCategory} onValueChange={setActiveCategory}>
+            <TabsList className="w-full flex overflow-x-auto pb-1 mb-2">
+              {categories.map((category) => (
+                <TabsTrigger
+                  key={category}
+                  value={category}
+                  className="flex-shrink-0 data-[state=active]:bg-[#4b7bb5] data-[state=active]:text-white"
+                >
+                  {category === "all" ? "Todos" : category === "social" ? "Redes Sociais" : "Planejamento"}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
-        {filteredModules.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <p>Nenhum módulo encontrado.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredModules.map((module) => (
-              <Card
-                key={module.id}
-                className={`cursor-pointer transition-all hover:border-[#4b7bb5] ${
-                  selectedModule === module.id ? "border-[#4b7bb5] bg-blue-50" : ""
-                } ${module.status !== "active" ? "opacity-70" : ""}`}
-                onClick={() => module.status === "active" && handleSelectModule(module.id)}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center space-x-2">
-                      {renderIcon(module.icon)}
-                      <CardTitle className="text-lg">{module.name}</CardTitle>
-                    </div>
-                    <Badge
-                      variant={module.status === "active" ? "outline" : "secondary"}
-                      className={module.status === "active" ? "bg-green-50 text-green-700" : ""}
-                    >
-                      {module.status === "active" ? "Ativo" : "Em breve"}
-                    </Badge>
-                  </div>
-                  <CardDescription>{module.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="pb-2">
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {module.features.slice(0, 3).map((feature: string, index: number) => (
-                      <Badge key={index} variant="outline" className="bg-white">
-                        {feature}
+      <ScrollArea className="flex-1">
+        <div className="p-4">
+          {filteredModules.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>Nenhum módulo encontrado.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {filteredModules.map((module) => (
+                <Card
+                  key={module.id}
+                  className={`cursor-pointer transition-all hover:border-[#4b7bb5] ${
+                    selectedModule === module.id ? "border-[#4b7bb5] bg-blue-50" : ""
+                  } ${module.status !== "active" ? "opacity-70" : ""}`}
+                  onClick={() => module.status === "active" && handleSelectModule(module.id)}
+                >
+                  <CardHeader className="pb-2 px-4 pt-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center space-x-2">
+                        {renderIcon(module.icon)}
+                        <CardTitle className="text-base font-semibold">{module.name}</CardTitle>
+                      </div>
+                      <Badge
+                        variant={module.status === "active" ? "outline" : "secondary"}
+                        className={module.status === "active" ? "bg-green-50 text-green-700" : ""}
+                      >
+                        {module.status === "active" ? "Ativo" : "Em breve"}
                       </Badge>
-                    ))}
-                    {module.features.length > 3 && (
-                      <Badge variant="outline" className="bg-white">
-                        +{module.features.length - 3}
-                      </Badge>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Engajamento</span>
-                      <span>{module.metrics.engagement || 0}%</span>
                     </div>
-                    <Progress value={module.metrics.engagement || 0} className="h-1" />
+                    <CardDescription className="text-xs mt-1 line-clamp-2">{module.description}</CardDescription>
+                  </CardHeader>
 
-                    <div className="flex justify-between text-sm">
-                      <span>Alcance</span>
-                      <span>{module.metrics.reach || 0}%</span>
+                  <CardContent className="pb-2 px-4">
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {module.features.slice(0, 2).map((feature: string, index: number) => (
+                        <Badge key={index} variant="outline" className="bg-white text-xs">
+                          {feature}
+                        </Badge>
+                      ))}
+                      {module.features.length > 2 && (
+                        <Badge variant="outline" className="bg-white text-xs">
+                          +{module.features.length - 2}
+                        </Badge>
+                      )}
                     </div>
-                    <Progress value={module.metrics.reach || 0} className="h-1" />
-                  </div>
-                </CardContent>
-                <CardFooter className="pt-2">
-                  <div className="w-full flex justify-between items-center">
-                    <span className="text-xs text-gray-500">
-                      {Object.keys(module.settings).filter((k) => module.settings[k] === true).length} configurações
-                      ativas
-                    </span>
-                    {selectedModule === module.id && (
+                  </CardContent>
+
+                  <CardFooter className="pt-0 px-4 pb-4 flex justify-between items-center">
+                    {selectedModule === module.id ? (
                       <Badge className="bg-[#4b7bb5]">
                         <Check className="h-3 w-3 mr-1" /> Selecionado
                       </Badge>
+                    ) : (
+                      module.status === "active" && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-7 px-2">
+                                <Zap className="h-3.5 w-3.5 mr-1" />
+                                <span className="text-xs">Aplicar</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Selecionar este módulo</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )
                     )}
-                  </div>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-        )}
 
-        {expandedModule && (
-          <div className="mt-6">
-            <h3 className="text-sm font-medium mb-2">Detalhes do Módulo</h3>
-            {modules
-              .filter((m) => m.id === expandedModule)
-              .map((module) => (
-                <div key={module.id} className="space-y-4">
-                  <Card>
-                    <CardHeader className="p-4 pb-2">
-                      <div className="flex justify-between">
-                        <div className="flex items-center gap-2">
-                          {renderIcon(module.icon)}
-                          <CardTitle className="text-base">{module.name}</CardTitle>
-                        </div>
-                        <Button variant="outline" size="sm" className="h-8">
-                          <Settings className="h-4 w-4 mr-1" />
-                          Configurar
-                        </Button>
-                      </div>
-                      <CardDescription>{module.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0">
-                      <Accordion type="single" collapsible className="w-full">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setExpandedModule(expandedModule === module.id ? null : module.id)
+                      }}
+                    >
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 transition-transform ${expandedModule === module.id ? "rotate-180" : ""}`}
+                      />
+                      <span className="text-xs ml-1">Detalhes</span>
+                    </Button>
+                  </CardFooter>
+
+                  {expandedModule === module.id && (
+                    <div className="px-4 pb-4 pt-0 border-t">
+                      <Collapsible defaultOpen>
+                        <CollapsibleTrigger className="flex items-center justify-between w-full text-sm font-medium py-2">
+                          <span>Ações Rápidas</span>
+                          <ChevronDown className="h-4 w-4 text-gray-500" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="grid grid-cols-2 gap-2 mt-2">
+                            {onApplyToPost && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onApplyToPost(module.id)
+                                }}
+                              >
+                                <FileText className="h-3 w-3 mr-1" />
+                                Aplicar ao Post
+                              </Button>
+                            )}
+
+                            {onApplyToTimeline && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onApplyToTimeline(module.id)
+                                }}
+                              >
+                                <Calendar className="h-3 w-3 mr-1" />
+                                Aplicar à Timeline
+                              </Button>
+                            )}
+
+                            {onApplyToMindmap && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onApplyToMindmap(module.id)
+                                }}
+                              >
+                                <Target className="h-3 w-3 mr-1" />
+                                Aplicar ao Mindmap
+                              </Button>
+                            )}
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Settings className="h-3 w-3 mr-1" />
+                              Configurar
+                            </Button>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+
+                      <Accordion type="single" collapsible className="w-full mt-2">
                         <AccordionItem value="features">
-                          <AccordionTrigger className="text-sm py-2">Recursos</AccordionTrigger>
+                          <AccordionTrigger className="text-xs py-2">Recursos</AccordionTrigger>
                           <AccordionContent>
                             <ul className="space-y-1">
                               {module.features.map((feature, i) => (
-                                <li key={i} className="text-sm flex items-start">
-                                  <ChevronRight className="h-4 w-4 mr-1 text-[#4b7bb5] shrink-0 mt-0.5" />
+                                <li key={i} className="text-xs flex items-start">
+                                  <ChevronRight className="h-3 w-3 mr-1 text-[#4b7bb5] shrink-0 mt-0.5" />
                                   <span>{feature}</span>
                                 </li>
                               ))}
@@ -274,68 +351,35 @@ export default function ModulesTab({ selectedModule, setSelectedModule }: Module
                           </AccordionContent>
                         </AccordionItem>
                         <AccordionItem value="metrics">
-                          <AccordionTrigger className="text-sm py-2">Métricas</AccordionTrigger>
+                          <AccordionTrigger className="text-xs py-2">Métricas</AccordionTrigger>
                           <AccordionContent>
-                            <div className="space-y-3">
+                            <div className="space-y-2">
                               <div className="space-y-1">
-                                <div className="flex justify-between text-sm">
+                                <div className="flex justify-between text-xs">
                                   <span>Engajamento</span>
                                   <span className="text-[#4b7bb5] font-medium">{module.metrics.engagement}%</span>
                                 </div>
-                                <Progress value={module.metrics.engagement} className="h-2" />
+                                <Progress value={module.metrics.engagement} className="h-1.5" />
                               </div>
                               <div className="space-y-1">
-                                <div className="flex justify-between text-sm">
+                                <div className="flex justify-between text-xs">
                                   <span>Alcance</span>
                                   <span className="text-[#4b7bb5] font-medium">{module.metrics.reach}%</span>
                                 </div>
-                                <Progress value={module.metrics.reach} className="h-2" />
+                                <Progress value={module.metrics.reach} className="h-1.5" />
                               </div>
-                              {module.metrics.conversion !== undefined && (
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-sm">
-                                    <span>Conversão</span>
-                                    <span className="text-[#4b7bb5] font-medium">{module.metrics.conversion}%</span>
-                                  </div>
-                                  <Progress value={module.metrics.conversion} className="h-2" />
-                                </div>
-                              )}
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                        <AccordionItem value="settings">
-                          <AccordionTrigger className="text-sm py-2">Configurações</AccordionTrigger>
-                          <AccordionContent>
-                            <div className="space-y-3">
-                              {Object.entries(module.settings).map(([key, value], i) => (
-                                <div key={i} className="flex justify-between items-center">
-                                  <span className="text-sm">{formatSettingName(key)}</span>
-                                  <Badge
-                                    variant={value === true ? "default" : "outline"}
-                                    className={value === true ? "bg-[#4b7bb5]" : ""}
-                                  >
-                                    {value === true ? "Ativo" : "Inativo"}
-                                  </Badge>
-                                </div>
-                              ))}
                             </div>
                           </AccordionContent>
                         </AccordionItem>
                       </Accordion>
-                    </CardContent>
-                  </Card>
-                </div>
+                    </div>
+                  )}
+                </Card>
               ))}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
     </div>
   )
-}
-
-// Função para formatar nomes de configurações
-function formatSettingName(key: string): string {
-  // Converter camelCase para espaços e capitalizar primeira letra
-  const formatted = key.replace(/([A-Z])/g, " $1").trim()
-  return formatted.charAt(0).toUpperCase() + formatted.slice(1)
 }
