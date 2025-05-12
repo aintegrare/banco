@@ -56,17 +56,18 @@ export function PostsCanvas() {
 
   // Carregar posts e conexões ao iniciar
   useEffect(() => {
-    const fetchData = async () => {
+    const loadData = async () => {
       setLoading(true)
       try {
         const [postsData, connectionsData] = await Promise.all([loadPosts(), loadConnections()])
+
         setPosts(postsData)
         setConnections(connectionsData)
       } catch (error) {
-        console.error("Erro ao carregar dados:", error)
+        console.error("Erro ao carregar dados do SMP:", error)
         toast({
-          title: "Erro",
-          description: "Não foi possível carregar os posts. Tente novamente mais tarde.",
+          title: "Erro ao carregar dados",
+          description: "Não foi possível carregar os posts e conexões. Verifique a conexão com o Supabase.",
           variant: "destructive",
         })
       } finally {
@@ -74,8 +75,8 @@ export function PostsCanvas() {
       }
     }
 
-    fetchData()
-  }, [])
+    loadData()
+  }, [toast])
 
   const handleMouseDown = (e: React.MouseEvent, id: string) => {
     if (isConnecting) {
