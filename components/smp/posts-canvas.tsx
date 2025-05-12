@@ -90,12 +90,13 @@ export function PostsCanvas() {
 
     const post = posts.find((p) => p.id === id)
     if (post) {
-      const rect = e.currentTarget.getBoundingClientRect()
+      // Calcular o offset correto considerando a posição atual do post
       setOffset({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
+        x: e.clientX - post.position.x,
+        y: e.clientY - post.position.y,
       })
       setDragging(id)
+      e.stopPropagation() // Impedir propagação do evento
     }
   }
 
@@ -118,7 +119,10 @@ export function PostsCanvas() {
     }
   }
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (dragging) {
+      e.preventDefault()
+    }
     setDragging(null)
   }
 
@@ -202,7 +206,7 @@ export function PostsCanvas() {
       className="h-full w-full relative overflow-hidden bg-gray-50 p-4"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onMouseLeave={(e) => handleMouseUp(e as React.MouseEvent)}
     >
       {/* Connections */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none">
