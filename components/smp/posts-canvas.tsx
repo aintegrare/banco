@@ -2,9 +2,9 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Plus, X, Link, Edit, Trash, Hash } from "lucide-react"
+import { Plus, X, Link, Edit, Trash, Hash, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -20,45 +20,24 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-
-interface Post {
-  id: string
-  title: string
-  caption: string
-  hashtags: string[]
-  theme: string
-  type: "PLM" | "PLC"
-  position: { x: number; y: number }
-}
-
-interface Connection {
-  source: string
-  target: string
-}
+import { toast } from "@/components/ui/use-toast"
+import {
+  type SMPPost,
+  type SMPConnection,
+  loadPosts,
+  loadConnections,
+  createPost,
+  updatePost,
+  deletePost,
+  createConnection,
+  updatePostPosition,
+} from "@/lib/smp-service"
 
 export function PostsCanvas() {
-  const [posts, setPosts] = useState<Post[]>([
-    {
-      id: "post1",
-      title: "Lançamento de Produto",
-      caption: "Novo produto chegando às lojas em breve! Fiquem ligados para mais informações.",
-      hashtags: ["novoproduto", "lançamento", "inovação"],
-      theme: "Produto",
-      type: "PLM",
-      position: { x: 100, y: 100 },
-    },
-    {
-      id: "post2",
-      title: "Promoção de Verão",
-      caption: "Aproveite nossos descontos especiais de verão em toda a linha de produtos!",
-      hashtags: ["promoção", "verão", "descontos"],
-      theme: "Promoção",
-      type: "PLC",
-      position: { x: 400, y: 300 },
-    },
-  ])
-
-  const [connections, setConnections] = useState<Connection[]>([{ source: "post1", target: "post2" }])
+  const [posts, setPosts] = useState<SMPPost[]>([])
+  const [connections, setConnections] = useState<SMPConnection[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
 
   const [dragging, setDragging] = useState<string | null>(null)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
@@ -66,7 +45,7 @@ export function PostsCanvas() {
   const [isEditing, setIsEditing] = useState<string | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
   const [connectingSource, setConnectingSource] = useState<string | null>(null)
-  const [newPost, setNewPost] = useState<Omit<Post, "id" | "position">>({
+  const [newPost, setNewPost] = useState<Omit<SMPPost, "id" | "position">>({
     title: "",
     caption: "",
     hashtags: [],
@@ -75,13 +54,36 @@ export function PostsCanvas() {
   })
   const [newHashtag, setNewHashtag] = useState("")
 
+  // Carregar posts e conexões ao iniciar
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true)
+      try {
+        const [postsData, connectionsData] = await Promise.all([loadPosts(), loadConnections()])
+        setPosts(postsData)
+        setConnections(connectionsData)
+      } catch (error) {
+        console.error("Erro ao carregar dados:", error)
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar os posts. Tente novamente mais tarde.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
   const handleMouseDown = (e: React.MouseEvent, id: string) => {
     if (isConnecting) {
       if (connectingSource === null) {
         setConnectingSource(id)
       } else if (connectingSource !== id) {
         // Create new connection
-        setConnections([...connections, { source: connectingSource, target: id }])
+        handleCreateConnection(connectingSource, id)
         setConnectingSource(null)
         setIsConnecting(false)
       }
@@ -119,45 +121,54 @@ export function PostsCanvas() {
     }
   }
 
-  const handleMouseUp = (e: React.MouseEvent) => {
+  const handleMouseUp = async (e: React.MouseEvent) => {
     if (dragging) {
       e.preventDefault()
+
+      // Salvar a nova posição no banco de dados
+      const post = posts.find((p) => p.id === dragging)
+      if (post) {
+        try {
+          await updatePostPosition(post.id, post.position)
+        } catch (error) {
+          console.error("Erro ao salvar posição:", error)
+          toast({
+            title: "Erro",
+            description: "Não foi possível salvar a posição do post.",
+            variant: "destructive",
+          })
+        }
+      }
     }
     setDragging(null)
   }
 
-  const handleCreatePost = () => {
-    const id = `post${Date.now()}`
-    const newPostWithId: Post = {
-      ...newPost,
-      id,
-      position: { x: 200, y: 200 },
-    }
-    setPosts([...posts, newPostWithId])
-    setNewPost({
-      title: "",
-      caption: "",
-      hashtags: [],
-      theme: "",
-      type: "PLM",
-    })
-    setIsCreating(false)
-  }
+  const handleCreatePost = async () => {
+    setSaving(true)
+    try {
+      const newPostData = {
+        ...newPost,
+        position: { x: 200, y: 200 },
+      }
 
-  const handleUpdatePost = () => {
-    if (isEditing) {
-      setPosts((prev) =>
-        prev.map((post) => {
-          if (post.id === isEditing) {
-            return {
-              ...post,
-              ...newPost,
-            }
-          }
-          return post
-        }),
-      )
-      setIsEditing(null)
+      const createdPost = await createPost(newPostData)
+
+      if (createdPost) {
+        setPosts([...posts, createdPost])
+        toast({
+          title: "Sucesso",
+          description: "Post criado com sucesso!",
+        })
+      }
+    } catch (error) {
+      console.error("Erro ao criar post:", error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível criar o post. Tente novamente.",
+        variant: "destructive",
+      })
+    } finally {
+      setSaving(false)
       setNewPost({
         title: "",
         caption: "",
@@ -165,10 +176,53 @@ export function PostsCanvas() {
         theme: "",
         type: "PLM",
       })
+      setIsCreating(false)
     }
   }
 
-  const handleEditPost = (post: Post) => {
+  const handleUpdatePost = async () => {
+    if (isEditing) {
+      setSaving(true)
+      try {
+        const postToUpdate = posts.find((p) => p.id === isEditing)
+        if (postToUpdate) {
+          const updatedPost = {
+            ...postToUpdate,
+            ...newPost,
+          }
+
+          const success = await updatePost(updatedPost)
+
+          if (success) {
+            setPosts((prev) => prev.map((post) => (post.id === isEditing ? updatedPost : post)))
+            toast({
+              title: "Sucesso",
+              description: "Post atualizado com sucesso!",
+            })
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao atualizar post:", error)
+        toast({
+          title: "Erro",
+          description: "Não foi possível atualizar o post. Tente novamente.",
+          variant: "destructive",
+        })
+      } finally {
+        setSaving(false)
+        setIsEditing(null)
+        setNewPost({
+          title: "",
+          caption: "",
+          hashtags: [],
+          theme: "",
+          type: "PLM",
+        })
+      }
+    }
+  }
+
+  const handleEditPost = (post: SMPPost) => {
     setNewPost({
       title: post.title,
       caption: post.caption,
@@ -179,9 +233,47 @@ export function PostsCanvas() {
     setIsEditing(post.id)
   }
 
-  const handleDeletePost = (id: string) => {
-    setPosts((prev) => prev.filter((post) => post.id !== id))
-    setConnections((prev) => prev.filter((conn) => conn.source !== id && conn.target !== id))
+  const handleDeletePost = async (id: string) => {
+    try {
+      const success = await deletePost(id)
+
+      if (success) {
+        setPosts((prev) => prev.filter((post) => post.id !== id))
+        setConnections((prev) => prev.filter((conn) => conn.source !== id && conn.target !== id))
+        toast({
+          title: "Sucesso",
+          description: "Post excluído com sucesso!",
+        })
+      }
+    } catch (error) {
+      console.error("Erro ao excluir post:", error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir o post. Tente novamente.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleCreateConnection = async (sourceId: string, targetId: string) => {
+    try {
+      const newConnection = await createConnection({ source: sourceId, target: targetId })
+
+      if (newConnection) {
+        setConnections([...connections, newConnection])
+        toast({
+          title: "Sucesso",
+          description: "Conexão criada com sucesso!",
+        })
+      }
+    } catch (error) {
+      console.error("Erro ao criar conexão:", error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível criar a conexão. Tente novamente.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleAddHashtag = () => {
@@ -199,6 +291,17 @@ export function PostsCanvas() {
       ...newPost,
       hashtags: newPost.hashtags.filter((t) => t !== tag),
     })
+  }
+
+  if (loading) {
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Carregando posts...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -419,9 +522,18 @@ export function PostsCanvas() {
             <Button
               type="submit"
               onClick={isEditing ? handleUpdatePost : handleCreatePost}
-              disabled={!newPost.title || !newPost.caption}
+              disabled={!newPost.title || !newPost.caption || saving}
             >
-              {isEditing ? "Salvar Alterações" : "Criar Post"}
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isEditing ? "Salvando..." : "Criando..."}
+                </>
+              ) : isEditing ? (
+                "Salvar Alterações"
+              ) : (
+                "Criar Post"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
