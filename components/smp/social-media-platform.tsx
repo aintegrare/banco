@@ -305,7 +305,7 @@ export function SocialMediaPlatform() {
           )}
 
           {/* Conteúdo Central */}
-          <div className="flex-1 h-full">
+          <div className="flex-1 h-full overflow-hidden">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
               <div className="border-b px-4 py-2">
                 <TabsList className="w-full overflow-x-auto flex-nowrap">
@@ -316,29 +316,37 @@ export function SocialMediaPlatform() {
                 </TabsList>
               </div>
 
-              <TabsContent value="posts" className="flex-1 h-full overflow-hidden">
-                <div className="h-full">
+              <div className="flex-1 overflow-hidden">
+                <TabsContent
+                  value="posts"
+                  className="h-full m-0 p-0 data-[state=active]:flex data-[state=active]:flex-col"
+                >
                   <PostsCanvas />
-                </div>
-              </TabsContent>
+                </TabsContent>
 
-              <TabsContent value="timeline" className="flex-1 h-full overflow-hidden">
-                <div className="h-full">
+                <TabsContent
+                  value="timeline"
+                  className="h-full m-0 p-0 data-[state=active]:flex data-[state=active]:flex-col"
+                >
                   <TimelineView />
-                </div>
-              </TabsContent>
+                </TabsContent>
 
-              <TabsContent value="mindmap" className="flex-1 h-full overflow-hidden">
-                <div className="h-full">
+                <TabsContent
+                  value="mindmap"
+                  className="h-full m-0 p-0 data-[state=active]:flex data-[state=active]:flex-col"
+                >
                   <FlowChart />
-                </div>
-              </TabsContent>
+                </TabsContent>
 
-              <TabsContent value="chat" className="flex-1 h-full overflow-hidden">
-                <div className="h-full p-4">
-                  <ChatInterface messages={messages} setMessages={setMessages} selectedModule="assistant" />
-                </div>
-              </TabsContent>
+                <TabsContent
+                  value="chat"
+                  className="h-full m-0 p-0 data-[state=active]:flex data-[state=active]:flex-col"
+                >
+                  <div className="flex-1 p-4">
+                    <ChatInterface messages={messages} setMessages={setMessages} selectedModule="assistant" />
+                  </div>
+                </TabsContent>
+              </div>
             </Tabs>
           </div>
 

@@ -109,7 +109,7 @@ export function PostsCanvas() {
   ]
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col flex-1 overflow-hidden">
       <div className="border-b">
         <Tabs defaultValue="editor" value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="px-4">

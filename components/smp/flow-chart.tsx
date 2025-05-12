@@ -322,7 +322,7 @@ export function FlowChart() {
   }, [setNodes, setEdges])
 
   return (
-    <div className="h-full w-full flex flex-col">
+    <div className="h-full w-full flex flex-col flex-1 bg-white">
       <div className="border-b p-2 flex justify-between items-center">
         <div className="flex items-center space-x-2">
           <Button variant="outline" size="sm" onClick={onAddNode}>

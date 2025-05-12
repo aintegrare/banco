@@ -176,7 +176,7 @@ export function TimelineView() {
       : currentDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
 
   return (
-    <div className="h-full flex flex-col bg-white p-4">
+    <div className="h-full flex flex-col flex-1 bg-white">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Calendar size={20} className="text-gray-500" />

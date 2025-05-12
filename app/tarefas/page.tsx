@@ -141,7 +141,8 @@ export default function TasksPage() {
     const matchesStatus = statusFilter === "all" || task.status === statusFilter
 
     // Filtro de projeto
-    const matchesProject = projectFilter === "all" || (task.project_id && task.project_id.toString() === projectFilter)
+    const matchesProject =
+      projectFilter === "all" || (task.project_id != null && task.project_id.toString() === projectFilter)
 
     // Filtro de prioridade
     const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter
@@ -152,7 +153,7 @@ export default function TasksPage() {
   // Agrupar tarefas por projeto para a visualização por projeto
   const tasksByProject = filteredTasks.reduce(
     (acc, task) => {
-      const projectId = task.project_id?.toString() || "sem-projeto"
+      const projectId = task.project_id != null ? task.project_id.toString() : "sem-projeto"
       if (!acc[projectId]) {
         acc[projectId] = []
       }
@@ -279,7 +280,8 @@ export default function TasksPage() {
     }
   }
 
-  const getProjectName = (projectId: string | number) => {
+  const getProjectName = (projectId: string | number | null) => {
+    if (projectId == null) return "Projeto Desconhecido"
     const project = projects.find((p) => p.id.toString() === projectId.toString())
     return project ? project.name : "Projeto Desconhecido"
   }
@@ -453,7 +455,9 @@ export default function TasksPage() {
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          {projects.find((p) => p.id.toString() === task.project_id.toString())?.name || "Projeto"}
+                          {task.project_id != null
+                            ? projects.find((p) => p.id.toString() === task.project_id?.toString())?.name || "Projeto"
+                            : "Sem projeto"}
                         </td>
                         <td className="py-3 px-4">{task.assignee || "Não atribuído"}</td>
                         <td className="py-3 px-4">{formatDate(task.due_date)}</td>
@@ -498,7 +502,9 @@ export default function TasksPage() {
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-500">Projeto:</span>
                           <span className="text-sm font-medium">
-                            {projects.find((p) => p.id.toString() === task.project_id.toString())?.name || "Projeto"}
+                            {task.project_id != null
+                              ? projects.find((p) => p.id.toString() === task.project_id.toString())?.name || "Projeto"
+                              : "Sem projeto"}
                           </span>
                         </div>
                         <div className="flex justify-between">

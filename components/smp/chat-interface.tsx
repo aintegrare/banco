@@ -123,7 +123,7 @@ export default function ChatInterface({
   }
 
   return (
-    <div className="h-full flex flex-col rounded-md border overflow-hidden">
+    <div className="h-full flex flex-col flex-1 bg-white rounded-md">
       <div className="p-3 border-b bg-[#4b7bb5] text-white flex justify-between items-center">
         <div className="flex items-center gap-2">
           <Avatar className="h-8 w-8">
