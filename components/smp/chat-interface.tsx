@@ -268,8 +268,8 @@ export default function ChatInterface({
   }, [isMobile])
 
   return (
-    <div className="bg-chat-bg rounded-xl flex flex-col h-full w-full max-w-full overflow-hidden">
-      <div className="p-4 md:p-6 flex-shrink-0">
+    <div className="bg-white rounded-xl flex flex-col h-full w-full max-w-full overflow-hidden border border-gray-200 shadow-sm">
+      <div className="p-4 md:p-6 flex-shrink-0 border-b border-gray-200">
         <AnimatePresence>
           <motion.div
             className="flex items-center justify-between mb-4"
@@ -278,17 +278,17 @@ export default function ChatInterface({
             transition={{ duration: 0.3 }}
           >
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-[#4b7bb5] flex items-center justify-center text-white">
                 {currentModule.icon}
               </div>
-              <h2 className="text-lg font-medium">{currentModule.name}</h2>
+              <h2 className="text-lg font-medium text-gray-800">{currentModule.name}</h2>
               {useFallback && (
-                <span className="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded-full">Modo Fallback</span>
+                <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Modo Fallback</span>
               )}
             </div>
-            <div className="flex space-x-2">
-              <span className="h-2 w-2 rounded-full bg-green-400"></span>
-              <span className="text-xs text-neutral-400">Ativo</span>
+            <div className="flex space-x-2 items-center">
+              <span className="h-2 w-2 rounded-full bg-green-500"></span>
+              <span className="text-xs text-gray-500">Ativo</span>
             </div>
           </motion.div>
         </AnimatePresence>
@@ -298,7 +298,7 @@ export default function ChatInterface({
           {["/ajuda", "/sobre", "/hora", "/data", "/teste", "/fallback"].map((cmd) => (
             <button
               key={cmd}
-              className="px-3 py-1 text-xs rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors"
+              className="px-3 py-1 text-xs rounded-full bg-[#edf2f7] text-[#4b7bb5] hover:bg-[#e2e8f0] transition-colors"
               onClick={() => handleCommandClick(cmd)}
             >
               {cmd}
@@ -307,7 +307,7 @@ export default function ChatInterface({
         </div>
       </div>
 
-      <div className="border-t border-b border-neutral-800 flex-grow overflow-y-auto scrollbar-hide">
+      <div className="border-b border-gray-200 flex-grow overflow-y-auto scrollbar-hide bg-gray-50">
         <div className="p-4 md:p-6 space-y-6">
           {localMessages.length === 0 ? (
             <motion.div
@@ -316,28 +316,28 @@ export default function ChatInterface({
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5 }}
             >
-              <div className="w-16 h-16 bg-neutral-800 rounded-full mb-4 flex items-center justify-center">
+              <div className="w-16 h-16 bg-[#4b7bb5] rounded-full mb-4 flex items-center justify-center text-white">
                 {currentModule.icon}
               </div>
-              <h3 className="text-xl font-medium mb-2">Bem-vindo à Jaque</h3>
-              <p className="text-neutral-400 max-w-sm">{currentModule.welcomeMessage}</p>
+              <h3 className="text-xl font-medium mb-2 text-gray-800">Bem-vindo à Jaque</h3>
+              <p className="text-gray-600 max-w-sm">{currentModule.welcomeMessage}</p>
 
               <div className="mt-6 grid grid-cols-2 gap-3">
-                <div className="p-3 bg-neutral-800 rounded-lg flex items-center">
-                  <HelpCircle size={18} className="mr-2 text-primary" />
-                  <span className="text-sm">Digite /ajuda para comandos</span>
+                <div className="p-3 bg-white rounded-lg flex items-center shadow-sm border border-gray-200">
+                  <HelpCircle size={18} className="mr-2 text-[#4b7bb5]" />
+                  <span className="text-sm text-gray-700">Digite /ajuda para comandos</span>
                 </div>
-                <div className="p-3 bg-neutral-800 rounded-lg flex items-center">
-                  <Info size={18} className="mr-2 text-primary" />
-                  <span className="text-sm">Digite /sobre para informações</span>
+                <div className="p-3 bg-white rounded-lg flex items-center shadow-sm border border-gray-200">
+                  <Info size={18} className="mr-2 text-[#4b7bb5]" />
+                  <span className="text-sm text-gray-700">Digite /sobre para informações</span>
                 </div>
-                <div className="p-3 bg-neutral-800 rounded-lg flex items-center">
-                  <Code size={18} className="mr-2 text-primary" />
-                  <span className="text-sm">Pergunte sobre marketing</span>
+                <div className="p-3 bg-white rounded-lg flex items-center shadow-sm border border-gray-200">
+                  <Code size={18} className="mr-2 text-[#4b7bb5]" />
+                  <span className="text-sm text-gray-700">Pergunte sobre marketing</span>
                 </div>
-                <div className="p-3 bg-neutral-800 rounded-lg flex items-center">
-                  <Calendar size={18} className="mr-2 text-primary" />
-                  <span className="text-sm">Tente /data ou /hora</span>
+                <div className="p-3 bg-white rounded-lg flex items-center shadow-sm border border-gray-200">
+                  <Calendar size={18} className="mr-2 text-[#4b7bb5]" />
+                  <span className="text-sm text-gray-700">Tente /data ou /hora</span>
                 </div>
               </div>
             </motion.div>
@@ -353,20 +353,22 @@ export default function ChatInterface({
                 <div
                   className={`max-w-[80%] p-3 rounded-lg ${
                     message.role === "user"
-                      ? "bg-primary text-white rounded-tr-none"
+                      ? "bg-[#4b7bb5] text-white rounded-tr-none shadow-sm"
                       : message.isError
-                        ? "bg-red-900/70 text-white rounded-tl-none"
-                        : "bg-neutral-800 text-white rounded-tl-none"
+                        ? "bg-red-50 text-red-800 rounded-tl-none border border-red-200"
+                        : "bg-white text-gray-800 rounded-tl-none shadow-sm border border-gray-200"
                   }`}
                 >
                   {message.isError && (
-                    <div className="flex items-center gap-2 mb-2 text-red-300">
+                    <div className="flex items-center gap-2 mb-2 text-red-600">
                       <AlertTriangle size={16} />
                       <span className="text-sm font-medium">Erro</span>
                     </div>
                   )}
                   <p className="break-words whitespace-pre-line">{message.text}</p>
-                  <div className="text-xs text-neutral-400 mt-1 text-right">
+                  <div
+                    className={`text-xs mt-1 text-right ${message.role === "user" ? "text-blue-100" : "text-gray-500"}`}
+                  >
                     {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </div>
                 </div>
@@ -382,10 +384,10 @@ export default function ChatInterface({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <div className="max-w-[80%] p-3 rounded-lg bg-neutral-800 text-white rounded-tl-none">
+              <div className="max-w-[80%] p-3 rounded-lg bg-white text-gray-800 rounded-tl-none shadow-sm border border-gray-200">
                 <div className="flex items-center gap-2">
-                  <Loader2 size={16} className="animate-spin text-neutral-400" />
-                  <p className="text-neutral-400">Jaque está digitando...</p>
+                  <Loader2 size={16} className="animate-spin text-[#4b7bb5]" />
+                  <p className="text-gray-600">Jaque está digitando...</p>
                 </div>
               </div>
             </motion.div>
@@ -396,7 +398,7 @@ export default function ChatInterface({
       </div>
 
       {/* Input field */}
-      <div className="p-4 md:p-6 flex-shrink-0">
+      <div className="p-4 md:p-6 flex-shrink-0 bg-white">
         <form onSubmit={handleSend} className="relative">
           <input
             id="chat-input"
@@ -404,18 +406,18 @@ export default function ChatInterface({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Digite uma mensagem ou comando (tente /ajuda)..."
-            className="w-full py-3 pl-4 pr-12 bg-neutral-800 border border-neutral-700 rounded-full focus:outline-none focus:ring-1 focus:ring-neutral-600"
+            className="w-full py-3 pl-4 pr-12 bg-white border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent text-gray-800"
             disabled={isLoading}
           />
           <button
             type="submit"
             className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full ${
-              isLoading || !inputValue.trim() ? "bg-neutral-700 text-neutral-500" : "bg-primary text-white"
+              isLoading || !inputValue.trim() ? "bg-gray-300 text-gray-500" : "bg-[#4b7bb5] text-white"
             }`}
             disabled={isLoading || !inputValue.trim()}
           >
             {isLoading ? (
-              <div className="w-4 h-4 border-2 border-neutral-500 border-t-neutral-300 rounded-full animate-spin"></div>
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-white rounded-full animate-spin"></div>
             ) : (
               <Send size={16} className="text-white" />
             )}
