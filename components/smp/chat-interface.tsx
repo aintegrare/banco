@@ -14,6 +14,49 @@ interface Message {
   isError?: boolean
 }
 
+// Respostas pré-definidas para simulação local
+const localResponses: Record<string, string> = {
+  default:
+    "Olá! Sou a Jaque, assistente virtual da Integrare. Como posso ajudar com seu planejamento de mídia social hoje?",
+  marketing:
+    "O marketing digital envolve várias estratégias como SEO, mídia social, email marketing e marketing de conteúdo. Qual área específica você gostaria de explorar?",
+  instagram:
+    "O Instagram é uma plataforma visual excelente para engajamento. Recomendo focar em Stories, Reels e posts com imagens de alta qualidade. A consistência visual é fundamental para sua marca.",
+  facebook:
+    "O Facebook é ideal para construir comunidade e alcançar públicos diversos. Conteúdo de vídeo e posts que incentivam interação tendem a ter melhor desempenho no algoritmo.",
+  linkedin:
+    "Para o LinkedIn, conteúdo profissional e educativo funciona melhor. Artigos de liderança de pensamento, cases de sucesso e atualizações do setor são formatos recomendados.",
+  twitter:
+    "No Twitter, mensagens concisas e oportunas são essenciais. Participar de conversas relevantes e usar hashtags estratégicas pode aumentar significativamente seu alcance.",
+  tiktok:
+    "O TikTok valoriza autenticidade e criatividade. Conteúdo curto, envolvente e que acompanha tendências tem maior chance de viralizar nesta plataforma.",
+  planejamento:
+    "Um bom planejamento de mídia social inclui: definição de objetivos claros, conhecimento do público-alvo, calendário de conteúdo, estratégia para cada plataforma e métricas para acompanhamento de resultados.",
+  hashtags:
+    "Hashtags devem ser relevantes, específicas e em número moderado. Misture hashtags populares com nichos específicos para melhor alcance. Pesquise as tendências do seu setor regularmente.",
+  métricas:
+    "As principais métricas a monitorar incluem: alcance, engajamento (curtidas, comentários, compartilhamentos), taxa de cliques, conversões, crescimento de seguidores e ROI das campanhas pagas.",
+  frequência:
+    "A frequência ideal de postagem varia por plataforma: Instagram (1-2/dia), Facebook (1/dia), LinkedIn (1-2/semana), Twitter (3-5/dia), TikTok (1-3/dia). Teste diferentes frequências para seu público específico.",
+  horário:
+    "Os melhores horários para postar dependem do seu público, mas geralmente: Instagram (meio-dia e 18h), Facebook (13h-16h), LinkedIn (manhã e início da tarde em dias úteis), Twitter (12h-15h), TikTok (19h-21h).",
+  conteúdo:
+    "Diversifique seu conteúdo entre educativo, inspirador, entretenimento e promocional. A regra 80/20 sugere 80% de conteúdo de valor e 20% promocional.",
+  ferramentas:
+    "Algumas ferramentas úteis para gestão de mídia social: Hootsuite, Buffer, Later, Canva, Planoly, Sprout Social e Google Analytics para métricas.",
+  crise:
+    "Para gestão de crise em redes sociais: monitore menções à sua marca, responda rapidamente, seja transparente, não delete críticas válidas e tenha um plano de contingência preparado.",
+  tendências:
+    "Tendências atuais incluem: conteúdo de vídeo curto, realidade aumentada, marketing de influência, conteúdo gerado pelo usuário e maior foco em autenticidade e responsabilidade social.",
+  orgânico:
+    "Para melhorar alcance orgânico: crie conteúdo de alta qualidade, incentive engajamento com perguntas e calls-to-action, use hashtags estrategicamente e mantenha consistência nas postagens.",
+  pago: "Anúncios pagos devem ter objetivos claros, segmentação precisa, criativos atraentes e testes A/B regulares. Comece com orçamentos pequenos e escale conforme os resultados.",
+  engajamento:
+    "Para aumentar engajamento: faça perguntas, crie enquetes, responda comentários prontamente, compartilhe conteúdo dos seguidores e crie conteúdo que ressoe emocionalmente com seu público.",
+  análise:
+    "Analise seus resultados mensalmente, identificando: conteúdos com melhor desempenho, horários mais eficazes, crescimento de seguidores e conversões geradas. Use esses insights para ajustar sua estratégia.",
+}
+
 export default function ChatInterface({
   messages: initialMessages = [],
   setMessages: setParentMessages,
@@ -28,7 +71,6 @@ export default function ChatInterface({
   const [inputValue, setInputValue] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [localMessages, setLocalMessages] = useState<Message[]>(initialMessages)
-  const [useFallback, setUseFallback] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Atualizar as informações do módulo
@@ -36,7 +78,8 @@ export default function ChatInterface({
     assistant: {
       name: "Jaque - Assistente",
       icon: <Bot size={20} />,
-      welcomeMessage: "Olá! Eu sou a Jaque, assistente virtual da Integrare. Como posso ajudar você hoje?",
+      welcomeMessage:
+        "Olá! Eu sou a Jaque, assistente virtual da Integrare. Como posso ajudar com seu planejamento de mídia social hoje?",
     },
   }
 
@@ -47,141 +90,54 @@ export default function ChatInterface({
     const command = text.trim().toLowerCase()
 
     if (command === "/ajuda") {
-      return "Comandos disponíveis:\n/ajuda - Mostrar esta mensagem de ajuda\n/sobre - Sobre este assistente\n/hora - Mostrar hora atual\n/data - Mostrar data atual\n/clima - Mostrar clima (demonstração)\n/teste - Testar o sistema\n/fallback - Alternar modo de fallback"
+      return "Comandos disponíveis:\n/ajuda - Mostrar esta mensagem de ajuda\n/sobre - Sobre este assistente\n/hora - Mostrar hora atual\n/data - Mostrar data atual\n/dicas - Dicas de mídia social\n/plataformas - Listar plataformas suportadas"
     } else if (command === "/sobre") {
-      return "Sou a Jaque, assistente virtual da Agência Integrare. Estou aqui para ajudar com informações sobre marketing digital, estratégias de mídia social e desenvolvimento web."
+      return "Sou a Jaque, assistente virtual da Agência Integrare. Estou aqui para ajudar com informações sobre marketing digital, estratégias de mídia social e planejamento de conteúdo."
     } else if (command === "/hora") {
       const now = new Date()
       return `Hora atual: ${now.toLocaleTimeString()}`
     } else if (command === "/data") {
       const now = new Date()
       return `Data atual: ${now.toLocaleDateString("pt-BR")}`
-    } else if (command === "/clima") {
-      return "Recurso de clima em breve. Esta é apenas uma resposta de demonstração."
-    } else if (command === "/teste") {
-      return "Teste realizado com sucesso! O sistema está funcionando corretamente."
-    } else if (command === "/fallback") {
-      setUseFallback(!useFallback)
-      return `Modo de fallback ${useFallback ? "desativado" : "ativado"}. ${
-        useFallback ? "Usando API principal." : "Usando respostas locais quando a API principal falhar."
-      }`
+    } else if (command === "/dicas") {
+      return "Dicas para mídia social:\n1. Mantenha consistência visual\n2. Engaje com sua audiência\n3. Use hashtags estrategicamente\n4. Analise métricas regularmente\n5. Planeje conteúdo com antecedência"
+    } else if (command === "/plataformas") {
+      return "Plataformas suportadas: Instagram, Facebook, LinkedIn, Twitter, TikTok, YouTube, Pinterest"
     }
 
     return null // Não é um comando especial
   }
 
-  // Função para enviar mensagem para a API
-  const sendMessageToAPI = async (userMessage: Message) => {
+  // Função para gerar resposta local baseada no texto do usuário
+  const generateLocalResponse = (userText: string) => {
+    const text = userText.toLowerCase()
+
+    // Verificar palavras-chave no texto do usuário
+    for (const [keyword, response] of Object.entries(localResponses)) {
+      if (text.includes(keyword.toLowerCase())) {
+        return response
+      }
+    }
+
+    // Se nenhuma palavra-chave for encontrada, usar resposta padrão
+    return localResponses.default
+  }
+
+  // Função para simular envio de mensagem para API (agora local)
+  const sendMessage = async (userMessage: Message) => {
     try {
       setIsLoading(true)
 
-      // Preparar mensagens para enviar à API
-      const apiMessages = localMessages.concat(userMessage).map((msg) => ({
-        role: msg.role,
-        content: msg.text,
-      }))
+      // Simular tempo de resposta
+      await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      // Determinar qual API usar
-      const apiEndpoint = useFallback ? "/api/chat-fallback" : "/api/chat-simple"
-
-      // Fazer a requisição para a API
-      const response = await fetch(apiEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: apiMessages,
-        }),
-      })
-
-      // Verificar se a resposta é OK antes de tentar analisar como JSON
-      if (!response.ok) {
-        // Tentar obter detalhes do erro, mas com tratamento de erro caso não seja JSON
-        let errorMessage = `Erro do servidor: ${response.status} ${response.statusText}`
-
-        try {
-          const errorData = await response.json()
-          if (errorData && errorData.error) {
-            errorMessage = errorData.error
-          }
-        } catch (jsonError) {
-          // Se não conseguir analisar como JSON, usar o texto bruto
-          try {
-            const errorText = await response.text()
-            errorMessage = errorText || errorMessage
-          } catch (textError) {
-            // Se nem conseguir obter o texto, manter a mensagem original
-          }
-        }
-
-        // Se não estiver usando fallback, tentar com a API de fallback
-        if (!useFallback) {
-          console.log("API principal falhou, tentando fallback...")
-
-          try {
-            const fallbackResponse = await fetch("/api/chat-fallback", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                messages: apiMessages,
-              }),
-            })
-
-            if (fallbackResponse.ok) {
-              const fallbackData = await fallbackResponse.json()
-
-              // Adicionar resposta do assistente do fallback
-              const assistantMessage: Message = {
-                id: Date.now().toString(),
-                text: fallbackData.content || "Resposta de fallback",
-                role: "assistant",
-                timestamp: new Date(),
-              }
-
-              const updatedMessages = [...localMessages, userMessage, assistantMessage]
-              setLocalMessages(updatedMessages)
-              setParentMessages(updatedMessages)
-              setIsLoading(false)
-              return
-            }
-          } catch (fallbackError) {
-            console.error("Erro na API de fallback:", fallbackError)
-            // Continuar com o fluxo de erro normal
-          }
-        }
-
-        throw new Error(errorMessage)
-      }
-
-      // Tentar analisar a resposta como JSON com tratamento de erro
-      let data
-      try {
-        data = await response.json()
-      } catch (jsonError) {
-        console.error("Erro ao analisar JSON:", jsonError)
-
-        // Tentar obter o texto bruto
-        try {
-          const textResponse = await response.text()
-          console.log("Resposta em texto:", textResponse)
-          throw new Error("Erro ao analisar resposta da API: formato JSON inválido")
-        } catch (textError) {
-          throw new Error("Erro ao analisar resposta da API: não foi possível obter o conteúdo")
-        }
-      }
-
-      // Verificar se a resposta contém o conteúdo esperado
-      if (!data || (!data.content && !data.text)) {
-        throw new Error("Resposta da API em formato inesperado")
-      }
+      // Gerar resposta local
+      const responseText = generateLocalResponse(userMessage.text)
 
       // Adicionar resposta do assistente
       const assistantMessage: Message = {
         id: Date.now().toString(),
-        text: data.content || data.text,
+        text: responseText,
         role: "assistant",
         timestamp: new Date(),
       }
@@ -190,12 +146,12 @@ export default function ChatInterface({
       setLocalMessages(updatedMessages)
       setParentMessages(updatedMessages)
     } catch (error: any) {
-      console.error("Erro ao enviar mensagem:", error)
+      console.error("Erro ao processar mensagem:", error)
 
       // Adicionar mensagem de erro
       const errorMessage: Message = {
         id: Date.now().toString(),
-        text: `Erro ao comunicar com a API: ${error.message || "Falha na comunicação com a API"}`,
+        text: `Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente mais tarde.`,
         role: "assistant",
         timestamp: new Date(),
         isError: true,
@@ -242,8 +198,8 @@ export default function ChatInterface({
       // Adicionar mensagem do usuário imediatamente
       setLocalMessages((prev) => [...prev, userMessage])
 
-      // Enviar para a API
-      await sendMessageToAPI(userMessage)
+      // Enviar para processamento local
+      await sendMessage(userMessage)
     }
 
     // Limpar o input
@@ -282,9 +238,6 @@ export default function ChatInterface({
                 {currentModule.icon}
               </div>
               <h2 className="text-lg font-medium text-gray-800">{currentModule.name}</h2>
-              {useFallback && (
-                <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Modo Fallback</span>
-              )}
             </div>
             <div className="flex space-x-2 items-center">
               <span className="h-2 w-2 rounded-full bg-green-500"></span>
@@ -295,7 +248,7 @@ export default function ChatInterface({
 
         {/* Command suggestions */}
         <div className="flex flex-wrap gap-2 mb-4">
-          {["/ajuda", "/sobre", "/hora", "/data", "/teste", "/fallback"].map((cmd) => (
+          {["/ajuda", "/sobre", "/hora", "/data", "/dicas", "/plataformas"].map((cmd) => (
             <button
               key={cmd}
               className="px-3 py-1 text-xs rounded-full bg-[#edf2f7] text-[#4b7bb5] hover:bg-[#e2e8f0] transition-colors"
@@ -337,7 +290,7 @@ export default function ChatInterface({
                 </div>
                 <div className="p-3 bg-white rounded-lg flex items-center shadow-sm border border-gray-200">
                   <Calendar size={18} className="mr-2 text-[#4b7bb5]" />
-                  <span className="text-sm text-gray-700">Tente /data ou /hora</span>
+                  <span className="text-sm text-gray-700">Tente /dicas ou /plataformas</span>
                 </div>
               </div>
             </motion.div>
