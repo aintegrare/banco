@@ -3,7 +3,19 @@
 import type React from "react"
 
 import { useState, useRef } from "react"
-import { Upload, File, Loader2, X, CheckCircle, AlertTriangle, ImageIcon, Trash2, FolderTree, Info } from "lucide-react"
+import {
+  Upload,
+  File,
+  Loader2,
+  X,
+  CheckCircle,
+  AlertTriangle,
+  ImageIcon,
+  Trash2,
+  FolderTree,
+  Info,
+  Film,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FolderBrowser } from "./folder-browser"
 import { getRecommendedCacheConfig } from "@/lib/bunny"
@@ -34,12 +46,15 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files)
 
-      // Verificar tamanho dos arquivos (100MB = 100 * 1024 * 1024 bytes)
+      // Verificar tamanho dos arquivos (500MB = 500 * 1024 * 1024 bytes para vídeos, 100MB para outros)
       const validFiles = selectedFiles.filter((file) => {
-        if (file.size > 100 * 1024 * 1024) {
+        const isVideo = file.type.startsWith("video/")
+        const maxSize = isVideo ? 500 * 1024 * 1024 : 100 * 1024 * 1024
+
+        if (file.size > maxSize) {
           setErrors((prev) => ({
             ...prev,
-            [file.name]: "O arquivo excede o tamanho máximo de 100MB.",
+            [file.name]: `O arquivo excede o tamanho máximo de ${isVideo ? "500MB" : "100MB"}.`,
           }))
           return false
         }
@@ -50,7 +65,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
       setErrors({})
       setSuccess([])
 
-      // Criar previews para imagens
+      // Criar previews para imagens e vídeos
       const newPreviewUrls: { [key: string]: string } = {}
       validFiles.forEach((file) => {
         if (file.type.startsWith("image/")) {
@@ -62,6 +77,13 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
             }))
           }
           reader.readAsDataURL(file)
+        } else if (file.type.startsWith("video/")) {
+          // Para vídeos, criamos uma URL temporária para preview
+          const videoUrl = URL.createObjectURL(file)
+          setPreviewUrls((prev) => ({
+            ...prev,
+            [file.name]: videoUrl,
+          }))
         }
       })
     }
@@ -87,12 +109,15 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFiles = Array.from(e.dataTransfer.files)
 
-      // Verificar tamanho dos arquivos (100MB = 100 * 1024 * 1024 bytes)
+      // Verificar tamanho dos arquivos (500MB para vídeos, 100MB para outros)
       const validFiles = droppedFiles.filter((file) => {
-        if (file.size > 100 * 1024 * 1024) {
+        const isVideo = file.type.startsWith("video/")
+        const maxSize = isVideo ? 500 * 1024 * 1024 : 100 * 1024 * 1024
+
+        if (file.size > maxSize) {
           setErrors((prev) => ({
             ...prev,
-            [file.name]: "O arquivo excede o tamanho máximo de 100MB.",
+            [file.name]: `O arquivo excede o tamanho máximo de ${isVideo ? "500MB" : "100MB"}.`,
           }))
           return false
         }
@@ -103,7 +128,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
       setErrors({})
       setSuccess([])
 
-      // Criar previews para imagens
+      // Criar previews para imagens e vídeos
       validFiles.forEach((file) => {
         if (file.type.startsWith("image/")) {
           const reader = new FileReader()
@@ -114,20 +139,50 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
             }))
           }
           reader.readAsDataURL(file)
+        } else if (file.type.startsWith("video/")) {
+          // Para vídeos, criamos uma URL temporária para preview
+          const videoUrl = URL.createObjectURL(file)
+          setPreviewUrls((prev) => ({
+            ...prev,
+            [file.name]: videoUrl,
+          }))
         }
       })
     }
   }
 
   const removeFile = (index: number) => {
+    const file = files[index]
+
+    // Limpar URL de objeto se for um vídeo
+    if (file && file.type.startsWith("video/") && previewUrls[file.name]) {
+      URL.revokeObjectURL(previewUrls[file.name])
+    }
+
     setFiles((prev) => {
       const newFiles = [...prev]
       newFiles.splice(index, 1)
       return newFiles
     })
+
+    // Remover preview
+    if (file) {
+      setPreviewUrls((prev) => {
+        const newPreviews = { ...prev }
+        delete newPreviews[file.name]
+        return newPreviews
+      })
+    }
   }
 
   const clearFiles = () => {
+    // Limpar todas as URLs de objeto para vídeos
+    files.forEach((file) => {
+      if (file.type.startsWith("video/") && previewUrls[file.name]) {
+        URL.revokeObjectURL(previewUrls[file.name])
+      }
+    })
+
     setFiles([])
     setPreviewUrls({})
     if (fileInputRef.current) {
@@ -164,6 +219,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
       // Upload de cada arquivo individualmente
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
+        const isVideo = file.type.startsWith("video/")
 
         // Inicializar progresso para este arquivo
         setUploadProgress((prev) => ({
@@ -179,7 +235,9 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
           setUploadProgress((prev) => {
             const newProgress = { ...prev }
             if (newProgress[file.name] < 90) {
-              newProgress[file.name] = newProgress[file.name] + 5
+              // Progresso mais lento para vídeos grandes
+              const increment = isVideo && file.size > 50 * 1024 * 1024 ? 2 : 5
+              newProgress[file.name] = newProgress[file.name] + increment
             }
             return newProgress
           })
@@ -189,7 +247,12 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
           const formData = new FormData()
           formData.append("file", file)
           formData.append("folder", selectedFolder) // Adicionar a pasta selecionada
-          formData.append("cacheControl", getCacheControlForFile(file)) // Adicionar esta linha
+          formData.append("cacheControl", getCacheControlForFile(file))
+
+          // Adicionar flag para vídeos
+          if (isVideo) {
+            formData.append("isVideo", "true")
+          }
 
           const response = await fetch("/api/upload", {
             method: "POST",
@@ -218,6 +281,11 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
 
           results.push(data)
           setSuccess((prev) => [...prev, data])
+
+          // Limpar URL de objeto se for um vídeo
+          if (isVideo && previewUrls[file.name]) {
+            URL.revokeObjectURL(previewUrls[file.name])
+          }
         } catch (fetchError) {
           console.error(`FileUploader: Erro na chamada fetch para ${file.name}`, fetchError)
           clearInterval(progressInterval)
@@ -304,7 +372,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
 
   // Determinar o tipo de arquivo aceito
   const getAcceptedFileTypes = () => {
-    return ".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.webp,.psd,.psb,.ai,.indd,.idml"
+    return ".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.webp,.psd,.psb,.ai,.indd,.idml,.mp4,.webm,.mov,.avi,.mkv"
   }
 
   // Calcular o total de arquivos com erro
@@ -323,6 +391,20 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
   const handleFolderSelect = (path: string) => {
     setSelectedFolder(path)
     setShowFolderBrowser(false)
+  }
+
+  // Função para verificar se um arquivo é um vídeo
+  const isVideo = (file: File) => {
+    return file.type.startsWith("video/")
+  }
+
+  // Função para formatar o tamanho do arquivo
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
   return (
@@ -397,7 +479,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
           </div>
           {cacheOption === "default" && (
             <p className="text-xs text-gray-500 mt-1">
-              Imagens: 30 dias, Documentos: 7 dias, Arquivos de design: 1 dia
+              Imagens: 30 dias, Vídeos: 7 dias, Documentos: 7 dias, Arquivos de design: 1 dia
             </p>
           )}
         </div>
@@ -440,7 +522,10 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
               <Upload className="h-8 w-8 text-gray-400 mb-2" />
               <p className="text-gray-600 mb-1">Arraste e solte arquivos aqui ou clique para selecionar</p>
               <p className="text-xs text-gray-500">
-                PDF, DOC, DOCX, TXT, JPG, PNG, GIF, WEBP, PSD, PSB, AI, INDD, IDML (máx. 100MB por arquivo)
+                PDF, DOC, DOCX, TXT, JPG, PNG, GIF, WEBP, PSD, PSB, AI, INDD, IDML (máx. 100MB)
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                <span className="font-medium">NOVO!</span> MP4, WEBM, MOV, AVI, MKV (máx. 500MB)
               </p>
             </div>
           </label>
@@ -461,7 +546,8 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
 
               <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md bg-white">
                 {files.map((file, index) => {
-                  const isImage = file.type.startsWith("image/")
+                  const isImageFile = file.type.startsWith("image/")
+                  const isVideoFile = file.type.startsWith("video/")
                   const hasError = errors[file.name]
                   const uploadComplete = uploadProgress[file.name] === 100
 
@@ -473,14 +559,19 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
                       }`}
                     >
                       <div className="flex items-center flex-1 min-w-0">
-                        {isImage ? (
+                        {isImageFile ? (
                           <ImageIcon className="h-6 w-6 text-[#4b7bb5] mr-3 flex-shrink-0" />
+                        ) : isVideoFile ? (
+                          <Film className="h-6 w-6 text-purple-500 mr-3 flex-shrink-0" />
                         ) : (
                           <File className="h-6 w-6 text-[#4b7bb5] mr-3 flex-shrink-0" />
                         )}
                         <div className="text-left min-w-0">
                           <p className="font-medium text-gray-800 truncate">{file.name}</p>
-                          <p className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                          <p className="text-xs text-gray-500">
+                            {formatFileSize(file.size)}
+                            {isVideoFile && <span className="ml-1 text-purple-500 font-medium">• Vídeo</span>}
+                          </p>
                         </div>
                       </div>
 
@@ -488,7 +579,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
                         <div className="w-20 mr-2">
                           <div className="w-full bg-gray-200 rounded-full h-1.5">
                             <div
-                              className="bg-[#4b7bb5] h-1.5 rounded-full"
+                              className={`h-1.5 rounded-full ${isVideoFile ? "bg-purple-500" : "bg-[#4b7bb5]"}`}
                               style={{ width: `${uploadProgress[file.name]}%` }}
                             ></div>
                           </div>

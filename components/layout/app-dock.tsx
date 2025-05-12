@@ -18,6 +18,7 @@ import {
   FileImage,
   LogOut,
   Users,
+  Share2,
 } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase/client"
 
@@ -133,6 +134,7 @@ export function AppDock() {
 
   const marketingItems = [
     { href: "/admin/crm", icon: <Users size={24} />, label: "CRM" },
+    { href: "/admin/smp", icon: <Share2 size={24} />, label: "SMP" },
     { href: "/admin/agenda", icon: <Calendar size={24} />, label: "Agenda" },
   ]
 
