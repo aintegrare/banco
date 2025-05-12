@@ -1,9 +1,4 @@
-import { adminSupabase } from "./api"
-
-// Verificar se estamos em ambiente de preview
-const isPreviewEnvironment = process.env.VERCEL_ENV === "preview" || process.env.NODE_ENV !== "production"
-
-// Tipos para os posts e conexões
+// Interfaces para posts e conexões
 export interface SMPPost {
   id: string
   title: string
@@ -20,177 +15,430 @@ export interface SMPConnection {
   target: string
 }
 
-// Armazenamento local para ambiente de preview
-let localPosts: SMPPost[] = [
+// Interface para módulos
+export interface Module {
+  id: string
+  name: string
+  description: string
+  icon: string
+  category: string
+  features: string[]
+  metrics: {
+    engagement: number
+    reach: number
+    conversion?: number
+  }
+  status: "active" | "inactive" | "coming_soon"
+  settings: Record<string, boolean | string>
+}
+
+// Interface para modelos de IA
+export interface AIModel {
+  id: string
+  name: string
+  description: string
+  category: string
+  capabilities: string[]
+  metrics: {
+    accuracy: number
+    speed: number
+    cost: number
+  }
+  status: "active" | "inactive" | "coming_soon"
+  settings: Record<string, boolean | string>
+}
+
+// Dados padrão para módulos
+const defaultModules: Module[] = [
   {
-    id: "post1",
-    title: "Lançamento de Produto",
-    caption: "Novo produto chegando às lojas em breve! Fiquem ligados para mais informações.",
-    hashtags: ["novoproduto", "lançamento", "inovação"],
-    theme: "Produto",
-    type: "PLM",
-    position: { x: 100, y: 100 },
+    id: "instagram",
+    name: "Instagram",
+    description: "Gerencie posts, stories e reels do Instagram com recursos avançados de planejamento e análise.",
+    icon: "instagram",
+    category: "social",
+    features: [
+      "Programação de posts",
+      "Análise de desempenho",
+      "Sugestões de hashtags",
+      "Planejamento de feed",
+      "Gerenciamento de stories",
+    ],
+    metrics: {
+      engagement: 85,
+      reach: 70,
+    },
+    status: "active",
+    settings: {
+      autoPublish: true,
+      hashtagSuggestions: true,
+      feedPreview: true,
+      analyticsReports: false,
+    },
   },
   {
-    id: "post2",
-    title: "Promoção de Verão",
-    caption: "Aproveite nossos descontos especiais de verão em toda a linha de produtos!",
-    hashtags: ["promoção", "verão", "descontos"],
-    theme: "Promoção",
-    type: "PLC",
-    position: { x: 400, y: 300 },
+    id: "facebook",
+    name: "Facebook",
+    description: "Gerencie sua página do Facebook com ferramentas para posts, eventos e análise de engajamento.",
+    icon: "facebook",
+    category: "social",
+    features: [
+      "Programação de posts",
+      "Gerenciamento de eventos",
+      "Análise de engajamento",
+      "Resposta a comentários",
+      "Integração com Messenger",
+    ],
+    metrics: {
+      engagement: 75,
+      reach: 80,
+    },
+    status: "active",
+    settings: {
+      autoPublish: true,
+      commentManagement: false,
+      eventCreation: true,
+      analyticsReports: true,
+    },
+  },
+  {
+    id: "linkedin",
+    name: "LinkedIn",
+    description: "Gerencie seu perfil profissional e página empresarial com conteúdo estratégico para B2B.",
+    icon: "linkedin",
+    category: "social",
+    features: [
+      "Programação de posts",
+      "Análise de perfil",
+      "Conteúdo para B2B",
+      "Gerenciamento de conexões",
+      "Métricas de engajamento",
+    ],
+    metrics: {
+      engagement: 65,
+      reach: 60,
+    },
+    status: "active",
+    settings: {
+      autoPublish: true,
+      b2bTemplates: false,
+      analyticsReports: true,
+      connectionManagement: false,
+    },
+  },
+  {
+    id: "twitter",
+    name: "Twitter",
+    description: "Gerencie sua presença no Twitter com programação de tweets e análise de tendências.",
+    icon: "twitter",
+    category: "social",
+    features: [
+      "Programação de tweets",
+      "Monitoramento de hashtags",
+      "Análise de tendências",
+      "Gerenciamento de threads",
+      "Resposta automática",
+    ],
+    metrics: {
+      engagement: 70,
+      reach: 75,
+    },
+    status: "active",
+    settings: {
+      autoPublish: true,
+      trendMonitoring: true,
+      threadCreation: false,
+      analyticsReports: true,
+    },
+  },
+  {
+    id: "planner",
+    name: "Planejador",
+    description: "Planeje sua estratégia de conteúdo com calendário editorial e fluxo de trabalho integrado.",
+    icon: "file-text",
+    category: "planning",
+    features: [
+      "Calendário editorial",
+      "Fluxo de trabalho",
+      "Atribuição de tarefas",
+      "Categorização de conteúdo",
+      "Visualização por plataforma",
+    ],
+    metrics: {
+      engagement: 0,
+      reach: 0,
+      conversion: 85,
+    },
+    status: "active",
+    settings: {
+      workflowManagement: true,
+      taskAssignment: true,
+      contentCategorization: true,
+      platformFiltering: true,
+    },
+  },
+  {
+    id: "calendar",
+    name: "Calendário",
+    description: "Visualize e organize seu conteúdo em um calendário interativo com múltiplas visualizações.",
+    icon: "calendar",
+    category: "planning",
+    features: [
+      "Visualização mensal",
+      "Visualização semanal",
+      "Arrastar e soltar",
+      "Filtros por plataforma",
+      "Exportação para PDF",
+    ],
+    metrics: {
+      engagement: 0,
+      reach: 0,
+      conversion: 80,
+    },
+    status: "active",
+    settings: {
+      dragAndDrop: true,
+      platformFiltering: true,
+      pdfExport: false,
+      multipleViews: true,
+    },
+  },
+  {
+    id: "analytics",
+    name: "Analytics",
+    description: "Analise o desempenho do seu conteúdo com métricas detalhadas e relatórios personalizados.",
+    icon: "bar-chart",
+    category: "planning",
+    features: [
+      "Métricas de engajamento",
+      "Relatórios personalizados",
+      "Comparação de períodos",
+      "Exportação de dados",
+      "Insights automáticos",
+    ],
+    metrics: {
+      engagement: 0,
+      reach: 0,
+      conversion: 90,
+    },
+    status: "active",
+    settings: {
+      customReports: true,
+      periodComparison: true,
+      dataExport: true,
+      automaticInsights: false,
+    },
   },
 ]
 
-let localConnections: SMPConnection[] = [
+// Dados padrão para modelos de IA
+const defaultAIModels: AIModel[] = [
   {
-    id: "conn1",
-    source: "post1",
-    target: "post2",
+    id: "content-generator",
+    name: "Gerador de Conteúdo",
+    description: "Cria textos para posts, legendas e hashtags com base no seu nicho e estilo.",
+    category: "content",
+    capabilities: [
+      "Geração de legendas",
+      "Sugestão de hashtags",
+      "Criação de títulos",
+      "Adaptação por plataforma",
+      "Personalização de tom",
+    ],
+    metrics: {
+      accuracy: 85,
+      speed: 90,
+      cost: 70,
+    },
+    status: "active",
+    settings: {
+      platformAdaptation: true,
+      toneCustomization: true,
+      hashtagGeneration: true,
+      lengthControl: true,
+    },
+  },
+  {
+    id: "image-enhancer",
+    name: "Aprimorador de Imagens",
+    description: "Melhora automaticamente suas imagens para maior impacto visual nas redes sociais.",
+    category: "visual",
+    capabilities: [
+      "Ajuste de cores",
+      "Recorte inteligente",
+      "Remoção de fundo",
+      "Aplicação de filtros",
+      "Redimensionamento por plataforma",
+    ],
+    metrics: {
+      accuracy: 90,
+      speed: 85,
+      cost: 75,
+    },
+    status: "active",
+    settings: {
+      autoColorCorrection: true,
+      smartCropping: true,
+      backgroundRemoval: true,
+      platformSizing: true,
+    },
+  },
+  {
+    id: "hashtag-optimizer",
+    name: "Otimizador de Hashtags",
+    description: "Encontra as melhores hashtags para maximizar o alcance do seu conteúdo.",
+    category: "content",
+    capabilities: [
+      "Pesquisa de tendências",
+      "Análise de relevância",
+      "Sugestões personalizadas",
+      "Monitoramento de desempenho",
+      "Agrupamento por categoria",
+    ],
+    metrics: {
+      accuracy: 85,
+      speed: 95,
+      cost: 65,
+    },
+    status: "active",
+    settings: {
+      trendResearch: true,
+      relevanceAnalysis: true,
+      performanceTracking: false,
+      categoryGrouping: true,
+    },
+  },
+  {
+    id: "content-scheduler",
+    name: "Agendador Inteligente",
+    description: "Determina os melhores horários para publicação com base no comportamento da audiência.",
+    category: "planning",
+    capabilities: [
+      "Análise de horários",
+      "Programação automática",
+      "Otimização por plataforma",
+      "Ajuste por fuso horário",
+      "Recomendações personalizadas",
+    ],
+    metrics: {
+      accuracy: 85,
+      speed: 90,
+      cost: 70,
+    },
+    status: "active",
+    settings: {
+      timeAnalysis: true,
+      autoScheduling: true,
+      platformOptimization: true,
+      timezoneAdjustment: false,
+    },
   },
 ]
 
-// Função para carregar posts
+// Função para carregar módulos
+export async function loadModules(): Promise<Module[]> {
+  try {
+    return defaultModules
+  } catch (error) {
+    console.error("Erro ao carregar módulos:", error)
+    return defaultModules
+  }
+}
+
+// Função para carregar modelos de IA
+export async function loadAIModels(): Promise<AIModel[]> {
+  try {
+    return defaultAIModels
+  } catch (error) {
+    console.error("Erro ao carregar modelos de IA:", error)
+    return defaultAIModels
+  }
+}
+
+// Função para salvar preferência do usuário
+export async function saveUserPreference(userId: string, key: string, value: string): Promise<boolean> {
+  try {
+    // Simulação de salvamento bem-sucedido
+    console.log(`Preferência salva: ${userId}, ${key}, ${value}`)
+    return true
+  } catch (error) {
+    console.error("Erro ao salvar preferência:", error)
+    return false
+  }
+}
+
+// Função para carregar preferência do usuário
+export async function loadUserPreference(userId: string, key: string, defaultValue = ""): Promise<string> {
+  try {
+    // Simulação de carregamento
+    console.log(`Carregando preferência: ${userId}, ${key}`)
+    return defaultValue
+  } catch (error) {
+    console.error("Erro ao carregar preferência:", error)
+    return defaultValue
+  }
+}
+
+// Funções para posts e conexões
 export async function loadPosts(): Promise<SMPPost[]> {
   try {
-    // Em ambiente de preview, usar dados locais
-    if (isPreviewEnvironment) {
-      console.log("Usando dados locais para posts em ambiente de preview")
-      return [...localPosts]
-    }
-
-    // Verificar se o cliente Supabase está disponível
-    if (!adminSupabase) {
-      console.error("Cliente Supabase não disponível")
-      return [...localPosts]
-    }
-
-    const { data, error } = await adminSupabase.from("smp_posts").select("*")
-
-    if (error) {
-      console.error("Erro ao carregar posts:", error)
-      return [...localPosts]
-    }
-
-    return data.map((post) => ({
-      id: post.id,
-      title: post.title,
-      caption: post.caption,
-      hashtags: post.hashtags || [],
-      theme: post.theme,
-      type: post.type,
-      position: post.position,
-    }))
+    // Dados de exemplo
+    return [
+      {
+        id: "post1",
+        title: "Lançamento de Produto",
+        caption: "Novo produto chegando às lojas em breve! Fiquem ligados para mais informações.",
+        hashtags: ["novoproduto", "lançamento", "inovação"],
+        theme: "Produto",
+        type: "PLM",
+        position: { x: 100, y: 100 },
+      },
+      {
+        id: "post2",
+        title: "Promoção de Verão",
+        caption: "Aproveite nossos descontos especiais de verão em toda a linha de produtos!",
+        hashtags: ["promoção", "verão", "descontos"],
+        theme: "Promoção",
+        type: "PLC",
+        position: { x: 400, y: 300 },
+      },
+    ]
   } catch (error) {
     console.error("Erro ao carregar posts:", error)
-    return [...localPosts]
+    return []
   }
 }
 
-// Função para carregar conexões
 export async function loadConnections(): Promise<SMPConnection[]> {
   try {
-    // Em ambiente de preview, usar dados locais
-    if (isPreviewEnvironment) {
-      console.log("Usando dados locais para conexões em ambiente de preview")
-      return [...localConnections]
-    }
-
-    // Verificar se o cliente Supabase está disponível
-    if (!adminSupabase) {
-      console.error("Cliente Supabase não disponível")
-      return [...localConnections]
-    }
-
-    const { data, error } = await adminSupabase.from("smp_connections").select("*")
-
-    if (error) {
-      console.error("Erro ao carregar conexões:", error)
-      return [...localConnections]
-    }
-
-    return data.map((connection) => ({
-      id: connection.id,
-      source: connection.source,
-      target: connection.target,
-    }))
+    // Dados de exemplo
+    return [
+      {
+        id: "conn1",
+        source: "post1",
+        target: "post2",
+      },
+    ]
   } catch (error) {
     console.error("Erro ao carregar conexões:", error)
-    return [...localConnections]
+    return []
   }
 }
 
-// Função para criar um novo post
 export async function createPost(post: Omit<SMPPost, "id">): Promise<SMPPost | null> {
   try {
-    const newPost: SMPPost = {
-      id: `post${Date.now()}`,
-      ...post,
-    }
-
-    // Em ambiente de preview, usar dados locais
-    if (isPreviewEnvironment) {
-      console.log("Salvando post localmente em ambiente de preview")
-      localPosts.push(newPost)
-      return newPost
-    }
-
-    // Verificar se o cliente Supabase está disponível
-    if (!adminSupabase) {
-      console.error("Cliente Supabase não disponível")
-      localPosts.push(newPost)
-      return newPost
-    }
-
-    const { data, error } = await adminSupabase.from("smp_posts").insert(newPost).select().single()
-
-    if (error) {
-      console.error("Erro ao criar post:", error)
-      localPosts.push(newPost)
-      return newPost
-    }
-
-    return data
+    const postId = Date.now().toString()
+    const newPost = { ...post, id: postId }
+    console.log("Post criado:", newPost)
+    return newPost
   } catch (error) {
     console.error("Erro ao criar post:", error)
     return null
   }
 }
 
-// Função para atualizar um post
 export async function updatePost(post: SMPPost): Promise<boolean> {
   try {
-    // Em ambiente de preview, usar dados locais
-    if (isPreviewEnvironment) {
-      console.log("Atualizando post localmente em ambiente de preview")
-      const index = localPosts.findIndex((p) => p.id === post.id)
-      if (index !== -1) {
-        localPosts[index] = post
-      }
-      return true
-    }
-
-    // Verificar se o cliente Supabase está disponível
-    if (!adminSupabase) {
-      console.error("Cliente Supabase não disponível")
-      const index = localPosts.findIndex((p) => p.id === post.id)
-      if (index !== -1) {
-        localPosts[index] = post
-      }
-      return true
-    }
-
-    const { error } = await adminSupabase.from("smp_posts").update(post).eq("id", post.id)
-
-    if (error) {
-      console.error("Erro ao atualizar post:", error)
-      const index = localPosts.findIndex((p) => p.id === post.id)
-      if (index !== -1) {
-        localPosts[index] = post
-      }
-      return true
-    }
-
+    console.log("Post atualizado:", post)
     return true
   } catch (error) {
     console.error("Erro ao atualizar post:", error)
@@ -198,76 +446,9 @@ export async function updatePost(post: SMPPost): Promise<boolean> {
   }
 }
 
-// Função para atualizar a posição de um post
-export async function updatePostPosition(id: string, position: { x: number; y: number }): Promise<boolean> {
-  try {
-    // Em ambiente de preview, usar dados locais
-    if (isPreviewEnvironment) {
-      console.log("Atualizando posição do post localmente em ambiente de preview")
-      const index = localPosts.findIndex((p) => p.id === id)
-      if (index !== -1) {
-        localPosts[index].position = position
-      }
-      return true
-    }
-
-    // Verificar se o cliente Supabase está disponível
-    if (!adminSupabase) {
-      console.error("Cliente Supabase não disponível")
-      const index = localPosts.findIndex((p) => p.id === id)
-      if (index !== -1) {
-        localPosts[index].position = position
-      }
-      return true
-    }
-
-    const { error } = await adminSupabase.from("smp_posts").update({ position }).eq("id", id)
-
-    if (error) {
-      console.error("Erro ao atualizar posição do post:", error)
-      const index = localPosts.findIndex((p) => p.id === id)
-      if (index !== -1) {
-        localPosts[index].position = position
-      }
-      return true
-    }
-
-    return true
-  } catch (error) {
-    console.error("Erro ao atualizar posição do post:", error)
-    return false
-  }
-}
-
-// Função para excluir um post
 export async function deletePost(id: string): Promise<boolean> {
   try {
-    // Em ambiente de preview, usar dados locais
-    if (isPreviewEnvironment) {
-      console.log("Excluindo post localmente em ambiente de preview")
-      localPosts = localPosts.filter((p) => p.id !== id)
-      // Também excluir conexões relacionadas
-      localConnections = localConnections.filter((c) => c.source !== id && c.target !== id)
-      return true
-    }
-
-    // Verificar se o cliente Supabase está disponível
-    if (!adminSupabase) {
-      console.error("Cliente Supabase não disponível")
-      localPosts = localPosts.filter((p) => p.id !== id)
-      localConnections = localConnections.filter((c) => c.source !== id && c.target !== id)
-      return true
-    }
-
-    const { error } = await adminSupabase.from("smp_posts").delete().eq("id", id)
-
-    if (error) {
-      console.error("Erro ao excluir post:", error)
-      localPosts = localPosts.filter((p) => p.id !== id)
-      localConnections = localConnections.filter((c) => c.source !== id && c.target !== id)
-      return true
-    }
-
+    console.log("Post excluído:", id)
     return true
   } catch (error) {
     console.error("Erro ao excluir post:", error)
@@ -275,103 +456,24 @@ export async function deletePost(id: string): Promise<boolean> {
   }
 }
 
-// Função para criar uma conexão
 export async function createConnection(connection: Omit<SMPConnection, "id">): Promise<SMPConnection | null> {
   try {
-    const newConnection: SMPConnection = {
-      id: `conn${Date.now()}`,
-      ...connection,
-    }
-
-    // Em ambiente de preview, usar dados locais
-    if (isPreviewEnvironment) {
-      console.log("Salvando conexão localmente em ambiente de preview")
-      localConnections.push(newConnection)
-      return newConnection
-    }
-
-    // Verificar se o cliente Supabase está disponível
-    if (!adminSupabase) {
-      console.error("Cliente Supabase não disponível")
-      localConnections.push(newConnection)
-      return newConnection
-    }
-
-    const { data, error } = await adminSupabase.from("smp_connections").insert(newConnection).select().single()
-
-    if (error) {
-      console.error("Erro ao criar conexão:", error)
-      localConnections.push(newConnection)
-      return newConnection
-    }
-
-    return data
+    const connectionId = Date.now().toString()
+    const newConnection = { ...connection, id: connectionId }
+    console.log("Conexão criada:", newConnection)
+    return newConnection
   } catch (error) {
     console.error("Erro ao criar conexão:", error)
     return null
   }
 }
 
-// Função para excluir uma conexão
-export async function deleteConnection(id: string): Promise<boolean> {
+export async function updatePostPosition(postId: string, position: { x: number; y: number }): Promise<boolean> {
   try {
-    // Em ambiente de preview, usar dados locais
-    if (isPreviewEnvironment) {
-      console.log("Excluindo conexão localmente em ambiente de preview")
-      localConnections = localConnections.filter((c) => c.id !== id)
-      return true
-    }
-
-    // Verificar se o cliente Supabase está disponível
-    if (!adminSupabase) {
-      console.error("Cliente Supabase não disponível")
-      localConnections = localConnections.filter((c) => c.id !== id)
-      return true
-    }
-
-    const { error } = await adminSupabase.from("smp_connections").delete().eq("id", id)
-
-    if (error) {
-      console.error("Erro ao excluir conexão:", error)
-      localConnections = localConnections.filter((c) => c.id !== id)
-      return true
-    }
-
+    console.log("Posição do post atualizada:", postId, position)
     return true
   } catch (error) {
-    console.error("Erro ao excluir conexão:", error)
-    return false
-  }
-}
-
-// Função para excluir uma conexão entre dois posts
-export async function deleteConnectionBetween(sourceId: string, targetId: string): Promise<boolean> {
-  try {
-    // Em ambiente de preview, usar dados locais
-    if (isPreviewEnvironment) {
-      console.log("Excluindo conexão entre posts localmente em ambiente de preview")
-      localConnections = localConnections.filter((c) => !(c.source === sourceId && c.target === targetId))
-      return true
-    }
-
-    // Verificar se o cliente Supabase está disponível
-    if (!adminSupabase) {
-      console.error("Cliente Supabase não disponível")
-      localConnections = localConnections.filter((c) => !(c.source === sourceId && c.target === targetId))
-      return true
-    }
-
-    const { error } = await adminSupabase.from("smp_connections").delete().eq("source", sourceId).eq("target", targetId)
-
-    if (error) {
-      console.error("Erro ao excluir conexão entre posts:", error)
-      localConnections = localConnections.filter((c) => !(c.source === sourceId && c.target === targetId))
-      return true
-    }
-
-    return true
-  } catch (error) {
-    console.error("Erro ao excluir conexão entre posts:", error)
+    console.error("Erro ao atualizar posição do post:", error)
     return false
   }
 }

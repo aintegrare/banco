@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { PostsCanvas } from "@/components/smp/posts-canvas"
 import ChatInterface from "@/components/smp/chat-interface"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -9,12 +9,32 @@ import { TimelineView } from "@/components/smp/timeline-view"
 import ModulesTab from "@/components/smp/modules-tab"
 import AIModels from "@/components/smp/aimodels"
 import { Card } from "@/components/ui/card"
+import { loadUserPreference } from "@/lib/smp-service"
 
 export function SocialMediaPlatform() {
   const [activeTab, setActiveTab] = useState("posts")
-  const [selectedModule, setSelectedModule] = useState("assistant")
-  const [selectedModel, setSelectedModel] = useState("openai-gpt4o")
+  const [selectedModule, setSelectedModule] = useState("instagram")
+  const [selectedModel, setSelectedModel] = useState("instagram-feed")
   const [messages, setMessages] = useState([])
+
+  // Carregar preferências do usuário
+  useEffect(() => {
+    const loadPreferences = async () => {
+      try {
+        // Carregar módulo selecionado
+        const moduleId = await loadUserPreference("current_user", "selected_module", "instagram")
+        setSelectedModule(moduleId)
+
+        // Carregar modelo selecionado
+        const modelId = await loadUserPreference("current_user", "selected_model", "instagram-feed")
+        setSelectedModel(modelId)
+      } catch (error) {
+        console.error("Erro ao carregar preferências:", error)
+      }
+    }
+
+    loadPreferences()
+  }, [])
 
   return (
     <div className="container mx-auto p-6">
@@ -50,7 +70,7 @@ export function SocialMediaPlatform() {
 
                 <TabsContent value="posts" className="m-0 p-0">
                   <div className="h-[calc(100vh-240px)]">
-                    <PostsCanvas />
+                    <PostsCanvas selectedModule={selectedModule} selectedModel={selectedModel} />
                   </div>
                 </TabsContent>
 
@@ -92,18 +112,23 @@ export function SocialMediaPlatform() {
 
                 <TabsContent value="chat" className="m-0 p-0">
                   <div className="h-[calc(100vh-240px)] p-2 bg-white">
-                    <ChatInterface messages={messages} setMessages={setMessages} selectedModule={selectedModule} />
+                    <ChatInterface
+                      messages={messages}
+                      setMessages={setMessages}
+                      selectedModule={selectedModule}
+                      selectedModel={selectedModel}
+                    />
                   </div>
                 </TabsContent>
 
                 <TabsContent value="modules" className="m-0 p-0">
-                  <div className="h-[calc(100vh-240px)] p-2 bg-white">
+                  <div className="h-[calc(100vh-240px)] bg-white">
                     <ModulesTab selectedModule={selectedModule} setSelectedModule={setSelectedModule} />
                   </div>
                 </TabsContent>
 
                 <TabsContent value="models" className="m-0 p-0">
-                  <div className="h-[calc(100vh-240px)] p-2 bg-white">
+                  <div className="h-[calc(100vh-240px)] bg-white">
                     <AIModels selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
                   </div>
                 </TabsContent>
