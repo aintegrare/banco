@@ -2,13 +2,28 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
-import { Plus, X, Link, Edit, Trash, Hash, Loader2 } from "lucide-react"
+import {
+  Plus,
+  X,
+  Link,
+  Edit,
+  Trash,
+  Hash,
+  Loader2,
+  Calendar,
+  ImageIcon,
+  Download,
+  FileText,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -21,6 +36,11 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toast } from "@/components/ui/use-toast"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import {
   type SMPPost,
   type SMPConnection,
@@ -31,6 +51,8 @@ import {
   deletePost,
   createConnection,
   updatePostPosition,
+  uploadPostImage,
+  exportPostsReport,
 } from "@/lib/smp-service"
 
 export function PostsCanvas() {
@@ -38,6 +60,7 @@ export function PostsCanvas() {
   const [connections, setConnections] = useState<SMPConnection[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const [dragging, setDragging] = useState<string | null>(null)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
@@ -45,14 +68,21 @@ export function PostsCanvas() {
   const [isEditing, setIsEditing] = useState<string | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
   const [connectingSource, setConnectingSource] = useState<string | null>(null)
+  const [showExportDialog, setShowExportDialog] = useState(false)
+  const [exportFormat, setExportFormat] = useState<"pdf" | "json" | "csv">("pdf")
+
   const [newPost, setNewPost] = useState<Omit<SMPPost, "id" | "position">>({
     title: "",
     caption: "",
     hashtags: [],
     theme: "",
     type: "PLM",
+    status: "draft",
   })
   const [newHashtag, setNewHashtag] = useState("")
+  const [date, setDate] = useState<Date | undefined>(undefined)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Carregar posts e conexões ao iniciar
   useEffect(() => {
@@ -67,7 +97,7 @@ export function PostsCanvas() {
         console.error("Erro ao carregar dados do SMP:", error)
         toast({
           title: "Erro ao carregar dados",
-          description: "Não foi possível carregar os posts e conexões. Verifique a conexão com o Supabase.",
+          description: "Não foi possível carregar os posts e conexões.",
           variant: "destructive",
         })
       } finally {
@@ -76,7 +106,7 @@ export function PostsCanvas() {
     }
 
     loadData()
-  }, [toast])
+  }, [])
 
   const handleMouseDown = (e: React.MouseEvent, id: string) => {
     if (isConnecting) {
@@ -150,6 +180,7 @@ export function PostsCanvas() {
       const newPostData = {
         ...newPost,
         position: { x: 200, y: 200 },
+        scheduledDate: date ? date.toISOString() : undefined,
       }
 
       const createdPost = await createPost(newPostData)
@@ -176,7 +207,10 @@ export function PostsCanvas() {
         hashtags: [],
         theme: "",
         type: "PLM",
+        status: "draft",
       })
+      setDate(undefined)
+      setImagePreview(null)
       setIsCreating(false)
     }
   }
@@ -190,6 +224,7 @@ export function PostsCanvas() {
           const updatedPost = {
             ...postToUpdate,
             ...newPost,
+            scheduledDate: date ? date.toISOString() : undefined,
           }
 
           const success = await updatePost(updatedPost)
@@ -218,7 +253,10 @@ export function PostsCanvas() {
           hashtags: [],
           theme: "",
           type: "PLM",
+          status: "draft",
         })
+        setDate(undefined)
+        setImagePreview(null)
       }
     }
   }
@@ -230,7 +268,18 @@ export function PostsCanvas() {
       hashtags: [...post.hashtags],
       theme: post.theme,
       type: post.type,
+      imageUrl: post.imageUrl,
+      status: post.status || "draft",
+      scheduledDate: post.scheduledDate,
     })
+
+    if (post.scheduledDate) {
+      setDate(new Date(post.scheduledDate))
+    } else {
+      setDate(undefined)
+    }
+
+    setImagePreview(post.imageUrl || null)
     setIsEditing(post.id)
   }
 
@@ -292,6 +341,94 @@ export function PostsCanvas() {
       ...newPost,
       hashtags: newPost.hashtags.filter((t) => t !== tag),
     })
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      // Criar preview local
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        setImagePreview(event.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+
+      // Simular upload para o servidor
+      const imageUrl = await uploadPostImage(file)
+
+      setNewPost({
+        ...newPost,
+        imageUrl,
+      })
+
+      toast({
+        title: "Imagem carregada",
+        description: "A imagem foi carregada com sucesso.",
+      })
+    } catch (error) {
+      console.error("Erro ao fazer upload da imagem:", error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível fazer upload da imagem. Tente novamente.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleExportReport = async () => {
+    setExporting(true)
+    try {
+      const downloadUrl = await exportPostsReport(exportFormat)
+
+      // Simular download
+      const link = document.createElement("a")
+      link.href = downloadUrl
+      link.download = `posts-report-${Date.now()}.${exportFormat}`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      setShowExportDialog(false)
+      toast({
+        title: "Relatório exportado",
+        description: `O relatório foi exportado com sucesso no formato ${exportFormat.toUpperCase()}.`,
+      })
+    } catch (error) {
+      console.error("Erro ao exportar relatório:", error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível exportar o relatório. Tente novamente.",
+        variant: "destructive",
+      })
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const getStatusIcon = (status?: string) => {
+    switch (status) {
+      case "published":
+        return <CheckCircle2 className="h-4 w-4 text-green-500" />
+      case "scheduled":
+        return <Clock className="h-4 w-4 text-amber-500" />
+      case "draft":
+      default:
+        return <AlertCircle className="h-4 w-4 text-gray-400" />
+    }
+  }
+
+  const getStatusLabel = (status?: string) => {
+    switch (status) {
+      case "published":
+        return "Publicado"
+      case "scheduled":
+        return "Agendado"
+      case "draft":
+      default:
+        return "Rascunho"
+    }
   }
 
   if (loading) {
@@ -372,7 +509,7 @@ export function PostsCanvas() {
           style={{
             left: post.position.x,
             top: post.position.y,
-            width: 300,
+            width: 300, // Tamanho padrão para todos os cards
           }}
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -399,22 +536,61 @@ export function PostsCanvas() {
                 <Badge variant={post.type === "PLM" ? "default" : "secondary"}>{post.type}</Badge>
               </div>
             </CardHeader>
+
+            {post.imageUrl && (
+              <div className="px-4 pb-2">
+                <div className="relative w-full h-32 rounded-md overflow-hidden">
+                  <img
+                    src={post.imageUrl || "/placeholder.svg"}
+                    alt={post.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            )}
+
             <CardContent className="pb-2">
-              <p className="text-sm text-gray-700">{post.caption}</p>
+              <p className="text-sm text-gray-700 line-clamp-3">{post.caption}</p>
               <div className="flex flex-wrap gap-1 mt-2">
-                {post.hashtags.map((tag) => (
+                {post.hashtags.slice(0, 3).map((tag) => (
                   <Badge key={tag} variant="outline" className="text-xs">
                     #{tag}
                   </Badge>
                 ))}
+                {post.hashtags.length > 3 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{post.hashtags.length - 3}
+                  </Badge>
+                )}
               </div>
             </CardContent>
+
+            <CardFooter className="pt-0 pb-2 px-4 flex justify-between items-center">
+              <div className="flex items-center gap-1 text-xs text-gray-500">
+                {getStatusIcon(post.status)}
+                <span>{getStatusLabel(post.status)}</span>
+              </div>
+
+              {post.scheduledDate && (
+                <div className="flex items-center gap-1 text-xs text-gray-500">
+                  <Calendar className="h-3 w-3" />
+                  <span>{format(new Date(post.scheduledDate), "dd/MM/yyyy")}</span>
+                </div>
+              )}
+            </CardFooter>
           </Card>
         </motion.div>
       ))}
 
       {/* Floating action buttons */}
       <div className="absolute bottom-4 right-4 flex flex-col gap-2">
+        <Button
+          className="rounded-full w-12 h-12 shadow-lg"
+          onClick={() => setShowExportDialog(true)}
+          variant="secondary"
+        >
+          <Download className="h-5 w-5" />
+        </Button>
         <Button
           className="rounded-full w-12 h-12 shadow-lg"
           onClick={() => {
@@ -433,9 +609,16 @@ export function PostsCanvas() {
       {/* Create/Edit Post Dialog */}
       <Dialog
         open={isCreating || isEditing !== null}
-        onOpenChange={(open) => !open && (setIsCreating(false), setIsEditing(null))}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsCreating(false)
+            setIsEditing(null)
+            setImagePreview(null)
+            setDate(undefined)
+          }
+        }}
       >
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>{isEditing ? "Editar Post" : "Criar Novo Post"}</DialogTitle>
             <DialogDescription>
@@ -443,15 +626,27 @@ export function PostsCanvas() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="title">Título</Label>
-              <Input
-                id="title"
-                value={newPost.title}
-                onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-                placeholder="Título do post"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="title">Título</Label>
+                <Input
+                  id="title"
+                  value={newPost.title}
+                  onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
+                  placeholder="Título do post"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="theme">Tema</Label>
+                <Input
+                  id="theme"
+                  value={newPost.theme}
+                  onChange={(e) => setNewPost({ ...newPost, theme: e.target.value })}
+                  placeholder="Tema do post"
+                />
+              </div>
             </div>
+
             <div className="grid gap-2">
               <Label htmlFor="caption">Legenda</Label>
               <Textarea
@@ -462,32 +657,111 @@ export function PostsCanvas() {
                 rows={3}
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="theme">Tema</Label>
-              <Input
-                id="theme"
-                value={newPost.theme}
-                onChange={(e) => setNewPost({ ...newPost, theme: e.target.value })}
-                placeholder="Tema do post"
-              />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Tipo</Label>
+                <RadioGroup
+                  value={newPost.type}
+                  onValueChange={(value) => setNewPost({ ...newPost, type: value as "PLM" | "PLC" })}
+                  className="flex space-x-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="PLM" id="plm" />
+                    <Label htmlFor="plm">Planejamento (PLM)</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="PLC" id="plc" />
+                    <Label htmlFor="plc">Campanha (PLC)</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Status</Label>
+                <Select
+                  value={newPost.status}
+                  onValueChange={(value) =>
+                    setNewPost({ ...newPost, status: value as "draft" | "scheduled" | "published" })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Rascunho</SelectItem>
+                    <SelectItem value="scheduled">Agendado</SelectItem>
+                    <SelectItem value="published">Publicado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
+            {newPost.status === "scheduled" && (
+              <div className="grid gap-2">
+                <Label>Data de Agendamento</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="justify-start text-left font-normal">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {date ? format(date, "PPP", { locale: ptBR }) : "Selecione uma data"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarComponent mode="single" selected={date} onSelect={setDate} initialFocus locale={ptBR} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
             <div className="grid gap-2">
-              <Label>Tipo</Label>
-              <RadioGroup
-                value={newPost.type}
-                onValueChange={(value) => setNewPost({ ...newPost, type: value as "PLM" | "PLC" })}
-                className="flex space-x-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="PLM" id="plm" />
-                  <Label htmlFor="plm">Planejamento (PLM)</Label>
+              <Label>Imagem</Label>
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex-1"
+                  >
+                    <ImageIcon className="h-4 w-4 mr-2" />
+                    {imagePreview ? "Trocar imagem" : "Selecionar imagem"}
+                  </Button>
+                  {imagePreview && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setImagePreview(null)
+                        setNewPost({ ...newPost, imageUrl: undefined })
+                        if (fileInputRef.current) fileInputRef.current.value = ""
+                      }}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Remover
+                    </Button>
+                  )}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                  />
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="PLC" id="plc" />
-                  <Label htmlFor="plc">Campanha (PLC)</Label>
-                </div>
-              </RadioGroup>
+
+                {imagePreview && (
+                  <div className="relative w-full h-40 rounded-md overflow-hidden border border-gray-200">
+                    <img
+                      src={imagePreview || "/placeholder.svg"}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
+
             <div className="grid gap-2">
               <Label>Hashtags</Label>
               <div className="flex gap-2">
@@ -534,6 +808,58 @@ export function PostsCanvas() {
                 "Salvar Alterações"
               ) : (
                 "Criar Post"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export Dialog */}
+      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Exportar Relatório</DialogTitle>
+            <DialogDescription>Escolha o formato para exportar o relatório de posts</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Formato</Label>
+              <Select value={exportFormat} onValueChange={(value) => setExportFormat(value as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o formato" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pdf">
+                    <div className="flex items-center">
+                      <FileText className="h-4 w-4 mr-2" />
+                      PDF
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="json">
+                    <div className="flex items-center">
+                      <FileText className="h-4 w-4 mr-2" />
+                      JSON
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="csv">
+                    <div className="flex items-center">
+                      <FileText className="h-4 w-4 mr-2" />
+                      CSV
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleExportReport} disabled={exporting}>
+              {exporting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Exportando...
+                </>
+              ) : (
+                "Exportar"
               )}
             </Button>
           </DialogFooter>

@@ -7,6 +7,9 @@ export interface SMPPost {
   theme: string
   type: "PLM" | "PLC"
   position: { x: number; y: number }
+  imageUrl?: string // Campo para armazenar a URL da imagem
+  status?: "draft" | "scheduled" | "published" // Status do post
+  scheduledDate?: string // Data de agendamento
 }
 
 export interface SMPConnection {
@@ -381,7 +384,7 @@ export async function loadUserPreference(userId: string, key: string, defaultVal
 // Funções para posts e conexões
 export async function loadPosts(): Promise<SMPPost[]> {
   try {
-    // Dados de exemplo
+    // Dados de exemplo com imagens
     return [
       {
         id: "post1",
@@ -391,6 +394,8 @@ export async function loadPosts(): Promise<SMPPost[]> {
         theme: "Produto",
         type: "PLM",
         position: { x: 100, y: 100 },
+        imageUrl: "/product-launch-excitement.png",
+        status: "draft",
       },
       {
         id: "post2",
@@ -400,6 +405,9 @@ export async function loadPosts(): Promise<SMPPost[]> {
         theme: "Promoção",
         type: "PLC",
         position: { x: 400, y: 300 },
+        imageUrl: "/summer-sale-display.png",
+        status: "scheduled",
+        scheduledDate: "2023-12-15T10:00:00",
       },
     ]
   } catch (error) {
@@ -475,5 +483,32 @@ export async function updatePostPosition(postId: string, position: { x: number; 
   } catch (error) {
     console.error("Erro ao atualizar posição do post:", error)
     return false
+  }
+}
+
+// Função para exportar posts como relatório
+export async function exportPostsReport(format: "pdf" | "json" | "csv" = "pdf"): Promise<string> {
+  try {
+    const posts = await loadPosts()
+    console.log(`Exportando posts em formato ${format}`)
+
+    // Simulação de URL de download
+    return `/api/export/posts?format=${format}&timestamp=${Date.now()}`
+  } catch (error) {
+    console.error("Erro ao exportar posts:", error)
+    throw new Error("Não foi possível exportar os posts")
+  }
+}
+
+// Função para simular upload de imagem
+export async function uploadPostImage(file: File): Promise<string> {
+  try {
+    console.log(`Simulando upload de imagem: ${file.name}`)
+
+    // Simulação de URL de imagem
+    return `/placeholder.svg?height=300&width=400&query=${encodeURIComponent(file.name.replace(/\.[^/.]+$/, ""))}`
+  } catch (error) {
+    console.error("Erro ao fazer upload de imagem:", error)
+    throw new Error("Não foi possível fazer upload da imagem")
   }
 }
