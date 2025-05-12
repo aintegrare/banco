@@ -2,115 +2,283 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
-import { Play, Pause, SkipBack } from "lucide-react"
+import { Instagram, Facebook, Twitter, Calendar, ChevronLeft, ChevronRight } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-interface TimelineEvent {
+interface SocialMediaPost {
   id: string
-  name: string
-  startTime: number
-  duration: number
+  title: string
+  platform: "instagram" | "facebook" | "twitter" | "linkedin"
+  type: "image" | "video" | "carousel" | "text"
+  date: Date
+  status: "draft" | "scheduled" | "published"
   color: string
   track: number
 }
 
 export function TimelineView() {
-  const [currentTime, setCurrentTime] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [events] = useState<TimelineEvent[]>([
-    { id: "1", name: "Motion Detected", startTime: 0, duration: 0.5, color: "#4b7bb5", track: 0 },
-    { id: "2", name: "Snapshot Camera", startTime: 0.5, duration: 2, color: "#527eb7", track: 1 },
-    { id: "3", name: "Turn On Lights", startTime: 0.5, duration: 1, color: "#3d649e", track: 2 },
-    { id: "4", name: "Analyze Person", startTime: 2.5, duration: 3, color: "#4072b0", track: 1 },
-    { id: "5", name: "Send Notification", startTime: 5.5, duration: 1, color: "#6b91c1", track: 3 },
-  ])
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [viewMode, setViewMode] = useState<"week" | "month">("week")
+  const [filter, setFilter] = useState<string | null>(null)
 
-  const totalDuration = 10 // seconds
-  const trackHeight = 40
-  const trackCount = 4
+  // Gerar posts para a semana atual
+  const generatePosts = (): SocialMediaPost[] => {
+    const posts: SocialMediaPost[] = []
+    const startDate = new Date(currentDate)
+    startDate.setDate(startDate.getDate() - startDate.getDay()) // Início da semana (domingo)
 
-  const togglePlayback = () => {
-    setIsPlaying(!isPlaying)
+    // Instagram posts
+    posts.push({
+      id: "1",
+      title: "Post de Produto",
+      platform: "instagram",
+      type: "image",
+      date: new Date(startDate.getTime() + 1 * 24 * 60 * 60 * 1000), // Segunda
+      status: "published",
+      color: "#E1306C",
+      track: 0,
+    })
+
+    posts.push({
+      id: "2",
+      title: "Reels Tutorial",
+      platform: "instagram",
+      type: "video",
+      date: new Date(startDate.getTime() + 3 * 24 * 60 * 60 * 1000), // Quarta
+      status: "scheduled",
+      color: "#E1306C",
+      track: 0,
+    })
+
+    // Facebook posts
+    posts.push({
+      id: "3",
+      title: "Artigo do Blog",
+      platform: "facebook",
+      type: "text",
+      date: new Date(startDate.getTime() + 2 * 24 * 60 * 60 * 1000), // Terça
+      status: "published",
+      color: "#4267B2",
+      track: 1,
+    })
+
+    posts.push({
+      id: "4",
+      title: "Carrossel de Produtos",
+      platform: "facebook",
+      type: "carousel",
+      date: new Date(startDate.getTime() + 4 * 24 * 60 * 60 * 1000), // Quinta
+      status: "draft",
+      color: "#4267B2",
+      track: 1,
+    })
+
+    // Twitter posts
+    posts.push({
+      id: "5",
+      title: "Novidades do Setor",
+      platform: "twitter",
+      type: "text",
+      date: new Date(startDate.getTime() + 2 * 24 * 60 * 60 * 1000), // Terça
+      status: "published",
+      color: "#1DA1F2",
+      track: 2,
+    })
+
+    posts.push({
+      id: "6",
+      title: "Thread Educativa",
+      platform: "twitter",
+      type: "text",
+      date: new Date(startDate.getTime() + 5 * 24 * 60 * 60 * 1000), // Sexta
+      status: "scheduled",
+      color: "#1DA1F2",
+      track: 2,
+    })
+
+    return posts
   }
 
-  const resetPlayback = () => {
-    setCurrentTime(0)
-    setIsPlaying(false)
+  const [posts] = useState<SocialMediaPost[]>(generatePosts())
+
+  const filteredPosts = filter ? posts.filter((post) => post.platform === filter) : posts
+
+  const getPlatformIcon = (platform: string) => {
+    switch (platform) {
+      case "instagram":
+        return <Instagram size={16} />
+      case "facebook":
+        return <Facebook size={16} />
+      case "twitter":
+        return <Twitter size={16} />
+      default:
+        return null
+    }
   }
 
-  const timeToPosition = (time: number) => {
-    return (time / totalDuration) * 100
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "published":
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Publicado</Badge>
+      case "scheduled":
+        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Agendado</Badge>
+      case "draft":
+        return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">Rascunho</Badge>
+      default:
+        return null
+    }
   }
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString("pt-BR", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+    })
+  }
+
+  const getDayOfWeek = (dayIndex: number) => {
+    const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
+    return days[dayIndex]
+  }
+
+  const navigatePrevious = () => {
+    const newDate = new Date(currentDate)
+    if (viewMode === "week") {
+      newDate.setDate(newDate.getDate() - 7)
+    } else {
+      newDate.setMonth(newDate.getMonth() - 1)
+    }
+    setCurrentDate(newDate)
+  }
+
+  const navigateNext = () => {
+    const newDate = new Date(currentDate)
+    if (viewMode === "week") {
+      newDate.setDate(newDate.getDate() + 7)
+    } else {
+      newDate.setMonth(newDate.getMonth() + 1)
+    }
+    setCurrentDate(newDate)
+  }
+
+  const startOfWeek = new Date(currentDate)
+  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
+
+  const endOfWeek = new Date(startOfWeek)
+  endOfWeek.setDate(endOfWeek.getDate() + 6)
+
+  const dateRangeText =
+    viewMode === "week"
+      ? `${startOfWeek.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} - ${endOfWeek.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`
+      : currentDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
 
   return (
     <div className="h-full flex flex-col bg-white p-4">
-      <div className="flex-1 relative">
-        {/* Time markers */}
-        <div className="absolute top-0 left-0 right-0 h-6 flex">
-          {Array.from({ length: totalDuration + 1 }).map((_, i) => (
-            <div key={i} className="relative flex-1">
-              <div className="absolute top-0 h-3 w-px bg-gray-300"></div>
-              <div className="absolute top-4 text-xs text-gray-500">{i}s</div>
-            </div>
-          ))}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Calendar size={20} className="text-gray-500" />
+          <h2 className="text-lg font-medium">Calendário de Publicações</h2>
         </div>
 
-        {/* Timeline tracks */}
-        <div className="mt-8">
-          {Array.from({ length: trackCount }).map((_, trackIndex) => (
-            <div key={trackIndex} className="relative h-10 mb-2 bg-gray-100 rounded">
-              {events
-                .filter((event) => event.track === trackIndex)
-                .map((event) => (
-                  <motion.div
-                    key={event.id}
-                    className="absolute h-full rounded flex items-center px-2 overflow-hidden text-white text-sm"
-                    style={{
-                      left: `${timeToPosition(event.startTime)}%`,
-                      width: `${timeToPosition(event.duration)}%`,
-                      backgroundColor: event.color,
-                    }}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: event.startTime * 0.1 }}
-                  >
-                    {event.name}
-                  </motion.div>
-                ))}
-            </div>
-          ))}
-        </div>
+        <div className="flex items-center gap-4">
+          <Select value={filter || "all"} onValueChange={(value) => setFilter(value === "all" ? null : value)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filtrar por plataforma" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as plataformas</SelectItem>
+              <SelectItem value="instagram">Instagram</SelectItem>
+              <SelectItem value="facebook">Facebook</SelectItem>
+              <SelectItem value="twitter">Twitter</SelectItem>
+            </SelectContent>
+          </Select>
 
-        {/* Current time indicator */}
-        <motion.div
-          className="absolute top-8 bottom-0 w-px bg-red-500 z-10"
-          style={{ left: `${timeToPosition(currentTime)}%` }}
-          animate={{ left: `${timeToPosition(currentTime)}%` }}
-          transition={{ duration: 0.1 }}
-        >
-          <div className="w-3 h-3 rounded-full bg-red-500 -translate-x-1/2"></div>
-        </motion.div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={navigatePrevious}>
+              <ChevronLeft size={16} />
+            </Button>
+            <span className="text-sm font-medium w-48 text-center">{dateRangeText}</span>
+            <Button variant="outline" size="icon" onClick={navigateNext}>
+              <ChevronRight size={16} />
+            </Button>
+          </div>
+
+          <Select value={viewMode} onValueChange={(value: "week" | "month") => setViewMode(value)}>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="Visualização" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week">Semana</SelectItem>
+              <SelectItem value="month">Mês</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="h-16 flex items-center space-x-4">
-        <Button variant="outline" size="icon" onClick={resetPlayback}>
-          <SkipBack className="h-4 w-4" />
-        </Button>
-        <Button variant="outline" size="icon" onClick={togglePlayback}>
-          {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-        </Button>
-        <div className="flex-1">
-          <Slider
-            value={[currentTime]}
-            min={0}
-            max={totalDuration}
-            step={0.1}
-            onValueChange={(value) => setCurrentTime(value[0])}
-          />
+      <div className="flex-1 relative border border-gray-200 rounded-lg overflow-hidden">
+        {/* Dias da semana */}
+        <div className="grid grid-cols-7 border-b border-gray-200">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="p-2 text-center border-r border-gray-200 last:border-r-0 bg-gray-50">
+              <div className="text-sm font-medium text-gray-700">{getDayOfWeek(i)}</div>
+            </div>
+          ))}
         </div>
-        <div className="text-sm tabular-nums">
-          {currentTime.toFixed(1)}s / {totalDuration.toFixed(1)}s
+
+        {/* Plataformas */}
+        <div className="grid grid-cols-7 h-full">
+          {Array.from({ length: 7 }).map((_, dayIndex) => {
+            const currentDay = new Date(startOfWeek)
+            currentDay.setDate(currentDay.getDate() + dayIndex)
+
+            const dayPosts = filteredPosts.filter((post) => {
+              const postDate = new Date(post.date)
+              return (
+                postDate.getDate() === currentDay.getDate() &&
+                postDate.getMonth() === currentDay.getMonth() &&
+                postDate.getFullYear() === currentDay.getFullYear()
+              )
+            })
+
+            return (
+              <div
+                key={dayIndex}
+                className={`border-r border-gray-200 last:border-r-0 p-2 ${
+                  currentDay.toDateString() === new Date().toDateString() ? "bg-blue-50" : ""
+                }`}
+              >
+                <div className="text-xs text-gray-500 mb-2">{currentDay.getDate()}</div>
+
+                <div className="space-y-2">
+                  {dayPosts.map((post) => (
+                    <motion.div
+                      key={post.id}
+                      className="p-2 rounded-md shadow-sm cursor-pointer"
+                      style={{ backgroundColor: `${post.color}15`, borderLeft: `3px solid ${post.color}` }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs" style={{ color: post.color }}>
+                            {getPlatformIcon(post.platform)}
+                          </span>
+                          <span className="text-xs font-medium">{post.title}</span>
+                        </div>
+                        {getStatusBadge(post.status)}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {post.type.charAt(0).toUpperCase() + post.type.slice(1)}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>

@@ -1,7 +1,9 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Bot, Clock, AlertCircle } from "lucide-react"
+import { Instagram, Facebook, Twitter, Linkedin, Youtube } from "lucide-react"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 
 export default function ModulesTab({
   selectedModule,
@@ -10,46 +12,94 @@ export default function ModulesTab({
   selectedModule: string
   setSelectedModule: (id: string) => void
 }) {
+  const modules = [
+    {
+      id: "instagram",
+      name: "Instagram",
+      description: "Planejamento e gestão de conteúdo para Instagram",
+      icon: <Instagram size={24} className="text-[#4b7bb5]" />,
+      status: "active",
+    },
+    {
+      id: "facebook",
+      name: "Facebook",
+      description: "Estratégias para engajamento no Facebook",
+      icon: <Facebook size={24} className="text-[#4b7bb5]" />,
+      status: "active",
+    },
+    {
+      id: "twitter",
+      name: "Twitter",
+      description: "Gestão de campanhas no Twitter",
+      icon: <Twitter size={24} className="text-[#4b7bb5]" />,
+      status: "coming-soon",
+    },
+    {
+      id: "linkedin",
+      name: "LinkedIn",
+      description: "Conteúdo corporativo para LinkedIn",
+      icon: <Linkedin size={24} className="text-[#4b7bb5]" />,
+      status: "coming-soon",
+    },
+    {
+      id: "youtube",
+      name: "YouTube",
+      description: "Estratégia de conteúdo em vídeo",
+      icon: <Youtube size={24} className="text-[#4b7bb5]" />,
+      status: "coming-soon",
+    },
+  ]
+
   return (
-    <div className="bg-chat-bg rounded-xl flex flex-col h-full overflow-hidden">
-      <div className="p-4 flex-shrink-0">
+    <div className="bg-white rounded-lg border border-gray-200 flex flex-col h-full overflow-hidden">
+      <div className="p-4 flex-shrink-0 border-b border-gray-200">
         <motion.div
           className="flex items-center justify-between mb-4"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          <h2 className="text-lg font-medium">Módulos</h2>
+          <h2 className="text-lg font-medium text-gray-800">Módulos de Mídia Social</h2>
         </motion.div>
       </div>
 
-      <div className="flex-grow overflow-y-auto scrollbar-hide">
-        <div className="p-4 flex flex-col items-center justify-center h-full">
-          <motion.div
-            className="text-center py-12"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="mx-auto w-16 h-16 bg-neutral-800 rounded-full mb-4 flex items-center justify-center">
-              <Bot size={24} className="text-neutral-400" />
-            </div>
-            <h3 className="text-xl font-medium mb-2">Módulos Em Breve</h3>
-            <p className="text-neutral-400 max-w-sm mx-auto mb-6">
-              Esta seção está atualmente em desenvolvimento. Volte mais tarde para módulos disponíveis.
-            </p>
-
-            <div className="flex flex-col gap-3 max-w-xs mx-auto">
-              <div className="p-3 bg-neutral-800 rounded-lg flex items-center">
-                <Clock size={18} className="mr-2 text-primary" />
-                <span className="text-sm">Desenvolvimento em andamento</span>
-              </div>
-              <div className="p-3 bg-neutral-800 rounded-lg flex items-center">
-                <AlertCircle size={18} className="mr-2 text-yellow-500" />
-                <span className="text-sm">Volte em breve para atualizações</span>
-              </div>
-            </div>
-          </motion.div>
+      <div className="flex-grow overflow-y-auto p-4">
+        <div className="grid gap-4">
+          {modules.map((module) => (
+            <Card
+              key={module.id}
+              className={`cursor-pointer transition-all ${
+                selectedModule === module.id ? "border-[#4b7bb5] shadow-md" : "hover:border-gray-300"
+              }`}
+              onClick={() => module.status === "active" && setSelectedModule(module.id)}
+            >
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {module.icon}
+                    <CardTitle className="text-base">{module.name}</CardTitle>
+                  </div>
+                  {module.status === "coming-soon" && (
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">Em breve</span>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <CardDescription>{module.description}</CardDescription>
+              </CardContent>
+              {module.status === "active" && (
+                <CardFooter className="pt-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-[#4b7bb5] border-[#4b7bb5] hover:bg-[#4b7bb5] hover:text-white"
+                  >
+                    Selecionar
+                  </Button>
+                </CardFooter>
+              )}
+            </Card>
+          ))}
         </div>
       </div>
     </div>
