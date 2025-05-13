@@ -247,30 +247,24 @@ export function FileRow({
           {/* Botões de ação rápida */}
           <div className="flex items-center justify-end space-x-1">
             {file.type === "file" && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  window.open(file.url, "_blank")
-                }}
-                className="h-8 w-8"
-                title="Abrir"
-              >
-                <ExternalLink size={16} className="text-blue-500" />
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    window.open(file.url, "_blank")
+                  }}
+                  className="h-8 w-8"
+                >
+                  <ExternalLink size={16} className="text-blue-500" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={handleShare} className="h-8 w-8">
+                  <Share2 size={16} className="text-purple-500" />
+                </Button>
+              </>
             )}
-            {/* Botão de compartilhamento - AGORA DISPONÍVEL PARA TODOS OS TIPOS */}
-            <Button variant="ghost" size="icon" onClick={handleShare} className="h-8 w-8" title="Compartilhar">
-              <Share2 size={16} className="text-purple-500" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleToggleFavorite}
-              className="h-8 w-8"
-              title={file.isFavorite ? "Remover favorito" : "Favoritar"}
-            >
+            <Button variant="ghost" size="icon" onClick={handleToggleFavorite} className="h-8 w-8">
               {file.isFavorite ? (
                 <StarOff size={16} className="text-amber-500" />
               ) : (
@@ -279,7 +273,7 @@ export function FileRow({
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" title="Mais opções">
+                <Button variant="ghost" size="icon" className="h-8 w-8">
                   <MoreVertical size={16} />
                 </Button>
               </DropdownMenuTrigger>

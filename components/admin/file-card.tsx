@@ -22,9 +22,6 @@ import {
   ExternalLink,
   Loader2,
   Check,
-  MoveIcon,
-  Clock,
-  RefreshCw,
 } from "lucide-react"
 import { useState } from "react"
 import { RenameWarningDialog } from "./rename-warning-dialog"
@@ -33,11 +30,8 @@ import { ToastNotification } from "./toast-notification"
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
-import { DocumentPreview } from "./document-preview"
-
-// Adicionar estas importações no início do arquivo
-import { checkCacheStatus, purgeBunnyCache } from "@/lib/bunny"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+// Adicionar importação para o badge de tarefas
+import { FolderTaskBadge } from "./folder-task-badge"
 
 // Modificar a interface FileCardProps para incluir a contagem de tarefas
 interface FileCardProps {
@@ -62,7 +56,6 @@ interface FileCardProps {
   taskCount?: number
   overdueCount?: number
   onOpenTasks?: () => void
-  onMove?: () => void
 }
 
 export function FileCard({
@@ -77,7 +70,6 @@ export function FileCard({
   taskCount,
   overdueCount,
   onOpenTasks,
-  onMove,
 }: FileCardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
@@ -94,12 +86,6 @@ export function FileCard({
     type: "success",
   })
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
-  const [showDocumentPreview, setShowDocumentPreview] = useState(false)
-
-  // Adicionar estes estados dentro da função FileCard
-  const [isCached, setIsCached] = useState<boolean | null>(null)
-  const [isCheckingCache, setIsCheckingCache] = useState(false)
-  const [isPurgingCache, setIsPurgingCache] = useState(false)
 
   // Função para formatar bytes em unidades legíveis
   const formatBytes = (bytes = 0) => {
@@ -135,28 +121,6 @@ export function FileCard({
     }
   }
 
-  // Função para obter o tempo relativo (ex: "há 23 horas")
-  const getRelativeTime = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-
-    const diffSecs = Math.floor(diffMs / 1000)
-    const diffMins = Math.floor(diffSecs / 60)
-    const diffHours = Math.floor(diffMins / 60)
-    const diffDays = Math.floor(diffHours / 24)
-
-    if (diffDays > 0) {
-      return `há ${diffDays} ${diffDays === 1 ? "dia" : "dias"}`
-    } else if (diffHours > 0) {
-      return `há ${diffHours} ${diffHours === 1 ? "hora" : "horas"}`
-    } else if (diffMins > 0) {
-      return `há ${diffMins} ${diffMins === 1 ? "minuto" : "minutos"}`
-    } else {
-      return "agora mesmo"
-    }
-  }
-
   const handleClick = () => {
     if (onToggleSelect) {
       onToggleSelect()
@@ -169,8 +133,6 @@ export function FileCard({
       // Para imagens, mostrar preview
       if (isImage()) {
         setShowPreview(true)
-      } else if (isPdf()) {
-        setShowDocumentPreview(true)
       } else {
         // Para outros arquivos, abrir
         if (file.url) {
@@ -188,11 +150,6 @@ export function FileCard({
   const isImage = () => {
     const fileType = file.fileType?.toLowerCase() || ""
     return ["jpg", "jpeg", "png", "gif", "webp"].includes(fileType)
-  }
-
-  const isPdf = () => {
-    const fileType = file.fileType?.toLowerCase() || ""
-    return fileType === "pdf"
   }
 
   // Função para compartilhar arquivo ou pasta
@@ -315,99 +272,10 @@ export function FileCard({
     }
   }
 
-  // Truncar o nome do arquivo se for muito longo
-  const truncateFileName = (name: string, maxLength = 25) => {
-    if (name.length <= maxLength) return name
-
-    const extension = name.split(".").pop() || ""
-    const nameWithoutExt = name.substring(0, name.length - extension.length - 1)
-
-    if (nameWithoutExt.length <= maxLength - 3) return name
-
-    return `${nameWithoutExt.substring(0, maxLength - 3)}...${extension ? "." + extension : ""}`
-  }
-
-  // Adicionar esta função dentro do componente FileCard
-  const checkCache = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!file.url) return
-
-    setIsCheckingCache(true)
-    try {
-      const status = await checkCacheStatus(file.url)
-      setIsCached(status.cached)
-
-      // Mostrar toast com o status
-      setToast({
-        visible: true,
-        message: status.cached
-          ? `Arquivo em cache. Idade: ${status.age ? Math.floor(status.age / 60) + " minutos" : "desconhecida"}`
-          : "Arquivo não está em cache",
-        type: "success",
-      })
-    } catch (error) {
-      console.error("Erro ao verificar cache:", error)
-      setToast({
-        visible: true,
-        message: "Erro ao verificar status de cache",
-        type: "error",
-      })
-    } finally {
-      setIsCheckingCache(false)
-    }
-  }
-
-  // Adicionar esta função dentro do componente FileCard
-  const purgeCache = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!file.url) return
-
-    if (!confirm("Tem certeza que deseja purgar o cache deste arquivo?")) {
-      return
-    }
-
-    setIsPurgingCache(true)
-    try {
-      // Extrair o caminho da URL
-      let path = file.path
-
-      if (file.url.startsWith("http")) {
-        try {
-          const url = new URL(file.url)
-          path = url.pathname.replace(/^\//, "")
-        } catch (e) {
-          throw new Error("URL inválida")
-        }
-      }
-
-      const success = await purgeBunnyCache(path)
-
-      if (success) {
-        setIsCached(false)
-        setToast({
-          visible: true,
-          message: "Cache purgado com sucesso",
-          type: "success",
-        })
-      } else {
-        throw new Error("Falha ao purgar cache")
-      }
-    } catch (error) {
-      console.error("Erro ao purgar cache:", error)
-      setToast({
-        visible: true,
-        message: "Erro ao purgar cache",
-        type: "error",
-      })
-    } finally {
-      setIsPurgingCache(false)
-    }
-  }
-
   return (
     <>
       <div
-        className={`bg-gray-100 rounded-lg border ${
+        className={`bg-white rounded-lg border ${
           isSelected ? "border-[#4b7bb5] bg-blue-50" : "border-gray-200"
         } overflow-hidden hover:shadow-md transition-all cursor-pointer relative group`}
         onClick={handleClick}
@@ -418,11 +286,9 @@ export function FileCard({
         {onToggleSelect && (
           <div className="absolute top-2 left-2 z-10">
             <div
-              className={`w-5 h-5 rounded-md flex items-center justify-center transition-all duration-200 ${
-                isSelected
-                  ? "bg-[#4b7bb5] border-[#4b7bb5] text-white scale-110 shadow-md"
-                  : "bg-white/80 border border-gray-300 hover:border-[#4b7bb5]"
-              }`}
+              className={`w-5 h-5 rounded-full border ${
+                isSelected ? "bg-[#4b7bb5] border-[#4b7bb5] text-white" : "bg-white border-gray-300"
+              } flex items-center justify-center`}
             >
               {isSelected && <Check className="h-3 w-3" />}
             </div>
@@ -436,15 +302,16 @@ export function FileCard({
           </div>
         )}
 
-        <div className="flex flex-col">
-          {/* Área de thumbnail */}
-          <div className="w-full h-40 overflow-hidden bg-white flex items-center justify-center">
-            {isImage() && file.url ? (
+        <div className="p-4 flex flex-col items-center">
+          {/* Mostrar thumbnail para imagens */}
+          {isImage() && file.url ? (
+            <div className="w-full h-32 mb-2 overflow-hidden rounded-md bg-gray-50 flex items-center justify-center">
               <img
                 src={file.url || "/placeholder.svg"}
                 alt={file.name}
-                className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
+                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                 onError={(e) => {
+                  // Fallback para ícone se a imagem falhar
                   e.currentTarget.style.display = "none"
                   const iconContainer = e.currentTarget.parentElement
                   if (iconContainer) {
@@ -456,60 +323,26 @@ export function FileCard({
                   }
                 }}
               />
-            ) : isPdf() ? (
-              <div className="flex flex-col items-center justify-center">
-                <div className="w-10 h-10 bg-red-500 rounded-md flex items-center justify-center mb-2">
-                  <FileText className="h-6 w-6 text-white" />
-                </div>
+            </div>
+          ) : (
+            <div className="w-16 h-16 flex items-center justify-center bg-gray-50 rounded-full mb-3 group-hover:bg-[#f0f4f9] transition-colors">
+              {getFileIcon()}
+            </div>
+          )}
+          <h3 className="mt-2 text-sm font-medium text-gray-700 text-center truncate w-full group-hover:text-[#4b7bb5] transition-colors">
+            {file.name}
+            {/* Adicionar o badge de tarefas no componente */}
+            {/* Localizar a div que contém o nome do arquivo (geralmente após o ícone) */}
+            {/* Adicionar após o nome do arquivo, dentro da mesma div */}
+            {file.type === "folder" && taskCount && taskCount > 0 && (
+              <div className="absolute top-1 right-1">
+                <FolderTaskBadge count={taskCount} overdueCount={overdueCount} />
               </div>
-            ) : file.type === "folder" ? (
-              <div className="flex flex-col items-center justify-center">
-                <Folder className="h-16 w-16 text-[#4b7bb5]" />
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center">{getFileIcon()}</div>
             )}
-          </div>
-
-          {/* Área de informações */}
-          <div className="p-3 bg-gray-200">
-            {/* Ícone de tipo de arquivo */}
-            <div className="flex items-center mb-1">
-              {isPdf() && (
-                <div className="w-6 h-6 bg-red-500 rounded-sm flex items-center justify-center mr-2">
-                  <FileText className="h-4 w-4 text-white" />
-                </div>
-              )}
-              <h3 className="text-sm font-medium text-gray-700 truncate">{truncateFileName(file.name)}</h3>
-            </div>
-            <div className="flex items-center text-xs text-gray-500">
-              <span>{isPdf() ? "PDF" : file.fileType?.toUpperCase() || "Arquivo"}</span>
-              <span className="mx-1">•</span>
-              <span>{getRelativeTime(file.modified)}</span>
-              {isCached !== null && (
-                <>
-                  <span className="mx-1">•</span>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className={`flex items-center ${isCached ? "text-green-500" : "text-gray-400"}`}>
-                          <Clock className="h-3 w-3 mr-0.5" />
-                          {isCached ? "Em cache" : "Sem cache"}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>
-                          {isCached
-                            ? "Este arquivo está armazenado em cache no CDN"
-                            : "Este arquivo não está em cache ou foi purgado"}
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </>
-              )}
-            </div>
-          </div>
+          </h3>
+          <p className="text-xs text-gray-500 mt-1">
+            {file.type === "folder" ? "Pasta" : file.size ? formatBytes(file.size) : ""}
+          </p>
         </div>
 
         {/* Overlay de ações para hover */}
@@ -529,18 +362,6 @@ export function FileCard({
                     <Eye size={18} />
                   </button>
                 )}
-                {isPdf() && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setShowDocumentPreview(true)
-                    }}
-                    className="p-2 bg-white rounded-full text-gray-700 hover:text-[#4b7bb5] transition-colors"
-                    title="Visualizar PDF"
-                  >
-                    <Eye size={18} />
-                  </button>
-                )}
                 <a
                   href={file.url}
                   target="_blank"
@@ -551,24 +372,24 @@ export function FileCard({
                 >
                   <ExternalLink size={18} />
                 </a>
+                {/* Botão de compartilhamento */}
+                <button
+                  onClick={handleShare}
+                  className="p-2 bg-white rounded-full text-gray-700 hover:text-purple-600 transition-colors"
+                  title="Compartilhar"
+                >
+                  <Share2 size={18} />
+                </button>
+                {/* Botão de favorito */}
+                <button
+                  onClick={handleToggleFavorite}
+                  className="p-2 bg-white rounded-full text-gray-700 hover:text-amber-500 transition-colors"
+                  title={file.isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                >
+                  {file.isFavorite ? <StarOff size={18} /> : <Star size={18} />}
+                </button>
               </>
             )}
-            {/* Botão de compartilhamento - AGORA DISPONÍVEL PARA TODOS OS TIPOS */}
-            <button
-              onClick={handleShare}
-              className="p-2 bg-white rounded-full text-gray-700 hover:text-purple-600 transition-colors"
-              title="Compartilhar"
-            >
-              <Share2 size={18} />
-            </button>
-            {/* Botão de favorito */}
-            <button
-              onClick={handleToggleFavorite}
-              className="p-2 bg-white rounded-full text-gray-700 hover:text-amber-500 transition-colors"
-              title={file.isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-            >
-              {file.isFavorite ? <StarOff size={18} /> : <Star size={18} />}
-            </button>
           </div>
         )}
 
@@ -585,24 +406,29 @@ export function FileCard({
         {/* Dropdown menu */}
         {showMenu && (
           <div
-            className="absolute bottom-10 right-2 bg-white rounded-md shadow-lg z-10 border border-gray-200 py-1 w-auto animate-fadeIn"
+            className="absolute bottom-10 right-2 bg-white rounded-md shadow-lg z-10 border border-gray-200 py-1 w-40 animate-fadeIn"
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
               onClick={handleToggleFavorite}
-              title={file.isFavorite ? "Remover favorito" : "Favoritar"}
             >
               {file.isFavorite ? (
-                <StarOff size={16} className="text-amber-500" />
+                <>
+                  <StarOff size={16} className="mr-2 text-amber-500" />
+                  <span>Remover favorito</span>
+                </>
               ) : (
-                <Star size={16} className="text-amber-500" />
+                <>
+                  <Star size={16} className="mr-2 text-amber-500" />
+                  <span>Favoritar</span>
+                </>
               )}
             </button>
             {file.type === "file" && (
               <>
                 <button
-                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
                   onClick={(e) => {
                     e.stopPropagation()
                     setShowMenu(false)
@@ -612,25 +438,12 @@ export function FileCard({
                       window.open(file.url, "_blank")
                     }
                   }}
-                  title="Visualizar"
                 >
-                  <Eye size={16} className="text-blue-500" />
+                  <Eye size={16} className="mr-2 text-blue-500" />
+                  <span>Visualizar</span>
                 </button>
-                {file.type === "file" && isPdf() && (
-                  <button
-                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setShowMenu(false)
-                      setShowDocumentPreview(true)
-                    }}
-                    title="Visualizar PDF"
-                  >
-                    <Eye className="h-4 w-4 text-blue-500" />
-                  </button>
-                )}
                 <button
-                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
                   onClick={(e) => {
                     e.stopPropagation()
                     if (file.url) {
@@ -643,33 +456,22 @@ export function FileCard({
                     }
                     setShowMenu(false)
                   }}
-                  title="Download"
                 >
-                  <Download size={16} className="text-green-500" />
+                  <Download size={16} className="mr-2 text-green-500" />
+                  <span>Download</span>
                 </button>
               </>
             )}
-            {/* Botão de compartilhamento no menu - AGORA DISPONÍVEL PARA TODOS OS TIPOS */}
+            {/* Botão de compartilhamento no menu */}
             <button
-              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
               onClick={handleShare}
-              title="Compartilhar"
             >
-              <Share2 size={16} className="text-purple-500" />
+              <Share2 size={16} className="mr-2 text-purple-500" />
+              <span>Compartilhar</span>
             </button>
             <button
-              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
-              onClick={(e) => {
-                e.stopPropagation()
-                setShowMenu(false)
-                onMove && onMove()
-              }}
-              title="Mover"
-            >
-              <MoveIcon className="h-4 w-4 text-purple-500" />
-            </button>
-            <button
-              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
               onClick={(e) => {
                 e.stopPropagation()
                 setShowMenu(false)
@@ -677,48 +479,22 @@ export function FileCard({
                 setRenameError(null)
                 setShowRenameModal(true)
               }}
-              title="Renomear"
             >
-              <Pencil size={16} className="text-orange-500" />
+              <Pencil size={16} className="mr-2 text-orange-500" />
+              <span>Renomear</span>
             </button>
             <DropdownMenuSeparator />
-            {/* Botões de cache */}
-            <button
-              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
-              onClick={checkCache}
-              disabled={isCheckingCache}
-              title="Verificar Cache"
-            >
-              {isCheckingCache ? (
-                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              ) : (
-                <Clock className="h-4 w-4 text-blue-500" />
-              )}
-            </button>
-
-            <button
-              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
-              onClick={purgeCache}
-              disabled={isPurgingCache}
-              title="Purgar Cache"
-            >
-              {isPurgingCache ? (
-                <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
-              ) : (
-                <RefreshCw className="h-4 w-4 text-orange-500" />
-              )}
-            </button>
             {/* Modificar o botão de exclusão para mostrar o diálogo de confirmação */}
             <button
-              className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
               onClick={(e) => {
                 e.stopPropagation()
                 setShowMenu(false)
                 setShowDeleteConfirmation(true)
               }}
-              title="Excluir"
             >
-              <Trash2 size={16} />
+              <Trash2 size={16} className="mr-2" />
+              <span>Excluir</span>
             </button>
           </div>
         )}
@@ -867,15 +643,6 @@ export function FileCard({
           message={toast.message}
           type={toast.type}
           onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
-        />
-      )}
-      {/* Preview de documento */}
-      {showDocumentPreview && (
-        <DocumentPreview
-          fileUrl={file.url || ""}
-          fileName={file.name}
-          fileType={file.fileType || ""}
-          onClose={() => setShowDocumentPreview(false)}
         />
       )}
     </>

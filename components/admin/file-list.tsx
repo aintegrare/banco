@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   File,
   FileText,
@@ -32,26 +32,11 @@ import {
   Palette,
   FileImage,
   BookOpen,
-  Folder,
-  Upload,
-  Star,
-  Clock,
-  Share2,
-  Filter,
-  SortAsc,
-  SortDesc,
-  LayoutGrid,
-  LayoutList,
-  HardDrive,
 } from "lucide-react"
 import { getBunnyPublicUrl } from "@/lib/bunny"
 import { FolderTaskBadge } from "./folder-task-badge"
 import { fetchFolderTaskCounts } from "@/lib/folder-tasks-manager"
 import { FolderTasksPanel } from "./folder-tasks-panel"
-// Primeiro, vamos adicionar a importação do novo componente no topo do arquivo
-import { FolderSelector } from "./folder-selector"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
 
 interface BunnyFile {
   ObjectName: string
@@ -120,19 +105,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
   const [showFolderTasks, setShowFolderTasks] = useState(false)
   const [selectedFolderForTasks, setSelectedFolderForTasks] = useState<string>("")
   const [folderTaskCounts, setFolderTaskCounts] = useState<Record<string, number>>({})
-  const [viewMode, setViewMode] = useState<"list" | "grid">("grid")
-  const [draggedFile, setDraggedFile] = useState<BunnyFile | null>(null)
-  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null)
-  const [isDraggingOver, setIsDraggingOver] = useState(false)
-  const [dragFeedback, setDragFeedback] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null)
-  const fileListRef = useRef<HTMLDivElement>(null)
-  const [activeFilter, setActiveFilter] = useState<"all" | "recent" | "favorites" | "shared">("all")
-  const [favorites, setFavorites] = useState<string[]>([])
-  const [recentFiles, setRecentFiles] = useState<BunnyFile[]>([])
-  const [sortBy, setSortBy] = useState<"name" | "date" | "size">("name")
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
-  const [viewType, setViewType] = useState<"files" | "tasks">("files")
-  const [storageUsage, setStorageUsage] = useState({ used: 0, total: 1024 * 1024 * 1024 * 10 }) // 10GB default
 
   // Função para carregar automaticamente as contagens de tarefas das pastas
   const loadFolderTaskCounts = useCallback(async (folders: BunnyFile[]) => {
@@ -187,18 +159,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
       setFiles(filesWithPublicUrls)
 
-      // Atualizar arquivos recentes
-      const newRecentFiles = filesWithPublicUrls
-        .filter((file) => file.type !== "folder")
-        .sort((a, b) => new Date(b.LastChanged).getTime() - new Date(a.LastChanged).getTime())
-        .slice(0, 5)
-
-      setRecentFiles(newRecentFiles)
-
-      // Simular cálculo de uso de armazenamento
-      const totalSize = filesWithPublicUrls.reduce((acc, file) => acc + (file.Length || 0), 0)
-      setStorageUsage((prev) => ({ ...prev, used: totalSize }))
-
       // Carregar contagens de tarefas para as pastas automaticamente
       loadFolderTaskCounts(filesWithPublicUrls)
 
@@ -218,14 +178,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     setSelectedFiles([])
     setIsSelectionMode(false)
   }, [currentPath])
-
-  // Carregar favoritos do localStorage
-  useEffect(() => {
-    const savedFavorites = localStorage.getItem("fileFavorites")
-    if (savedFavorites) {
-      setFavorites(JSON.parse(savedFavorites))
-    }
-  }, [])
 
   const getCurrentPathString = () => {
     return currentPath.join("/")
@@ -517,6 +469,29 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     })
   }
 
+  const handleCreateTestDirectory = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      const response = await fetch("/api/test-directory", {
+        method: "POST",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || errorData.error || `Erro ao criar diretório de teste: ${response.status}`)
+      }
+
+      await fetchFiles(getCurrentPathString())
+    } catch (err) {
+      console.error("Erro ao criar diretório de teste:", err)
+      setError(err instanceof Error ? err.message : "Erro ao criar diretório de teste")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const isImage = (fileName: string) => {
     const extension = fileName.split(".").pop()?.toLowerCase()
     return ["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")
@@ -554,72 +529,8 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     setSelectedDirectory(directory)
   }
 
-  // Filtrar arquivos com base na pesquisa e no filtro ativo
-  const getFilteredFiles = () => {
-    let filtered = files
-
-    // Filtrar por pesquisa
-    if (searchQuery) {
-      filtered = filtered.filter((file) => file.ObjectName.toLowerCase().includes(searchQuery.toLowerCase()))
-    }
-
-    // Filtrar por aba ativa
-    if (activeFilter === "favorites") {
-      filtered = filtered.filter((file) => favorites.includes(file.Path))
-    } else if (activeFilter === "recent") {
-      // Mostrar apenas os 20 arquivos mais recentes
-      const recentOnly = filtered
-        .filter((file) => !file.IsDirectory)
-        .sort((a, b) => new Date(b.LastChanged).getTime() - new Date(a.LastChanged).getTime())
-        .slice(0, 20)
-
-      filtered = recentOnly
-    } else if (activeFilter === "shared") {
-      // Implementação futura para arquivos compartilhados
-      filtered = filtered.filter((file) => false) // Por enquanto, não mostra nada
-    }
-
-    return filtered
-  }
-
-  const filteredFiles = getFilteredFiles()
-
-  // Ordenar arquivos
-  const sortedFiles = [...filteredFiles].sort((a, b) => {
-    // Sempre mostrar pastas primeiro
-    if (a.IsDirectory && b.IsDirectory) {
-      // Se ambos são pastas, ordenar pelo critério selecionado
-      if (sortBy === "name") {
-        return sortDirection === "asc"
-          ? a.ObjectName.localeCompare(b.ObjectName)
-          : b.ObjectName.localeCompare(a.ObjectName)
-      } else if (sortBy === "date") {
-        return sortDirection === "asc"
-          ? new Date(a.LastChanged).getTime() - new Date(b.LastChanged).getTime()
-          : new Date(b.LastChanged).getTime() - new Date(a.LastChanged).getTime()
-      } else if (sortBy === "size") {
-        return sortDirection === "asc" ? a.Length - b.Length : b.Length - a.Length
-      }
-    } else if (a.IsDirectory && !b.IsDirectory) {
-      return -1 // Pastas vêm primeiro
-    } else if (!a.IsDirectory && b.IsDirectory) {
-      return 1 // Arquivos vêm depois
-    }
-
-    // Se ambos são arquivos, ordenar pelo critério selecionado
-    if (sortBy === "name") {
-      return sortDirection === "asc"
-        ? a.ObjectName.localeCompare(b.ObjectName)
-        : b.ObjectName.localeCompare(a.ObjectName)
-    } else if (sortBy === "date") {
-      return sortDirection === "asc"
-        ? new Date(a.LastChanged).getTime() - new Date(b.LastChanged).getTime()
-        : new Date(b.LastChanged).getTime() - new Date(a.LastChanged).getTime()
-    } else if (sortBy === "size") {
-      return sortDirection === "asc" ? a.Length - b.Length : b.Length - a.Length
-    }
-
-    return 0
+  const filteredFiles = files.filter((file) => {
+    return searchQuery ? file.ObjectName.toLowerCase().includes(searchQuery.toLowerCase()) : true
   })
 
   const handleSearch = (e: React.FormEvent) => {
@@ -833,14 +744,7 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
   const openMultiMoveModal = () => {
     if (selectedFiles.length === 0) {
-      setDragFeedback({
-        message: "Selecione pelo menos um arquivo para mover",
-        type: "error",
-      })
-
-      setTimeout(() => {
-        setDragFeedback(null)
-      }, 3000)
+      alert("Selecione pelo menos um arquivo para mover")
       return
     }
 
@@ -849,12 +753,16 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     setShowMultiMoveModal(true)
   }
 
-  // Atualizar a função de mover múltiplos arquivos
-  const handleMoveMultipleFiles = async (e) => {
-    if (typeof e.preventDefault === "function") e.preventDefault()
+  const handleMoveMultipleFiles = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!multiMoveDestination) {
+      setMultiMoveError("Selecione um destino para mover os arquivos")
+      return
+    }
 
     if (selectedFiles.length === 0) {
-      setMultiMoveError("Nenhum arquivo selecionado para mover")
+      setMultiMoveError("Nenhum arquivo selecionado")
       return
     }
 
@@ -868,9 +776,6 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
     try {
       const sourcePaths = selectedFiles.map((file) => file.Path)
-      const destinationFolder = multiMoveDestination || getCurrentPathString()
-
-      console.log(`Movendo ${sourcePaths.length} arquivos para ${destinationFolder}`)
 
       // Usar a API de mover múltiplos arquivos
       const response = await fetch("/api/files/move-multiple", {
@@ -880,7 +785,7 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
         },
         body: JSON.stringify({
           sourcePaths,
-          destinationFolder,
+          destinationFolder: multiMoveDestination,
         }),
       })
 
@@ -901,12 +806,7 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
 
       await fetchFiles(getCurrentPathString())
 
-      // Mostrar toast de sucesso
-      const successMessage = data.success
-        ? `${selectedFiles.length} arquivo(s) movido(s) com sucesso!`
-        : `Operação concluída com ${data.errors?.length || 0} erro(s)`
-
-      alert(successMessage)
+      alert(`${selectedFiles.length} arquivo(s) movido(s) com sucesso!`)
     } catch (error) {
       console.error("Erro ao mover arquivos:", error)
       setMultiMoveError(error instanceof Error ? error.message : "Erro ao mover arquivos")
@@ -973,1510 +873,735 @@ export function FileList({ initialDirectory = "documents" }: FileListProps) {
     setSelectedFolderForTasks("")
   }
 
-  const truncateFileName = (name: string, maxLength = 25) => {
-    if (name.length <= maxLength) return name
-
-    const extension = name.split(".").pop() || ""
-    const nameWithoutExt = name.substring(0, name.length - extension.length - 1)
-
-    if (nameWithoutExt.length <= maxLength - 3) return name
-
-    return `${nameWithoutExt.substring(0, maxLength - 3)}...${extension ? "." + extension : ""}`
-  }
-
-  const getRelativeTime = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-
-    const diffSecs = Math.floor(diffMs / 1000)
-    const diffMins = Math.floor(diffSecs / 60)
-    const diffHours = Math.floor(diffMins / 60)
-    const diffDays = Math.floor(diffHours / 24)
-
-    if (diffDays > 0) {
-      return `há ${diffDays} ${diffDays === 1 ? "dia" : "dias"}`
-    } else if (diffHours > 0) {
-      return `há ${diffHours} ${diffHours === 1 ? "hora" : "horas"}`
-    } else if (diffMins > 0) {
-      return `há ${diffMins} ${diffMins === 1 ? "minuto" : "minutos"}`
-    } else {
-      return "agora mesmo"
-    }
-  }
-
-  // Funções para drag and drop
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, file: BunnyFile) => {
-    e.dataTransfer.setData("application/json", JSON.stringify(file))
-    e.dataTransfer.effectAllowed = "move"
-    setDraggedFile(file)
-
-    // Criar uma imagem de preview para o drag
-    const dragPreview = document.createElement("div")
-    dragPreview.className = "bg-white p-2 rounded shadow-md border border-[#4b7bb5] flex items-center"
-    dragPreview.innerHTML = `
-      <div class="mr-2">${
-        file.IsDirectory
-          ? '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4b7bb5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>'
-          : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>'
-      }</div>
-      <span class="text-sm font-medium">${file.ObjectName.length > 15 ? file.ObjectName.substring(0, 15) + "..." : file.ObjectName}</span>
-    `
-    document.body.appendChild(dragPreview)
-
-    // Definir a imagem de preview para o drag
-    try {
-      e.dataTransfer.setDragImage(dragPreview, 20, 20)
-      setTimeout(() => {
-        document.body.removeChild(dragPreview)
-      }, 0)
-    } catch (err) {
-      console.error("Erro ao definir imagem de drag:", err)
-      if (document.body.contains(dragPreview)) {
-        document.body.removeChild(dragPreview)
-      }
-    }
-  }
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, folder?: BunnyFile) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    if (!draggedFile) return
-
-    // Não permitir arrastar para a mesma pasta ou para um arquivo
-    if (folder) {
-      if (!folder.IsDirectory) return
-      if (draggedFile.Path === folder.Path) return
-      if (draggedFile.IsDirectory && folder.Path.startsWith(draggedFile.Path)) return
-
-      e.dataTransfer.dropEffect = "move"
-      setDragOverFolder(folder.Path)
-    } else {
-      // Estamos sobre a área de drop geral
-      e.dataTransfer.dropEffect = "move"
-      setIsDraggingOver(true)
-    }
-  }
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOverFolder(null)
-    setIsDraggingOver(false)
-  }
-
-  const handleDrop = async (e: React.DragEvent<HTMLDivElement>, folder?: BunnyFile) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    setDragOverFolder(null)
-    setIsDraggingOver(false)
-
-    if (!draggedFile) return
-
-    try {
-      let destinationPath: string
-
-      if (folder) {
-        // Drop em uma pasta específica
-        if (!folder.IsDirectory) return
-        if (draggedFile.Path === folder.Path) return
-        if (draggedFile.IsDirectory && folder.Path.startsWith(draggedFile.Path)) {
-          setDragFeedback({
-            message: "Não é possível mover uma pasta para dentro dela mesma",
-            type: "error",
-          })
-          return
-        }
-
-        destinationPath = folder.Path
-      } else {
-        // Drop na área geral (pasta atual)
-        destinationPath = getCurrentPathString()
-
-        // Verificar se já estamos na pasta atual
-        const currentDir = getCurrentPathString()
-        const fileDir = draggedFile.Path.substring(0, draggedFile.Path.lastIndexOf("/"))
-
-        if (fileDir === currentDir) {
-          setDragFeedback({
-            message: "O arquivo já está nesta pasta",
-            type: "info",
-          })
-          return
-        }
-      }
-
-      // Construir o novo caminho
-      const fileName = draggedFile.ObjectName
-      const newPath = `${destinationPath}${destinationPath.endsWith("/") ? "" : "/"}${fileName}`
-
-      console.log(`Movendo arquivo via drag & drop: ${draggedFile.Path} para ${newPath}`)
-
-      setDragFeedback({
-        message: `Movendo ${draggedFile.ObjectName}...`,
-        type: "info",
-      })
-
-      const response = await fetch("/api/files/move", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          sourcePath: draggedFile.Path,
-          destinationPath: newPath,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || "Erro ao mover arquivo")
-      }
-
-      // Atualizar a UI
-      setFiles((prevFiles) => prevFiles.filter((file) => file.Path !== draggedFile.Path))
-
-      setDragFeedback({
-        message: `${draggedFile.ObjectName} movido com sucesso!`,
-        type: "success",
-      })
-
-      // Limpar o feedback após alguns segundos
-      setTimeout(() => {
-        setDragFeedback(null)
-      }, 3000)
-
-      // Recarregar os arquivos
-      await fetchFiles(getCurrentPathString())
-    } catch (error) {
-      console.error("Erro ao mover arquivo via drag & drop:", error)
-      setDragFeedback({
-        message: error instanceof Error ? error.message : "Erro ao mover arquivo",
-        type: "error",
-      })
-
-      // Limpar o feedback após alguns segundos
-      setTimeout(() => {
-        setDragFeedback(null)
-      }, 5000)
-    } finally {
-      setDraggedFile(null)
-    }
-  }
-
-  // Função para lidar com o upload de arquivos via drag and drop
-  const handleFileUploadDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    setIsDraggingOver(false)
-
-    // Verificar se temos arquivos
-    if (!e.dataTransfer.files || e.dataTransfer.files.length === 0) return
-
-    const files = Array.from(e.dataTransfer.files)
-
-    // Verificar se são arquivos válidos
-    if (files.some((file) => file.size > 100 * 1024 * 1024)) {
-      setDragFeedback({
-        message: "Alguns arquivos excedem o tamanho máximo de 100MB",
-        type: "error",
-      })
-      return
-    }
-
-    setDragFeedback({
-      message: `Iniciando upload de ${files.length} arquivo(s)...`,
-      type: "info",
-    })
-
-    // Fazer upload de cada arquivo
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-
-        setDragFeedback({
-          message: `Enviando ${i + 1}/${files.length}: ${file.name}...`,
-          type: "info",
-        })
-
-        const formData = new FormData()
-        formData.append("file", file)
-        formData.append("folder", getCurrentPathString())
-
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || errorData.error || `Erro ao fazer upload: ${response.status}`)
-        }
-      }
-
-      setDragFeedback({
-        message: `${files.length} arquivo(s) enviado(s) com sucesso!`,
-        type: "success",
-      })
-
-      // Limpar o feedback após alguns segundos
-      setTimeout(() => {
-        setDragFeedback(null)
-      }, 3000)
-
-      // Recarregar os arquivos
-      await fetchFiles(getCurrentPathString())
-    } catch (error) {
-      console.error("Erro ao fazer upload de arquivos:", error)
-      setDragFeedback({
-        message: error instanceof Error ? error.message : "Erro ao fazer upload de arquivos",
-        type: "error",
-      })
-
-      // Limpar o feedback após alguns segundos
-      setTimeout(() => {
-        setDragFeedback(null)
-      }, 5000)
-    }
-  }
-
-  // Alternar favorito
-  const toggleFavorite = (file: BunnyFile) => {
-    const newFavorites = favorites.includes(file.Path)
-      ? favorites.filter((path) => path !== file.Path)
-      : [...favorites, file.Path]
-
-    setFavorites(newFavorites)
-    localStorage.setItem("fileFavorites", JSON.stringify(newFavorites))
-
-    // Mostrar feedback
-    setDragFeedback({
-      message: favorites.includes(file.Path) ? "Removido dos favoritos" : "Adicionado aos favoritos",
-      type: "success",
-    })
-
-    // Esconder o feedback após alguns segundos
-    setTimeout(() => {
-      setDragFeedback(null)
-    }, 3000)
-  }
-
-  // Renderizar estatísticas de armazenamento
-  const renderStorageStats = () => {
-    const usedPercentage = (storageUsage.used / storageUsage.total) * 100
-
-    return (
-      <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm mb-4">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-sm font-medium text-gray-700 flex items-center">
-            <HardDrive className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-            Armazenamento
-          </h3>
-          <span className="text-xs text-gray-500">
-            {formatFileSize(storageUsage.used)} de {formatFileSize(storageUsage.total)}
-          </span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div
-            className={`h-2 rounded-full ${
-              usedPercentage < 70 ? "bg-[#4b7bb5]" : usedPercentage < 90 ? "bg-yellow-500" : "bg-red-500"
-            }`}
-            style={{ width: `${usedPercentage}%` }}
-          ></div>
-        </div>
-        <p className="mt-2 text-xs text-gray-500">
-          {usedPercentage < 70
-            ? "Espaço suficiente disponível"
-            : usedPercentage < 90
-              ? "Espaço limitado disponível"
-              : "Pouco espaço disponível"}
-        </p>
-      </div>
-    )
-  }
-
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Área principal de arquivos */}
-        <div className="md:col-span-3">
-          <div
-            className="bg-white rounded-xl shadow-md p-6 border border-gray-100"
-            ref={fileListRef}
-            onDragOver={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              if (!draggedFile) {
-                setIsDraggingOver(true)
-              }
-            }}
-            onDragLeave={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              if (!draggedFile) {
-                setIsDraggingOver(false)
-              }
-            }}
-            onDrop={(e) => {
-              if (draggedFile) {
-                handleDrop(e)
-              } else {
-                handleFileUploadDrop(e)
-              }
-            }}
-          >
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <h2 className="text-xl font-bold text-[#4072b0] flex items-center">
-                <FolderOpen className="mr-2 h-6 w-6 text-[#4b7bb5]" />
-                Arquivos Armazenados
-              </h2>
+      <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <h2 className="text-xl font-bold text-[#4072b0] flex items-center">
+            <FolderOpen className="mr-2 h-6 w-6 text-[#4b7bb5]" />
+            Arquivos Armazenados
+          </h2>
 
-              <div className="flex flex-wrap gap-3 w-full md:w-auto">
-                <div className="flex gap-2 bg-gray-50 p-1 rounded-lg border border-gray-200">
-                  <button
-                    onClick={() => switchDirectory("documents")}
-                    className={`px-3 py-1.5 text-sm rounded-md transition-all ${
-                      selectedDirectory === "documents"
-                        ? "bg-[#4b7bb5] text-white shadow-sm"
-                        : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    Documentos
-                  </button>
-                  <button
-                    onClick={() => switchDirectory("images")}
-                    className={`px-3 py-1.5 text-sm rounded-md transition-all ${
-                      selectedDirectory === "images"
-                        ? "bg-[#4b7bb5] text-white shadow-sm"
-                        : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    Imagens
-                  </button>
-                </div>
-
-                <form onSubmit={handleSearch} className="relative flex-grow max-w-xs">
-                  <input
-                    type="text"
-                    placeholder="Buscar arquivos..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5] transition-all"
-                  />
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                </form>
-              </div>
-            </div>
-
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              <div className="flex items-center space-x-2 mr-4">
-                <button
-                  onClick={navigateBack}
-                  disabled={pathHistory.length === 0}
-                  className="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-transparent"
-                  title="Voltar"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <button
-                  onClick={navigateForward}
-                  disabled={forwardHistory.length === 0}
-                  className="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-transparent"
-                  title="Avançar"
-                >
-                  <ChevronRight size={18} />
-                </button>
-                <button
-                  onClick={navigateHome}
-                  className="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                  title="Início"
-                >
-                  <Home size={18} />
-                </button>
-              </div>
-
-              {renderBreadcrumb()}
-            </div>
-
-            <div className="flex flex-wrap gap-2 mb-6">
+          <div className="flex flex-wrap gap-3 w-full md:w-auto">
+            <div className="flex gap-2 bg-gray-50 p-1 rounded-lg border border-gray-200">
               <button
-                onClick={toggleSelectionMode}
-                className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all ${
-                  isSelectionMode
+                onClick={() => switchDirectory("documents")}
+                className={`px-3 py-1.5 text-sm rounded-md transition-all ${
+                  selectedDirectory === "documents"
                     ? "bg-[#4b7bb5] text-white shadow-sm"
-                    : "bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
+                    : "text-gray-600 hover:bg-gray-100"
                 }`}
               >
-                {isSelectionMode ? (
-                  <>
-                    <X className="h-4 w-4 mr-1.5" />
-                    Cancelar Seleção
-                  </>
-                ) : (
-                  <>
-                    <CheckSquare className="h-4 w-4 mr-1.5" />
-                    Selecionar Múltiplos
-                  </>
-                )}
+                Documentos
+              </button>
+              <button
+                onClick={() => switchDirectory("images")}
+                className={`px-3 py-1.5 text-sm rounded-md transition-all ${
+                  selectedDirectory === "images"
+                    ? "bg-[#4b7bb5] text-white shadow-sm"
+                    : "text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                Imagens
+              </button>
+            </div>
+
+            <form onSubmit={handleSearch} className="relative flex-grow max-w-xs">
+              <input
+                type="text"
+                placeholder="Buscar arquivos..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5] transition-all"
+              />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            </form>
+          </div>
+        </div>
+
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="flex items-center space-x-2 mr-4">
+            <button
+              onClick={navigateBack}
+              disabled={pathHistory.length === 0}
+              className="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-transparent"
+              title="Voltar"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              onClick={navigateForward}
+              disabled={forwardHistory.length === 0}
+              className="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-transparent"
+              title="Avançar"
+            >
+              <ChevronRight size={18} />
+            </button>
+            <button
+              onClick={navigateHome}
+              className="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+              title="Início"
+            >
+              <Home size={18} />
+            </button>
+          </div>
+
+          {renderBreadcrumb()}
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-6"></div>
+
+        {renderBreadcrumb()}
+
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            onClick={toggleSelectionMode}
+            className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all ${
+              isSelectionMode
+                ? "bg-[#4b7bb5] text-white"
+                : "bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
+            }`}
+          >
+            {isSelectionMode ? (
+              <>
+                <X className="h-4 w-4 mr-1.5" />
+                Cancelar Seleção
+              </>
+            ) : (
+              <>
+                <CheckSquare className="h-4 w-4 mr-1.5" />
+                Selecionar Arquivos
+              </>
+            )}
+          </button>
+
+          {isSelectionMode && (
+            <>
+              <button
+                onClick={selectAll}
+                className="flex items-center text-sm px-3 py-1.5 rounded-md transition-all bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
+                disabled={filteredFiles.length === 0}
+              >
+                <CheckSquare className="h-4 w-4 mr-1.5" />
+                Selecionar Todos
               </button>
 
-              {isSelectionMode && (
-                <>
-                  <button
-                    onClick={selectAll}
-                    className="flex items-center text-sm px-3 py-1.5 rounded-md transition-all bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
-                    disabled={filteredFiles.length === 0}
-                  >
-                    <CheckSquare className="h-4 w-4 mr-1.5" />
-                    Selecionar Todos
-                  </button>
-
-                  <button
-                    onClick={deselectAll}
-                    className="flex items-center text-sm px-3 py-1.5 rounded-md transition-all bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
-                    disabled={selectedFiles.length === 0}
-                  >
-                    <Square className="h-4 w-4 mr-1.5" />
-                    Limpar Seleção
-                  </button>
-
-                  <button
-                    onClick={openMultiMoveModal}
-                    className="flex items-center text-sm px-3 py-1.5 rounded-md transition-all bg-[#4b7bb5] text-white hover:bg-[#3d649e] shadow-sm"
-                    disabled={selectedFiles.length === 0}
-                  >
-                    <MoveIcon className="h-4 w-4 mr-1.5" />
-                    Mover Selecionados ({selectedFiles.length})
-                  </button>
-
-                  <button
-                    onClick={handleDeleteMultipleFiles}
-                    className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all 
-                  ${
-                    selectedFiles.length > 0
-                      ? "bg-white text-red-600 border border-red-600 hover:bg-red-50"
-                      : "bg-white text-gray-400 border border-gray-300 cursor-not-allowed"
-                  }`}
-                    disabled={selectedFiles.length === 0}
-                  >
-                    <Trash2 className="h-4 w-4 mr-1.5" />
-                    Excluir Selecionados ({selectedFiles.length})
-                  </button>
-                </>
-              )}
-
-              {!isSelectionMode && (
-                <>
-                  <button
-                    onClick={handleCreateDirectory}
-                    className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all ${
-                      isCreatingDirectory
-                        ? "bg-gray-100 text-gray-500"
-                        : "bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
-                    }`}
-                    disabled={isCreatingDirectory}
-                  >
-                    {isCreatingDirectory ? (
-                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                    ) : (
-                      <FolderPlus className="h-4 w-4 mr-1.5" />
-                    )}
-                    Criar Pasta
-                  </button>
-
-                  <button
-                    onClick={() => fetchFiles(getCurrentPathString())}
-                    className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all ${
-                      isLoading
-                        ? "bg-gray-100 text-gray-500"
-                        : "bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
-                    }`}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4 mr-1.5" />
-                    )}
-                    Atualizar
-                  </button>
-
-                  <div className="flex items-center gap-1 ml-auto">
-                    <button
-                      onClick={() => setViewMode("grid")}
-                      className={`p-2 rounded-md ${
-                        viewMode === "grid" ? "bg-[#4b7bb5] text-white" : "text-gray-500 hover:bg-gray-100"
-                      }`}
-                      title="Visualização em grade"
-                    >
-                      <LayoutGrid size={16} />
-                    </button>
-                    <button
-                      onClick={() => setViewMode("list")}
-                      className={`p-2 rounded-md ${
-                        viewMode === "list" ? "bg-[#4b7bb5] text-white" : "text-gray-500 hover:bg-gray-100"
-                      }`}
-                      title="Visualização em lista"
-                    >
-                      <LayoutList size={16} />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => {
-                        setSortBy("name")
-                        setSortDirection(sortBy === "name" && sortDirection === "asc" ? "desc" : "asc")
-                      }}
-                      className={`p-2 rounded-md ${
-                        sortBy === "name" ? "bg-[#4b7bb5] text-white" : "text-gray-500 hover:bg-gray-100"
-                      }`}
-                      title={`Ordenar por nome (${sortDirection === "asc" ? "A-Z" : "Z-A"})`}
-                    >
-                      {sortBy === "name" && sortDirection === "asc" ? <SortAsc size={16} /> : <SortDesc size={16} />}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {isSelectionMode && selectedFiles.length > 0 && (
-              <div className="bg-blue-50 p-3 rounded-lg mb-4 border border-blue-100 flex items-center justify-between">
-                <div className="flex items-center">
-                  <CheckSquare className="h-5 w-5 mr-2 text-[#4b7bb5]" />
-                  <span className="font-medium text-[#4b7bb5]">{selectedFiles.length} arquivo(s) selecionado(s)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={openMultiMoveModal}
-                    className="bg-[#4b7bb5] text-white text-sm py-1 px-2 rounded hover:bg-[#3d649e] flex items-center"
-                  >
-                    <MoveIcon className="h-3 w-3 mr-1" />
-                    Mover
-                  </button>
-                  <button
-                    onClick={handleDeleteMultipleFiles}
-                    className="bg-red-500 text-white text-sm py-1 px-2 rounded hover:bg-red-600 flex items-center"
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" />
-                    Excluir
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {directoryCreated && (
-              <div className="bg-green-50 p-4 rounded-lg mb-6 border-l-4 border-green-500 flex items-start animate-fadeIn">
-                <CheckCircle className="h-5 w-5 mr-2 text-green-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-green-700">Diretório criado com sucesso!</p>
-                  <p className="mt-1 text-green-600">
-                    O diretório "{selectedDirectory}" foi criado e está pronto para receber arquivos.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {directoryInfo && (
-              <div className="bg-blue-50 p-4 rounded-lg mb-6 border-l-4 border-blue-500">
-                <h3 className="font-medium text-blue-700 mb-2 flex items-center">
-                  <Info className="h-4 w-4 mr-2" />
-                  Informações do Diretório
-                </h3>
-                <div className="bg-white p-3 rounded-md border border-blue-100">
-                  <p className="mb-1">
-                    Status: <span className="font-medium">{directoryInfo.exists ? "Existe" : "Não existe"}</span>
-                  </p>
-                  {directoryInfo.exists && (
-                    <p>
-                      Quantidade de arquivos: <span className="font-medium">{directoryInfo.fileCount}</span>
-                    </p>
-                  )}
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-blue-600 hover:text-blue-800 text-sm">
-                      Detalhes técnicos
-                    </summary>
-                    <pre className="mt-2 p-2 bg-blue-50 rounded text-xs overflow-auto max-h-40 border border-blue-100">
-                      {JSON.stringify(directoryInfo, null, 2)}
-                    </pre>
-                  </details>
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-red-50 p-4 rounded-lg mb-6 border-l-4 border-red-500 flex items-start">
-                <AlertCircle className="h-5 w-5 mr-2 text-red-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-red-700 mb-2">Erro ao carregar arquivos:</p>
-                  <p className="mb-3 text-red-600">{error}</p>
-                  <div className="bg-white p-3 rounded-md border border-red-100 text-sm space-y-2">
-                    <p>
-                      Verifique se as variáveis de ambiente{" "}
-                      <code className="bg-red-50 px-1 py-0.5 rounded">BUNNY_API_KEY</code> e{" "}
-                      <code className="bg-red-50 px-1 py-0.5 rounded">BUNNY_STORAGE_ZONE</code> estão configuradas
-                      corretamente.
-                    </p>
-                    <p>
-                      <strong>Importante:</strong> Certifique-se de que você configurou uma Pull Zone no painel do
-                      Bunny.net conectada à sua Storage Zone para acessar os arquivos publicamente.
-                    </p>
-                    <div className="mt-3">
-                      <button
-                        onClick={() => handleCreateDirectory()}
-                        className="text-red-600 hover:text-red-800 underline font-medium"
-                        disabled={isCreatingDirectory}
-                      >
-                        Tentar criar uma nova pasta
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Área de drop para upload de arquivos */}
-            {isDraggingOver && !draggedFile && (
-              <div className="absolute inset-0 bg-[#4b7bb5] bg-opacity-10 border-2 border-dashed border-[#4b7bb5] rounded-xl flex items-center justify-center z-10">
-                <div className="bg-white p-6 rounded-lg shadow-lg text-center">
-                  <Upload className="h-12 w-12 text-[#4b7bb5] mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-[#4b7bb5] mb-2">Solte os arquivos aqui</h3>
-                  <p className="text-gray-600">Solte para fazer upload para a pasta atual</p>
-                </div>
-              </div>
-            )}
-
-            {isLoading && filteredFiles.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="animate-spin h-10 w-10 border-3 border-[#4b7bb5] border-t-transparent rounded-full mx-auto mb-4"></div>
-                <p className="text-gray-600 font-medium">Carregando arquivos...</p>
-                <p className="text-gray-500 text-sm mt-1">Aguarde enquanto buscamos os arquivos do diretório</p>
-              </div>
-            ) : filteredFiles.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                <FolderOpen size={48} className="text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-700 mb-1">Pasta vazia</h3>
-                <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                  {searchQuery
-                    ? `Nenhum arquivo encontrado para "${searchQuery}". Tente outra busca.`
-                    : `Esta pasta não contém nenhum arquivo ou subpasta. Faça upload de arquivos ou crie uma nova pasta.`}
-                </p>
-                <div className="flex flex-wrap justify-center gap-3">
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className={`flex items-center px-4 py-2 rounded-md transition-all ${
-                      searchQuery ? "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50" : "hidden"
-                    }`}
-                  >
-                    <X className="h-4 w-4 mr-1.5" />
-                    Limpar busca
-                  </button>
-
-                  <button
-                    onClick={handleCreateDirectory}
-                    className="flex items-center px-4 py-2 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] transition-colors shadow-sm"
-                    disabled={isCreatingDirectory}
-                  >
-                    {isCreatingDirectory ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                        <span>Criando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FolderPlus className="h-4 w-4 mr-1.5" />
-                        <span>Criar pasta</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            ) : viewMode === "grid" ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {sortedFiles.map((file) => (
-                  <div
-                    key={file.Guid || file.ObjectName}
-                    className={`bg-gray-100 rounded-lg border ${
-                      dragOverFolder === file.Path
-                        ? "border-[#4b7bb5] border-2 shadow-md"
-                        : isSelectionMode && selectedFiles.some((f) => f.Path === file.Path)
-                          ? "border-[#4b7bb5] shadow-md bg-blue-50"
-                          : "border-gray-200"
-                    } overflow-hidden hover:shadow-md transition-all cursor-pointer relative group`}
-                    onClick={() => (isSelectionMode ? toggleFileSelection(file) : handlePreviewFile(file))}
-                    draggable={!isSelectionMode}
-                    onDragStart={(e) => handleDragStart(e, file)}
-                    onDragOver={(e) => handleDragOver(e, file)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, file)}
-                  >
-                    <div className="flex flex-col">
-                      {/* Área de thumbnail */}
-                      <div className="w-full h-40 overflow-hidden bg-white flex items-center justify-center">
-                        {isImage(file.ObjectName) && file.PublicUrl ? (
-                          <img
-                            src={file.PublicUrl || "/placeholder.svg"}
-                            alt={file.ObjectName}
-                            className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none"
-                              const iconContainer = e.currentTarget.parentElement
-                              if (iconContainer) {
-                                const icon = document.createElement("div")
-                                icon.className = "flex items-center justify-center h-full"
-                                icon.innerHTML =
-                                  '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="text-green-500"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>'
-                                iconContainer.appendChild(icon)
-                              }
-                            }}
-                          />
-                        ) : file.ObjectName.toLowerCase().endsWith(".pdf") ? (
-                          <div className="flex flex-col items-center justify-center">
-                            <div className="w-10 h-10 bg-red-500 rounded-md flex items-center justify-center mb-2">
-                              <FileText className="h-6 w-6 text-white" />
-                            </div>
-                          </div>
-                        ) : file.IsDirectory ? (
-                          <div className="flex flex-col items-center justify-center">
-                            <Folder className="h-16 w-16 text-[#4b7bb5]" />
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center">
-                            {getFileIcon(file.ObjectName)}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Área de informações */}
-                      <div className="p-3 bg-gray-200">
-                        {/* Ícone de tipo de arquivo */}
-                        <div className="flex items-center mb-1">
-                          {file.ObjectName.toLowerCase().endsWith(".pdf") && (
-                            <div className="w-6 h-6 bg-red-500 rounded-sm flex items-center justify-center mr-2">
-                              <FileText className="h-4 w-4 text-white" />
-                            </div>
-                          )}
-                          <h3 className="text-sm font-medium text-gray-700 truncate">
-                            {truncateFileName(file.ObjectName, 25)}
-                          </h3>
-                        </div>
-                        <div className="flex items-center text-xs text-gray-500">
-                          <span>
-                            {file.IsDirectory
-                              ? "Pasta"
-                              : file.ObjectName.toLowerCase().endsWith(".pdf")
-                                ? "PDF"
-                                : file.ObjectName.split(".").pop()?.toUpperCase() || "Arquivo"}
-                          </span>
-                          <span className="mx-1">•</span>
-                          <span>{getRelativeTime(file.LastChanged)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Indicador de seleção */}
-                    {isSelectionMode && (
-                      <div className="absolute top-2 left-2 z-10">
-                        <div
-                          className={`w-6 h-6 rounded-md flex items-center justify-center transition-all ${
-                            isFileSelected(file)
-                              ? "bg-[#4b7bb5] text-white shadow-md scale-110"
-                              : "bg-white/80 border border-gray-300"
-                          }`}
-                        >
-                          {isFileSelected(file) && <CheckSquare className="h-4 w-4" />}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-lg border border-gray-200">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        {isSelectionMode && <th className="py-3 px-2 font-medium text-gray-600 w-10"></th>}
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Arquivo</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Tamanho</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Data</th>
-                        <th className="text-right py-3 px-4 font-medium text-gray-600">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {sortedFiles.map((file) => (
-                        <tr
-                          key={file.Guid || file.ObjectName}
-                          className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                            isFileSelected(file) ? "bg-blue-50" : ""
-                          } ${dragOverFolder === file.Path ? "bg-blue-100" : ""}`}
-                          draggable={!isSelectionMode}
-                          onDragStart={(e) => handleDragStart(e, file)}
-                          onDragOver={(e) => handleDragOver(e, file)}
-                          onDragLeave={handleDragLeave}
-                          onDrop={(e) => handleDrop(e, file)}
-                        >
-                          {isSelectionMode && (
-                            <td className="py-3 px-2 text-center">
-                              <button
-                                onClick={() => toggleFileSelection(file)}
-                                className="p-1 rounded hover:bg-gray-100"
-                              >
-                                {isFileSelected(file) ? (
-                                  <CheckSquare className="h-5 w-5 text-[#4b7bb5]" />
-                                ) : (
-                                  <Square className="h-5 w-5 text-gray-400" />
-                                )}
-                              </button>
-                            </td>
-                          )}
-
-                          <td className="py-3 px-4">
-                            <div className="flex items-center">
-                              <div className="p-1.5 bg-gray-100 rounded-md mr-3">
-                                {file.IsDirectory ? (
-                                  <FolderOpen className="h-5 w-5 text-[#4b7bb5]" />
-                                ) : (
-                                  getFileIcon(file.ObjectName)
-                                )}
-                              </div>
-                              <div className="flex flex-col">
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className="cursor-pointer hover:text-[#4b7bb5] font-medium transition-colors"
-                                    onClick={() => handlePreviewFile(file)}
-                                  >
-                                    {file.ObjectName}
-                                  </span>
-                                  {file.IsDirectory && folderTaskCounts[file.Path] > 0 && (
-                                    <FolderTaskBadge
-                                      count={folderTaskCounts[file.Path]}
-                                      onClick={(e) => {
-                                        openFolderTasks(file.Path)
-                                      }}
-                                    />
-                                  )}
-                                  {favorites.includes(file.Path) && (
-                                    <Star size={14} className="fill-amber-500 text-amber-500" />
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-gray-500">
-                            {file.IsDirectory ? "-" : formatFileSize(file.Length)}
-                          </td>
-                          <td className="py-3 px-4 text-gray-500">{formatDate(file.LastChanged)}</td>
-
-                          <td className="py-3 px-4 text-right">
-                            <div className="flex justify-end space-x-2">
-                              {file.IsDirectory && (
-                                <button
-                                  className="p-1.5 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-md transition-colors"
-                                  title="Tarefas da pasta"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    openFolderTasks(file.Path)
-                                  }}
-                                >
-                                  <ClipboardList className="h-4 w-4" />
-                                </button>
-                              )}
-                              {!file.IsDirectory && (
-                                <a
-                                  href={file.PublicUrl || getBunnyPublicUrl(file.Path)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
-                                  title="Abrir arquivo"
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                </a>
-                              )}
-                              <button
-                                className="p-1.5 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-md transition-colors"
-                                title={
-                                  favorites.includes(file.Path) ? "Remover dos favoritos" : "Adicionar aos favoritos"
-                                }
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  toggleFavorite(file)
-                                }}
-                              >
-                                <Star
-                                  className={`h-4 w-4 ${
-                                    favorites.includes(file.Path) ? "fill-amber-500 text-amber-500" : ""
-                                  }`}
-                                />
-                              </button>
-                              <button
-                                className="p-1.5 text-orange-500 hover:text-orange-700 hover:bg-orange-50 rounded-md transition-colors"
-                                title="Renomear"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  openRenameModal(file)
-                                }}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </button>
-                              {!file.IsDirectory && (
-                                <button
-                                  className="p-1.5 text-purple-500 hover:text-purple-700 hover:bg-purple-50 rounded-md transition-colors"
-                                  title="Mover arquivo"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    openMoveFileModal(file)
-                                  }}
-                                >
-                                  <MoveIcon className="h-4 w-4" />
-                                </button>
-                              )}
-                              <button
-                                className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
-                                title="Excluir"
-                                onClick={() => handleDelete(file.Path)}
-                                disabled={deletingFile === file.Path}
-                              >
-                                {deletingFile === file.Path ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Feedback de drag and drop */}
-            {dragFeedback && (
-              <div
-                className={`fixed bottom-4 right-4 p-4 rounded-lg shadow-lg max-w-md z-50 transition-all duration-300 ${
-                  dragFeedback.type === "success"
-                    ? "bg-green-100 border-l-4 border-green-500 text-green-700"
-                    : dragFeedback.type === "error"
-                      ? "bg-red-100 border-l-4 border-red-500 text-red-700"
-                      : "bg-blue-100 border-l-4 border-blue-500 text-blue-700"
-                }`}
+              <button
+                onClick={deselectAll}
+                className="flex items-center text-sm px-3 py-1.5 rounded-md transition-all bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
+                disabled={selectedFiles.length === 0}
               >
-                <div className="flex items-start">
-                  {dragFeedback.type === "success" && <CheckCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />}
-                  {dragFeedback.type === "error" && <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />}
-                  {dragFeedback.type === "info" && <Info className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />}
-                  <p>{dragFeedback.message}</p>
-                </div>
-              </div>
-            )}
-          </div>
-          {/* Botão flutuante para mover arquivos quando há seleção */}
-          {isSelectionMode && selectedFiles.length > 0 && (
-            <div className="fixed bottom-6 right-6 z-10">
+                <Square className="h-4 w-4 mr-1.5" />
+                Limpar Seleção
+              </button>
+
               <button
                 onClick={openMultiMoveModal}
-                className="flex items-center justify-center gap-2 bg-[#4b7bb5] text-white p-4 rounded-full shadow-lg hover:bg-[#3d649e] transition-all"
+                className="flex items-center text-sm px-3 py-1.5 rounded-md transition-all bg-white text-purple-600 border border-purple-600 hover:bg-purple-50"
+                disabled={selectedFiles.length === 0}
               >
-                <MoveIcon className="h-5 w-5" />
-                <span className="font-medium">{selectedFiles.length}</span>
+                <MoveIcon className="h-4 w-4 mr-1.5" />
+                Mover Selecionados ({selectedFiles.length})
               </button>
-            </div>
+
+              <button
+                onClick={handleDeleteMultipleFiles}
+                className="flex items-center text-sm px-3 py-1.5 rounded-md transition-all bg-white text-red-600 border border-red-600 hover:bg-red-50"
+                disabled={selectedFiles.length === 0}
+              >
+                <Trash2 className="h-4 w-4 mr-1.5" />
+                Excluir Selecionados ({selectedFiles.length})
+              </button>
+            </>
+          )}
+
+          {!isSelectionMode && (
+            <>
+              <button
+                onClick={() => checkFolderExists(getCurrentPathString())}
+                className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all ${
+                  isCheckingDirectory
+                    ? "bg-gray-100 text-gray-500"
+                    : "bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
+                }`}
+                disabled={isCheckingDirectory}
+              >
+                {isCheckingDirectory ? (
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4 mr-1.5" />
+                )}
+                Verificar Diretório
+              </button>
+
+              <button
+                onClick={handleCreateDirectory}
+                className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all ${
+                  isCreatingDirectory
+                    ? "bg-gray-100 text-gray-500"
+                    : "bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
+                }`}
+                disabled={isCreatingDirectory}
+              >
+                {isCreatingDirectory ? (
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                ) : (
+                  <FolderPlus className="h-4 w-4 mr-1.5" />
+                )}
+                Criar Pasta
+              </button>
+
+              <button
+                onClick={() => fetchFiles(getCurrentPathString())}
+                className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all ${
+                  isLoading
+                    ? "bg-gray-100 text-gray-500"
+                    : "bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
+                }`}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-1.5" />
+                )}
+                Atualizar
+              </button>
+            </>
           )}
         </div>
 
-        {/* Sidebar direita */}
-        <div className="space-y-4">
-          {/* Filtros */}
-          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-            <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-              <Filter className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-              Filtrar Arquivos
+        {isSelectionMode && selectedFiles.length > 0 && (
+          <div className="bg-blue-50 p-3 rounded-lg mb-4 border border-blue-100 flex items-center">
+            <CheckSquare className="h-5 w-5 mr-2 text-[#4b7bb5]" />
+            <span className="font-medium text-[#4b7bb5]">{selectedFiles.length} arquivo(s) selecionado(s)</span>
+          </div>
+        )}
+
+        {directoryCreated && (
+          <div className="bg-green-50 p-4 rounded-lg mb-6 border-l-4 border-green-500 flex items-start animate-fadeIn">
+            <CheckCircle className="h-5 w-5 mr-2 text-green-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-green-700">Diretório criado com sucesso!</p>
+              <p className="mt-1 text-green-600">
+                O diretório "{selectedDirectory}" foi criado e está pronto para receber arquivos.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {directoryInfo && (
+          <div className="bg-blue-50 p-4 rounded-lg mb-6 border-l-4 border-blue-500">
+            <h3 className="font-medium text-blue-700 mb-2 flex items-center">
+              <Info className="h-4 w-4 mr-2" />
+              Informações do Diretório
             </h3>
-            <div className="space-y-2">
-              <button
-                onClick={() => setActiveFilter("all")}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm ${
-                  activeFilter === "all" ? "bg-[#4b7bb5] text-white" : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                Todos os Arquivos
-              </button>
-              <button
-                onClick={() => setActiveFilter("recent")}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center ${
-                  activeFilter === "recent" ? "bg-[#4b7bb5] text-white" : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                <Clock className="h-4 w-4 mr-2" />
-                Arquivos Recentes
-              </button>
-              <button
-                onClick={() => setActiveFilter("favorites")}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center ${
-                  activeFilter === "favorites"
-                    ? "bg-[#4b7bb5] text-white"
-                    : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                <Star className="h-4 w-4 mr-2" />
-                Favoritos
-              </button>
-              <button
-                onClick={() => setActiveFilter("shared")}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center ${
-                  activeFilter === "shared" ? "bg-[#4b7bb5] text-white" : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                <Share2 className="h-4 w-4 mr-2" />
-                Compartilhados
-              </button>
+            <div className="bg-white p-3 rounded-md border border-blue-100">
+              <p className="mb-1">
+                Status: <span className="font-medium">{directoryInfo.exists ? "Existe" : "Não existe"}</span>
+              </p>
+              {directoryInfo.exists && (
+                <p>
+                  Quantidade de arquivos: <span className="font-medium">{directoryInfo.fileCount}</span>
+                </p>
+              )}
+              <details className="mt-2">
+                <summary className="cursor-pointer text-blue-600 hover:text-blue-800 text-sm">
+                  Detalhes técnicos
+                </summary>
+                <pre className="mt-2 p-2 bg-blue-50 rounded text-xs overflow-auto max-h-40 border border-blue-100">
+                  {JSON.stringify(directoryInfo, null, 2)}
+                </pre>
+              </details>
             </div>
           </div>
+        )}
 
-          {/* Estatísticas de armazenamento */}
-          {renderStorageStats()}
-
-          {/* Arquivos recentes */}
-          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-            <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-              <Clock className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-              Arquivos Recentes
-            </h3>
-            {recentFiles.length === 0 ? (
-              <p className="text-xs text-gray-500 text-center py-2">Nenhum arquivo recente</p>
-            ) : (
-              <ul className="space-y-2">
-                {recentFiles.slice(0, 5).map((file) => (
-                  <li key={file.Guid || file.ObjectName} className="text-sm">
-                    <button
-                      onClick={() => window.open(file.PublicUrl, "_blank")}
-                      className="flex items-center hover:bg-gray-50 p-1.5 rounded-md w-full text-left"
-                    >
-                      {file.ObjectName.toLowerCase().endsWith(".pdf") ? (
-                        <FileText className="h-4 w-4 mr-2 text-red-500" />
-                      ) : isImage(file.ObjectName) ? (
-                        <ImageIcon className="h-4 w-4 mr-2 text-green-500" />
-                      ) : (
-                        getFileIcon(file.ObjectName)
-                      )}
-                      <span className="truncate flex-1">{file.ObjectName}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <button
-              onClick={() => setActiveFilter("recent")}
-              className="mt-3 text-xs text-[#4b7bb5] hover:text-[#3d649e] hover:underline w-full text-center"
-            >
-              Ver todos os arquivos recentes
-            </button>
-          </div>
-
-          {/* Favoritos */}
-          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-            <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-              <Star className="h-4 w-4 mr-2 text-amber-500" />
-              Favoritos
-            </h3>
-            {favorites.length === 0 ? (
-              <p className="text-xs text-gray-500 text-center py-2">Nenhum favorito</p>
-            ) : (
-              <ul className="space-y-2">
-                {files
-                  .filter((file) => favorites.includes(file.Path))
-                  .slice(0, 5)
-                  .map((file) => (
-                    <li key={file.Guid || file.ObjectName} className="text-sm">
-                      <button
-                        onClick={() =>
-                          file.IsDirectory ? navigateToFolder(file.Path) : window.open(file.PublicUrl, "_blank")
-                        }
-                        className="flex items-center hover:bg-gray-50 p-1.5 rounded-md w-full text-left"
-                      >
-                        {file.IsDirectory ? (
-                          <Folder className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-                        ) : (
-                          getFileIcon(file.ObjectName)
-                        )}
-                        <span className="truncate flex-1">{file.ObjectName}</span>
-                      </button>
-                    </li>
-                  ))}
-              </ul>
-            )}
-            <button
-              onClick={() => setActiveFilter("favorites")}
-              className="mt-3 text-xs text-[#4b7bb5] hover:text-[#3d649e] hover:underline w-full text-center"
-            >
-              Ver todos os favoritos
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Modais */}
-      {showRenameModal && fileToRename && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="font-medium flex items-center">
-                {fileToRename.IsDirectory ? (
-                  <FolderOpen className="h-5 w-5 mr-2 text-[#4b7bb5]" />
-                ) : (
-                  getFileIcon(fileToRename.ObjectName)
-                )}
-                <span className="ml-2">Renomear {fileToRename.IsDirectory ? "pasta" : "arquivo"}</span>
-              </h3>
-              <button
-                onClick={() => setShowRenameModal(false)}
-                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <form onSubmit={handleRename}>
-              <div className="p-6">
-                <div className="mb-4">
-                  <p className="text-sm text-gray-500 mb-2">Nome atual:</p>
-                  <p className="font-medium text-gray-700 bg-gray-50 p-2 rounded-md">{fileToRename.ObjectName}</p>
-                </div>
-                <div>
-                  <label htmlFor="newFileName" className="block text-sm font-medium text-gray-700 mb-1">
-                    Novo nome:
-                  </label>
-                  <input
-                    type="text"
-                    id="newFileName"
-                    value={newFileName}
-                    onChange={(e) => setNewFileName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5]"
-                    autoFocus
-                  />
-                  {renameError && <p className="mt-2 text-sm text-red-600">{renameError}</p>}
-                </div>
-              </div>
-              <div className="p-4 bg-gray-50 flex justify-end space-x-3 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowRenameModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isRenaming}
-                  className="px-4 py-2 bg-[#4b7bb5] border border-transparent rounded-md text-sm font-medium text-white hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4b7bb5] disabled:opacity-50 transition-colors"
-                >
-                  {isRenaming ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-1.5 inline animate-spin" />
-                      Renomeando...
-                    </>
-                  ) : (
-                    "Renomear"
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showCreateFolderModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="font-medium flex items-center">
-                <FolderPlus className="h-5 w-5 mr-2 text-[#4b7bb5]" />
-                <span className="ml-2">Criar Nova Pasta</span>
-              </h3>
-              <button
-                onClick={() => setShowCreateFolderModal(false)}
-                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <form onSubmit={submitCreateFolder}>
-              <div className="p-6">
-                <div>
-                  <label htmlFor="newFolderName" className="block text-sm font-medium text-gray-700 mb-1">
-                    Nome da pasta:
-                  </label>
-                  <input
-                    type="text"
-                    id="newFolderName"
-                    value={newFolderName}
-                    onChange={(e) => setNewFolderName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5]"
-                    autoFocus
-                    placeholder="Digite o nome da nova pasta"
-                  />
-                  {createFolderError && <p className="mt-2 text-sm text-red-600">{createFolderError}</p>}
-                </div>
-              </div>
-              <div className="p-4 bg-gray-50 flex justify-end space-x-3 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateFolderModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreatingFolder}
-                  className="px-4 py-2 bg-[#4b7bb5] border border-transparent rounded-md text-sm font-medium text-white hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4b7bb5] disabled:opacity-50 transition-colors"
-                >
-                  {isCreatingFolder ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-1.5 inline animate-spin" />
-                      Criando...
-                    </>
-                  ) : (
-                    "Criar Pasta"
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showMoveFileModal && fileToMove && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="font-medium flex items-center">
-                {fileToMove.IsDirectory ? (
-                  <FolderOpen className="h-5 w-5 mr-2 text-[#4b7bb5]" />
-                ) : (
-                  getFileIcon(fileToMove.ObjectName)
-                )}
-                <span className="ml-2">Mover {fileToMove.IsDirectory ? "pasta" : "arquivo"}</span>
-              </h3>
-              <button
-                onClick={() => setShowMoveFileModal(false)}
-                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <form onSubmit={handleMoveFile}>
-              <div className="p-6">
-                <div className="mb-4">
-                  <p className="text-sm text-gray-500 mb-2">Arquivo:</p>
-                  <p className="font-medium text-gray-700 bg-gray-50 p-2 rounded-md">{fileToMove.ObjectName}</p>
-                </div>
-                <div>
-                  <FolderSelector
-                    onSelect={(path) => setDestinationPath(path)}
-                    currentPath={getCurrentPathString()}
-                    excludePaths={fileToMove.IsDirectory ? [fileToMove.Path] : []}
-                  />
-                  {moveFileError && <p className="mt-2 text-sm text-red-600">{moveFileError}</p>}
-                  {destinationPath && (
-                    <div className="mt-3 p-2 bg-blue-50 rounded-md border border-blue-100">
-                      <p className="text-sm text-blue-700">Destino selecionado:</p>
-                      <p className="text-sm font-medium text-blue-800">{destinationPath}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="p-4 bg-gray-50 flex justify-end space-x-3 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowMoveFileModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isMovingFile || !destinationPath}
-                  className="px-4 py-2 bg-[#4b7bb5] border border-transparent rounded-md text-sm font-medium text-white hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4b7bb5] disabled:opacity-50 transition-colors"
-                >
-                  {isMovingFile ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-1.5 inline animate-spin" />
-                      Movendo...
-                    </>
-                  ) : (
-                    "Mover"
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal para mover múltiplos arquivos */}
-      <Dialog open={showMultiMoveModal} onOpenChange={setShowMultiMoveModal}>
-        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
-          <DialogHeader className="p-4 pb-2 border-b">
-            <DialogTitle className="flex items-center">
-              <MoveIcon className="h-5 w-5 mr-2 text-[#4b7bb5]" />
-              <span>Mover {selectedFiles.length} arquivo(s)</span>
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="grid grid-cols-1 md:grid-cols-5 h-[500px]">
-            {/* Painel esquerdo - Lista de pastas */}
-            <div className="md:col-span-2 border-r border-gray-200 h-full overflow-y-auto">
-              <div className="p-3 border-b bg-gray-50">
-                <h3 className="text-sm font-medium text-gray-700 flex items-center">
-                  <Folder className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-                  Pastas disponíveis
-                </h3>
-              </div>
-              <div className="overflow-y-auto h-[calc(100%-48px)]">
-                <div className="p-2">
+        {error && (
+          <div className="bg-red-50 p-4 rounded-lg mb-6 border-l-4 border-red-500 flex items-start">
+            <AlertCircle className="h-5 w-5 mr-2 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-red-700 mb-2">Erro ao carregar arquivos:</p>
+              <p className="mb-3 text-red-600">{error}</p>
+              <div className="bg-white p-3 rounded-md border border-red-100 text-sm space-y-2">
+                <p>
+                  Verifique se as variáveis de ambiente{" "}
+                  <code className="bg-red-50 px-1 py-0.5 rounded">BUNNY_API_KEY</code> e{" "}
+                  <code className="bg-red-50 px-1 py-0.5 rounded">BUNNY_STORAGE_ZONE</code> estão configuradas
+                  corretamente.
+                </p>
+                <p>
+                  <strong>Importante:</strong> Certifique-se de que você configurou uma Pull Zone no painel do Bunny.net
+                  conectada à sua Storage Zone para acessar os arquivos publicamente.
+                </p>
+                <div className="mt-3">
                   <button
-                    onClick={() => setMultiMoveDestination("")}
-                    className={`flex items-center w-full py-2 px-3 rounded-md text-left ${multiMoveDestination === "" ? "bg-[#4b7bb5] text-white" : "hover:bg-gray-100"}`}
+                    onClick={() => handleCreateDirectory()}
+                    className="text-red-600 hover:text-red-800 underline font-medium"
+                    disabled={isCreatingDirectory}
                   >
-                    <Home className="h-4 w-4 mr-2" />
-                    <span>Pasta raiz</span>
+                    Tentar criar uma nova pasta
                   </button>
-
-                  {availableFolders.map((folderPath) => {
-                    // Evitar pastas que são subpastas das pastas selecionadas
-                    if (selectedFiles.some((file) => file.IsDirectory && folderPath.startsWith(file.Path))) return null
-
-                    const folderName = folderPath.split("/").pop() || folderPath
-                    const isSelected = multiMoveDestination === folderPath
-
-                    return (
-                      <button
-                        key={folderPath}
-                        onClick={() => setMultiMoveDestination(folderPath)}
-                        className={`flex items-center w-full py-2 px-3 rounded-md text-left mt-1 ${isSelected ? "bg-[#4b7bb5] text-white" : "hover:bg-gray-100"}`}
-                      >
-                        <Folder className={`h-4 w-4 mr-2 ${isSelected ? "text-white" : "text-[#4b7bb5]"}`} />
-                        <span className="truncate">{folderName}</span>
-                      </button>
-                    )
-                  })}
                 </div>
-              </div>
-            </div>
-
-            {/* Painel direito - Prévia e detalhes */}
-            <div className="md:col-span-3 h-full overflow-y-auto flex flex-col">
-              <div className="p-3 border-b bg-gray-50">
-                <h3 className="text-sm font-medium text-gray-700 flex items-center">
-                  <Info className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-                  Detalhes da operação
-                </h3>
-              </div>
-
-              <div className="p-4 flex-1 overflow-y-auto">
-                {/* Destino selecionado */}
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-600 mb-2">Destino selecionado:</h4>
-                  {multiMoveDestination ? (
-                    <div className="bg-blue-50 p-3 rounded-md border border-blue-100 flex items-center">
-                      <Folder className="h-5 w-5 mr-2 text-[#4b7bb5]" />
-                      <span className="font-medium text-[#4b7bb5]">{multiMoveDestination}</span>
-                    </div>
-                  ) : (
-                    <div className="bg-yellow-50 p-3 rounded-md border border-yellow-100 flex items-center">
-                      <Home className="h-5 w-5 mr-2 text-amber-500" />
-                      <span className="font-medium text-amber-700">Pasta raiz</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Arquivos selecionados */}
-                <div>
-                  <h4 className="text-sm font-medium text-gray-600 mb-2">
-                    Arquivos a serem movidos ({selectedFiles.length}):
-                  </h4>
-                  <div className="bg-gray-50 rounded-md border border-gray-200 max-h-64 overflow-y-auto">
-                    {selectedFiles.map((file) => (
-                      <div key={file.Path} className="p-2 border-b border-gray-100 last:border-0 flex items-center">
-                        {file.IsDirectory ? (
-                          <Folder className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-                        ) : (
-                          getFileIcon(file.ObjectName)
-                        )}
-                        <span className="text-sm truncate">{file.ObjectName}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Mensagem de erro */}
-                {multiMoveError && (
-                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
-                    <AlertCircle className="h-4 w-4 inline mr-2" />
-                    {multiMoveError}
-                  </div>
-                )}
-
-                {/* Progresso */}
-                {multiMoveProgress && (
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <div className="flex justify-between text-sm text-blue-700 mb-1">
-                      <span>Movendo arquivos...</span>
-                      <span>
-                        {multiMoveProgress.current + 1} de {multiMoveProgress.total}
-                      </span>
-                    </div>
-                    <div className="w-full bg-blue-200 rounded-full h-2">
-                      <div
-                        className="bg-[#4b7bb5] h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${((multiMoveProgress.current + 1) / multiMoveProgress.total) * 100}%` }}
-                      ></div>
-                    </div>
-                    <p className="text-xs text-blue-600 mt-1 truncate">Processando: {multiMoveProgress.currentFile}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
-                <Button variant="outline" onClick={() => setShowMultiMoveModal(false)} disabled={isMovingMultiple}>
-                  Cancelar
-                </Button>
-                <Button
-                  variant="default"
-                  onClick={handleMoveMultipleFiles}
-                  disabled={isMovingMultiple || selectedFiles.length === 0}
-                  className="bg-[#4b7bb5] hover:bg-[#3d649e]"
-                >
-                  {isMovingMultiple ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Movendo...
-                    </>
-                  ) : (
-                    <>
-                      <MoveIcon className="h-4 w-4 mr-2" />
-                      Mover arquivos
-                    </>
-                  )}
-                </Button>
               </div>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-      {showFolderTasks && selectedFolderForTasks && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <FolderTasksPanel folderPath={selectedFolderForTasks} onClose={() => setShowFolderTasks(false)} />
-        </div>
-      )}
+        )}
+
+        {isLoading && filteredFiles.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="animate-spin h-10 w-10 border-3 border-[#4b7bb5] border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-gray-600 font-medium">Carregando arquivos...</p>
+            <p className="text-gray-500 text-sm mt-1">Aguarde enquanto buscamos os arquivos do diretório</p>
+          </div>
+        ) : filteredFiles.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+            <FolderOpen size={48} className="text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-700 mb-1">Pasta vazia</h3>
+            <p className="text-gray-500 mb-6 max-w-md mx-auto">
+              {searchQuery
+                ? `Nenhum arquivo encontrado para "${searchQuery}". Tente outra busca.`
+                : `Esta pasta não contém nenhum arquivo ou subpasta. Faça upload de arquivos ou crie uma nova pasta.`}
+            </p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <button
+                onClick={() => setSearchQuery("")}
+                className={`flex items-center px-4 py-2 rounded-md transition-all ${
+                  searchQuery ? "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50" : "hidden"
+                }`}
+              >
+                <X className="h-4 w-4 mr-1.5" />
+                Limpar busca
+              </button>
+
+              <button
+                onClick={handleCreateDirectory}
+                className="flex items-center px-4 py-2 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] transition-colors shadow-sm"
+                disabled={isCreatingDirectory}
+              >
+                {isCreatingDirectory ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                    <span>Criando...</span>
+                  </>
+                ) : (
+                  <>
+                    <FolderPlus className="h-4 w-4 mr-1.5" />
+                    <span>Criar pasta</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-gray-200">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    {isSelectionMode && <th className="py-3 px-2 font-medium text-gray-600 w-10"></th>}
+                    <th className="text-left py-3 px-4 font-medium text-gray-600">Arquivo</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-600">Tamanho</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-600">Data</th>
+                    <th className="text-right py-3 px-4 font-medium text-gray-600">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredFiles.map((file) => (
+                    <tr
+                      key={file.Guid || file.ObjectName}
+                      className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                        isFileSelected(file) ? "bg-blue-50" : ""
+                      }`}
+                    >
+                      {isSelectionMode && (
+                        <td className="py-3 px-2 text-center">
+                          <button onClick={() => toggleFileSelection(file)} className="p-1 rounded hover:bg-gray-100">
+                            {isFileSelected(file) ? (
+                              <CheckSquare className="h-5 w-5 text-[#4b7bb5]" />
+                            ) : (
+                              <Square className="h-5 w-5 text-gray-400" />
+                            )}
+                          </button>
+                        </td>
+                      )}
+
+                      <td className="py-3 px-4">
+                        <div className="flex items-center">
+                          <div className="p-1.5 bg-gray-100 rounded-md mr-3">
+                            {file.IsDirectory ? (
+                              <FolderOpen className="h-5 w-5 text-[#4b7bb5]" />
+                            ) : (
+                              getFileIcon(file.ObjectName)
+                            )}
+                          </div>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="cursor-pointer hover:text-[#4b7bb5] font-medium transition-colors"
+                                onClick={() => handlePreviewFile(file)}
+                              >
+                                {file.ObjectName}
+                              </span>
+                              {file.IsDirectory && folderTaskCounts[file.Path] > 0 && (
+                                <FolderTaskBadge
+                                  count={folderTaskCounts[file.Path]}
+                                  onClick={(e) => {
+                                    openFolderTasks(file.Path)
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-gray-500">
+                        {file.IsDirectory ? "-" : formatFileSize(file.Length)}
+                      </td>
+                      <td className="py-3 px-4 text-gray-500">{formatDate(file.LastChanged)}</td>
+
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex justify-end space-x-2">
+                          {file.IsDirectory && (
+                            <button
+                              className="p-1.5 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-md transition-colors"
+                              title="Tarefas da pasta"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openFolderTasks(file.Path)
+                              }}
+                            >
+                              <ClipboardList className="h-4 w-4" />
+                            </button>
+                          )}
+                          {!file.IsDirectory && (
+                            <a
+                              href={file.PublicUrl || getBunnyPublicUrl(file.Path)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+                              title="Abrir arquivo"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          )}
+                          <button
+                            className="p-1.5 text-orange-500 hover:text-orange-700 hover:bg-orange-50 rounded-md transition-colors"
+                            title="Renomear"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openRenameModal(file)
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          {!file.IsDirectory && (
+                            <button
+                              className="p-1.5 text-purple-500 hover:text-purple-700 hover:bg-purple-50 rounded-md transition-colors"
+                              title="Mover arquivo"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openMoveFileModal(file)
+                              }}
+                            >
+                              <MoveIcon className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
+                            title="Excluir"
+                            onClick={() => handleDelete(file.Path)}
+                            disabled={deletingFile === file.Path}
+                          >
+                            {deletingFile === file.Path ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {showRenameModal && fileToRename && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
+            <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
+              <div className="p-4 border-b flex justify-between items-center">
+                <h3 className="font-medium flex items-center">
+                  {fileToRename.IsDirectory ? (
+                    <FolderOpen className="h-5 w-5 mr-2 text-[#4b7bb5]" />
+                  ) : (
+                    getFileIcon(fileToRename.ObjectName)
+                  )}
+                  <span className="ml-2">Renomear {fileToRename.IsDirectory ? "pasta" : "arquivo"}</span>
+                </h3>
+                <button
+                  onClick={() => setShowRenameModal(false)}
+                  className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <form onSubmit={handleRename}>
+                <div className="p-6">
+                  <div className="mb-4">
+                    <p className="text-sm text-gray-500 mb-2">Nome atual:</p>
+                    <p className="font-medium text-gray-700 bg-gray-50 p-2 rounded-md">{fileToRename.ObjectName}</p>
+                  </div>
+                  <div>
+                    <label htmlFor="newFileName" className="block text-sm font-medium text-gray-700 mb-1">
+                      Novo nome:
+                    </label>
+                    <input
+                      type="text"
+                      id="newFileName"
+                      value={newFileName}
+                      onChange={(e) => setNewFileName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5]"
+                      autoFocus
+                    />
+                    {renameError && <p className="mt-2 text-sm text-red-600">{renameError}</p>}
+                  </div>
+                </div>
+                <div className="p-4 bg-gray-50 flex justify-end space-x-3 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setShowRenameModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isRenaming}
+                    className="px-4 py-2 bg-[#4b7bb5] border border-transparent rounded-md text-sm font-medium text-white hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4b7bb5] disabled:opacity-50 transition-colors"
+                  >
+                    {isRenaming ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1.5 inline animate-spin" />
+                        Renomeando...
+                      </>
+                    ) : (
+                      "Renomear"
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {showMoveFileModal && fileToMove && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
+            <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
+              <div className="p-4 border-b flex justify-between items-center">
+                <h3 className="font-medium flex items-center">
+                  {fileToMove.IsDirectory ? (
+                    <FolderOpen className="h-5 w-5 mr-2 text-[#4b7bb5]" />
+                  ) : (
+                    getFileIcon(fileToMove.ObjectName)
+                  )}
+                  <span className="ml-2">Mover {fileToMove.IsDirectory ? "pasta" : "arquivo"}</span>
+                </h3>
+                <button
+                  onClick={() => setShowMoveFileModal(false)}
+                  className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <form onSubmit={handleMoveFile}>
+                <div className="p-6">
+                  <div className="mb-4">
+                    <p className="text-sm text-gray-500 mb-2">Arquivo:</p>
+                    <p className="font-medium text-gray-700 bg-gray-50 p-2 rounded-md">{fileToMove.ObjectName}</p>
+                  </div>
+                  <div>
+                    <label htmlFor="destinationPath" className="block text-sm font-medium text-gray-700 mb-1">
+                      Destino:
+                    </label>
+                    <select
+                      id="destinationPath"
+                      value={destinationPath}
+                      onChange={(e) => setDestinationPath(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5]"
+                    >
+                      <option value="">Selecione uma pasta</option>
+                      <option value="documents">Documentos (Raiz)</option>
+                      <option value="images">Imagens (Raiz)</option>
+                      {availableFolders
+                        .filter((folder) => folder !== fileToMove.Path && !folder.startsWith(fileToMove.Path + "/"))
+                        .map((folder) => (
+                          <option key={folder} value={folder}>
+                            {folder}
+                          </option>
+                        ))}
+                    </select>
+                    {moveFileError && <p className="mt-2 text-sm text-red-600">{moveFileError}</p>}
+                  </div>
+                </div>
+                <div className="p-4 bg-gray-50 flex justify-end space-x-3 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setShowMoveFileModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isMovingFile || !destinationPath}
+                    className="px-4 py-2 bg-[#4b7bb5] border border-transparent rounded-md text-sm font-medium text-white hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4b7bb5] disabled:opacity-50 transition-colors"
+                  >
+                    {isMovingFile ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1.5 inline animate-spin" />
+                        Movendo...
+                      </>
+                    ) : (
+                      "Mover"
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {showMultiMoveModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
+            <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
+              <div className="p-4 border-b flex justify-between items-center">
+                <h3 className="font-medium flex items-center">
+                  <MoveIcon className="h-5 w-5 mr-2 text-purple-500" />
+                  <span className="ml-2">Mover {selectedFiles.length} arquivo(s)</span>
+                </h3>
+                <button
+                  onClick={() => setShowMultiMoveModal(false)}
+                  className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <form onSubmit={handleMoveMultipleFiles}>
+                <div className="p-6">
+                  <div className="mb-4">
+                    <p className="text-sm text-gray-500 mb-2">Arquivos selecionados:</p>
+                    <div className="max-h-32 overflow-y-auto bg-gray-50 p-2 rounded-md">
+                      {selectedFiles.map((file) => (
+                        <div key={file.Path} className="flex items-center py-1">
+                          <div className="mr-2">
+                            {file.IsDirectory ? (
+                              <FolderOpen className="h-4 w-4 text-[#4b7bb5]" />
+                            ) : (
+                              getFileIcon(file.ObjectName)
+                            )}
+                          </div>
+                          <span className="text-sm text-gray-700 truncate">{file.ObjectName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="multiMoveDestination" className="block text-sm font-medium text-gray-700 mb-1">
+                      Destino:
+                    </label>
+                    <select
+                      id="multiMoveDestination"
+                      value={multiMoveDestination}
+                      onChange={(e) => setMultiMoveDestination(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5]"
+                    >
+                      <option value="">Selecione uma pasta</option>
+                      <option value="documents">Documentos (Raiz)</option>
+                      <option value="images">Imagens (Raiz)</option>
+                      {availableFolders
+                        .filter(
+                          (folder) =>
+                            !selectedFiles.some((file) => file.Path === folder || file.Path.startsWith(folder + "/")),
+                        )
+                        .map((folder) => (
+                          <option key={folder} value={folder}>
+                            {folder}
+                          </option>
+                        ))}
+                    </select>
+                    {multiMoveError && <p className="mt-2 text-sm text-red-600">{multiMoveError}</p>}
+                  </div>
+
+                  {multiMoveProgress && (
+                    <div className="mt-4">
+                      <p className="text-sm text-gray-600 mb-1">
+                        Movendo {multiMoveProgress.current + 1} de {multiMoveProgress.total}
+                      </p>
+                      <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div
+                          className="bg-[#4b7bb5] h-2.5 rounded-full"
+                          style={{ width: `${((multiMoveProgress.current + 1) / multiMoveProgress.total) * 100}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1 truncate">{multiMoveProgress.currentFile}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="p-4 bg-gray-50 flex justify-end space-x-3 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setShowMultiMoveModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    disabled={isMovingMultiple}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isMovingMultiple || !multiMoveDestination}
+                    className="px-4 py-2 bg-[#4b7bb5] border border-transparent rounded-md text-sm font-medium text-white hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4b7bb5] disabled:opacity-50 transition-colors"
+                  >
+                    {isMovingMultiple ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1.5 inline animate-spin" />
+                        Movendo...
+                      </>
+                    ) : (
+                      "Mover"
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Outros modais e componentes... */}
+
+        {/* Modais de pasta, move, etc. são mantidos como no código original */}
+
+        {/* Modificar a parte onde o modal de tarefas é renderizado para usar o novo componente FolderTasksPanel */}
+
+        {/* Substituir o modal de tarefas existente por: */}
+        {showFolderTasks && selectedFolderForTasks && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
+            <FolderTasksPanel folderPath={selectedFolderForTasks} onClose={() => setShowFolderTasks(false)} />
+          </div>
+        )}
+        {showTasksPanel && selectedFolderForTasks && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="max-w-2xl w-full">
+              {/*<FolderTasksPanel
+                folderPath={selectedFolderForTasks}
+                onClose={closeTasksPanel}
+              />*/}
+            </div>
+          </div>
+        )}
+      </div>
     </>
   )
 }

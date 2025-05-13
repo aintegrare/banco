@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { X, Calendar, Paperclip, Loader2, AlertCircle } from "lucide-react"
+import { X, Calendar, Paperclip, Loader2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 
 interface Project {
@@ -11,7 +11,7 @@ interface Project {
   name: string
 }
 
-// Lista de status disponíveis - mantemos os mesmos IDs para a UI
+// Lista de status disponíveis
 const STATUSES = [
   { id: "backlog", name: "Backlog" },
   { id: "todo", name: "A Fazer" },
@@ -57,8 +57,6 @@ export function CreateTaskDialog({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
-  const [debugInfo, setDebugInfo] = useState<any>(null)
-  const [debugVisible, setDebugVisible] = useState(false)
   const { toast } = useToast()
 
   // Buscar projetos disponíveis
@@ -89,32 +87,11 @@ export function CreateTaskDialog({
     }
   }, [isOpen, toast])
 
-  // Buscar informações de depuração da tabela tasks
-  useEffect(() => {
-    if (isOpen && debugVisible) {
-      const fetchDebugInfo = async () => {
-        try {
-          const response = await fetch("/api/debug-tasks-table")
-          if (!response.ok) {
-            throw new Error("Falha ao buscar informações de depuração")
-          }
-          const data = await response.json()
-          setDebugInfo(data)
-        } catch (error) {
-          console.error("Erro ao buscar informações de depuração:", error)
-        }
-      }
-
-      fetchDebugInfo()
-    }
-  }, [isOpen, debugVisible])
-
   // Se o diálogo não estiver aberto, não renderize nada
   if (!isOpen) {
     return null
   }
 
-  // Modificar a função handleSubmit para remover o campo status ao enviar os dados
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -132,26 +109,22 @@ export function CreateTaskDialog({
     setError(null)
 
     try {
-      // Criar objeto de dados sem incluir o status
-      const taskData = {
-        title: taskTitle,
-        description: taskDescription,
-        // Não enviar o status para o backend
-        project_id: projectId,
-        due_date: dueDate || null,
-        color: taskColor,
-        creator: creator || null,
-        assignee: assignee || null,
-        priority: "medium", // Valor padrão
-      }
-
       // Criar nova tarefa via API
       const response = await fetch("/api/tasks", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(taskData),
+        body: JSON.stringify({
+          title: taskTitle,
+          description: taskDescription,
+          status: status,
+          project_id: projectId,
+          due_date: dueDate || null,
+          color: taskColor,
+          creator: creator || null,
+          assignee: assignee || null,
+        }),
       })
 
       if (!response.ok) {
@@ -168,11 +141,7 @@ export function CreateTaskDialog({
 
       // Notificar o componente pai sobre a nova tarefa
       if (onTaskCreated) {
-        // Adicionar o status visual do frontend
-        onTaskCreated({
-          ...newTask,
-          status: status, // Usar o status selecionado no frontend
-        })
+        onTaskCreated(newTask)
       }
 
       // Fechar o diálogo após sucesso
@@ -190,28 +159,17 @@ export function CreateTaskDialog({
     }
   }
 
-  const toggleDebugInfo = () => {
-    setDebugVisible(!debugVisible)
-  }
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 px-6 py-4">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Nova Tarefa</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-            type="button"
-          >
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-center border-b border-gray-200 px-6 py-4">
+          <h2 className="text-xl font-semibold text-gray-800">Nova Tarefa</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600" type="button">
             <X size={24} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 bg-white dark:bg-gray-800">
+        <form onSubmit={handleSubmit} className="p-6">
           <div className="mb-4">
             <label htmlFor="task-title" className="block text-sm font-medium text-gray-700 mb-1">
               Título
@@ -224,7 +182,7 @@ export function CreateTaskDialog({
                 setTaskTitle(e.target.value)
                 setError(null)
               }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
               placeholder="Digite o título da tarefa"
               autoFocus
             />
@@ -238,7 +196,7 @@ export function CreateTaskDialog({
               id="task-description"
               value={taskDescription}
               onChange={(e) => setTaskDescription(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
               placeholder="Descreva a tarefa brevemente"
               rows={3}
             />
@@ -253,7 +211,7 @@ export function CreateTaskDialog({
                 id="project-select"
                 value={projectId?.toString() || ""}
                 onChange={(e) => setProjectId(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
                 disabled={isLoadingProjects}
               >
                 <option value="">Selecione um projeto</option>
@@ -267,13 +225,13 @@ export function CreateTaskDialog({
 
             <div>
               <label htmlFor="status-select" className="block text-sm font-medium text-gray-700 mb-1">
-                Status (visual apenas)
+                Status
               </label>
               <select
                 id="status-select"
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
               >
                 {STATUSES.map((status) => (
                   <option key={status.id} value={status.id}>
@@ -281,10 +239,6 @@ export function CreateTaskDialog({
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-amber-600 mt-1 flex items-center">
-                <AlertCircle size={12} className="mr-1" />
-                Este campo é apenas visual e não será salvo no banco de dados
-              </p>
             </div>
           </div>
 
@@ -298,7 +252,7 @@ export function CreateTaskDialog({
                 id="due-date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent pl-10 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent pl-10"
               />
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
             </div>
@@ -306,7 +260,7 @@ export function CreateTaskDialog({
 
           <div className="mb-4">
             <label htmlFor="task-color" className="block text-sm font-medium text-gray-700 mb-1">
-              Cor da Tarefa (visual apenas)
+              Cor da Tarefa
             </label>
             <div className="grid grid-cols-5 gap-2">
               {COLOR_OPTIONS.map((color) => (
@@ -322,73 +276,40 @@ export function CreateTaskDialog({
                 />
               ))}
             </div>
-            <div className="mt-2 text-xs text-gray-500 flex items-center">
-              <span>
-                Cor selecionada:{" "}
-                <span className="font-medium">{COLOR_OPTIONS.find((c) => c.id === taskColor)?.name}</span>
-              </span>
-              <span className="text-amber-600 ml-2 flex items-center">
-                <AlertCircle size={12} className="mr-1" />
-                Visual apenas
-              </span>
+            <div className="mt-2 text-xs text-gray-500">
+              Cor selecionada:{" "}
+              <span className="font-medium">{COLOR_OPTIONS.find((c) => c.id === taskColor)?.name}</span>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label htmlFor="task-creator" className="block text-sm font-medium text-gray-700 mb-1">
-                Criador da Tarefa (visual apenas)
+                Criador da Tarefa
               </label>
               <input
                 type="text"
                 id="task-creator"
                 value={creator}
                 onChange={(e) => setCreator(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
                 placeholder="Nome do criador"
               />
-              <p className="text-xs text-amber-600 mt-1 flex items-center">
-                <AlertCircle size={12} className="mr-1" />
-                Visual apenas
-              </p>
             </div>
             <div>
               <label htmlFor="task-assignee" className="block text-sm font-medium text-gray-700 mb-1">
-                Responsável (visual apenas)
+                Responsável
               </label>
               <input
                 type="text"
                 id="task-assignee"
                 value={assignee}
                 onChange={(e) => setAssignee(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-transparent"
                 placeholder="Nome do responsável"
               />
-              <p className="text-xs text-amber-600 mt-1 flex items-center">
-                <AlertCircle size={12} className="mr-1" />
-                Visual apenas
-              </p>
             </div>
           </div>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-red-600 text-sm flex items-start">
-                <AlertCircle size={16} className="mr-2 mt-0.5 flex-shrink-0" />
-                <span>{error}</span>
-              </p>
-              <button type="button" onClick={toggleDebugInfo} className="text-xs text-blue-600 hover:underline mt-2">
-                {debugVisible ? "Ocultar informações de depuração" : "Mostrar informações de depuração"}
-              </button>
-
-              {debugVisible && debugInfo && (
-                <div className="mt-2 text-xs overflow-auto max-h-40 bg-gray-100 p-2 rounded">
-                  <p className="font-semibold">Informações da tabela tasks:</p>
-                  <pre className="whitespace-pre-wrap break-all">{JSON.stringify(debugInfo, null, 2)}</pre>
-                </div>
-              )}
-            </div>
-          )}
 
           <div className="mb-4">
             <button type="button" className="flex items-center text-sm text-[#4b7bb5] hover:text-[#3d649e]">
@@ -397,11 +318,13 @@ export function CreateTaskDialog({
             </button>
           </div>
 
+          {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+
           <div className="flex justify-end space-x-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               disabled={isSubmitting}
             >
               Cancelar

@@ -1,56 +1,39 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { FileService } from "@/lib/file-service"
-import { logger } from "@/lib/logger"
+import { renameBunnyFile } from "@/lib/bunny"
 
 export async function POST(request: NextRequest) {
   try {
     const { oldPath, newName } = await request.json()
 
     if (!oldPath || !newName) {
-      logger.warn("API Files Rename: Parâmetros inválidos", { data: { oldPath, newName } })
-      return NextResponse.json(
-        { error: "Parâmetros inválidos. 'oldPath' e 'newName' são obrigatórios." },
-        { status: 400 },
-      )
+      return NextResponse.json({ error: "Caminho antigo e novo nome são obrigatórios" }, { status: 400 })
     }
 
-    logger.info(`API Files Rename: Renomeando arquivo de ${oldPath} para ${newName}`)
+    console.log(`API Rename File: Renomeando arquivo de ${oldPath} para ${newName}`)
 
-    // Verificar se as variáveis de ambiente estão configuradas
-    if (!process.env.BUNNY_API_KEY || !process.env.BUNNY_STORAGE_ZONE) {
-      logger.error("API Files Rename: Configurações do Bunny.net incompletas")
-      return NextResponse.json(
-        {
-          error: "Configurações do Bunny.net incompletas. Verifique as variáveis de ambiente.",
-          details: "BUNNY_API_KEY e BUNNY_STORAGE_ZONE são necessários",
-        },
-        { status: 500 },
-      )
+    // Verificar se o novo nome contém caracteres inválidos
+    if (/[\\/:*?"<>|]/.test(newName)) {
+      return NextResponse.json({ error: "O nome do arquivo contém caracteres inválidos" }, { status: 400 })
     }
 
-    // Usar o serviço de arquivos para renomear o arquivo
-    const result = await FileService.renameFile(oldPath, newName)
+    // Verificar se é uma pasta (termina com /)
+    const isDirectory = oldPath.endsWith("/") || oldPath.endsWith("\\")
+    console.log(`API Rename File: Tipo de item: ${isDirectory ? "Pasta" : "Arquivo"}`)
 
-    if (!result.success) {
-      logger.error(`API Files Rename: ${result.error}`, { data: result.details })
-      return NextResponse.json(
-        {
-          error: result.error,
-          details: result.details,
-          retryable: result.retryable,
-        },
-        { status: result.retryable ? 503 : 400 },
-      )
-    }
+    // Usar a função de renomeação apropriada
+    const newUrl = await renameBunnyFile(oldPath, newName)
 
-    return NextResponse.json(result.data)
+    return NextResponse.json({
+      success: true,
+      newUrl,
+      message: `${isDirectory ? "Pasta" : "Arquivo"} renomeado com sucesso`,
+    })
   } catch (error) {
-    logger.error("API Files Rename: Erro ao renomear arquivo:", { data: error })
+    console.error("Erro ao renomear arquivo:", error)
     return NextResponse.json(
       {
         error: "Erro ao renomear arquivo",
         message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 },
     )

@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Calendar, Clock, CheckCircle, AlertTriangle, ArrowRight, Plus, Loader2, Trash2 } from "lucide-react"
+import { Calendar, Clock, CheckCircle, AlertTriangle, ArrowRight, Plus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CreateTaskDialog } from "@/components/tasks/create-task-dialog"
 import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
 import { useToast } from "@/components/ui/use-toast"
-import { DeleteTaskConfirmation } from "@/components/tasks/delete-task-confirmation"
 
 interface Task {
   id: string | number
@@ -31,7 +30,6 @@ export function ProjectTasks({ tasks: initialTasks, projectId }: ProjectTasksPro
   const [isLoading, setIsLoading] = useState(false)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editTaskId, setEditTaskId] = useState<string | number | null>(null)
-  const [deleteTaskId, setDeleteTaskId] = useState<string | number | null>(null)
   const { toast } = useToast()
 
   // Buscar tarefas do projeto
@@ -41,24 +39,12 @@ export function ProjectTasks({ tasks: initialTasks, projectId }: ProjectTasksPro
 
       setIsLoading(true)
       try {
-        // Adicionando logs para debug
-        console.log(`Buscando tarefas para o projeto ID: ${projectId}`)
-
-        const response = await fetch(`/api/tasks?project_id=${projectId}`)
+        const response = await fetch(`/api/tasks?projectId=${projectId}`)
         if (!response.ok) {
           throw new Error("Falha ao buscar tarefas")
         }
-
         const data = await response.json()
-        console.log(`Tarefas recebidas: ${data.length}`, data)
-
-        // Filtrando explicitamente pelo project_id para garantir
-        const filteredTasks = data.filter(
-          (task: Task) => task.project_id && task.project_id.toString() === projectId.toString(),
-        )
-
-        console.log(`Tarefas filtradas: ${filteredTasks.length}`, filteredTasks)
-        setTasks(filteredTasks)
+        setTasks(data)
       } catch (error: any) {
         console.error("Erro ao buscar tarefas:", error)
         toast({
@@ -151,58 +137,19 @@ export function ProjectTasks({ tasks: initialTasks, projectId }: ProjectTasksPro
   const displayTasks = sortedTasks.slice(0, 5)
 
   const handleTaskCreated = (newTask: Task) => {
-    // Verificar se a tarefa pertence a este projeto
-    if (newTask.project_id && newTask.project_id.toString() === projectId.toString()) {
-      setTasks((prevTasks) => [newTask, ...prevTasks])
-      toast({
-        title: "Tarefa criada",
-        description: "A tarefa foi criada com sucesso!",
-      })
-    }
+    setTasks((prevTasks) => [newTask, ...prevTasks])
+    toast({
+      title: "Tarefa criada",
+      description: "A tarefa foi criada com sucesso!",
+    })
   }
 
   const handleTaskUpdated = (updatedTask: Task) => {
-    // Verificar se a tarefa ainda pertence a este projeto após a atualização
-    if (updatedTask.project_id && updatedTask.project_id.toString() === projectId.toString()) {
-      setTasks((prevTasks) => prevTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task)))
-    } else {
-      // Se a tarefa foi movida para outro projeto, remova-a da lista
-      setTasks((prevTasks) => prevTasks.filter((task) => task.id !== updatedTask.id))
-    }
-
+    setTasks((prevTasks) => prevTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task)))
     toast({
       title: "Tarefa atualizada",
       description: "A tarefa foi atualizada com sucesso!",
     })
-  }
-
-  const handleDeleteTask = async (taskId: string | number) => {
-    setIsLoading(true)
-    try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: "DELETE",
-      })
-
-      if (!response.ok) {
-        throw new Error("Falha ao excluir tarefa")
-      }
-
-      setTasks((prevTasks) => prevTasks.filter((task) => task.id !== taskId))
-      toast({
-        title: "Tarefa excluída",
-        description: "A tarefa foi excluída com sucesso!",
-      })
-    } catch (error: any) {
-      console.error("Erro ao excluir tarefa:", error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível excluir a tarefa",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-      setDeleteTaskId(null)
-    }
   }
 
   return (
@@ -261,12 +208,13 @@ export function ProjectTasks({ tasks: initialTasks, projectId }: ProjectTasksPro
         <div className="space-y-3">
           {displayTasks.length > 0 ? (
             displayTasks.map((task) => (
-              <div key={task.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+              <div
+                key={task.id}
+                className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow cursor-pointer"
+                onClick={() => setEditTaskId(task.id)}
+              >
                 <div className="flex items-start justify-between">
-                  <div
-                    className="flex items-start space-x-3 cursor-pointer flex-1"
-                    onClick={() => setEditTaskId(task.id)}
-                  >
+                  <div className="flex items-start space-x-3">
                     <div className="mt-1">{getStatusIcon(task.status)}</div>
                     <div>
                       <h3 className="font-medium text-gray-800">{task.title}</h3>
@@ -285,16 +233,6 @@ export function ProjectTasks({ tasks: initialTasks, projectId }: ProjectTasksPro
                       <Calendar size={14} className="mr-1" />
                       <span>{formatDate(task.due_date)}</span>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setDeleteTaskId(task.id)
-                      }}
-                      className="mt-2 text-gray-400 hover:text-red-500 transition-colors"
-                      title="Excluir tarefa"
-                    >
-                      <Trash2 size={16} />
-                    </button>
                   </div>
                 </div>
                 <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
@@ -339,16 +277,6 @@ export function ProjectTasks({ tasks: initialTasks, projectId }: ProjectTasksPro
           onClose={() => setEditTaskId(null)}
           taskId={editTaskId}
           onSave={handleTaskUpdated}
-        />
-      )}
-
-      {/* Diálogo de confirmação de exclusão */}
-      {deleteTaskId && (
-        <DeleteTaskConfirmation
-          isOpen={!!deleteTaskId}
-          onClose={() => setDeleteTaskId(null)}
-          onConfirm={() => handleDeleteTask(deleteTaskId)}
-          taskTitle={tasks.find((t) => t.id === deleteTaskId)?.title || "esta tarefa"}
         />
       )}
     </div>

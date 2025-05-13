@@ -1,22 +1,41 @@
+"use client"
+
+import type React from "react"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Search } from "lucide-react"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
 export function BlogSearch() {
+  const router = useRouter()
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      router.push(`/blog/busca?q=${encodeURIComponent(searchQuery)}`)
+    }
+  }
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-      <h3 className="text-xl font-bold text-[#4072b0] dark:text-[#6b91c1] mb-4">Buscar</h3>
-      <div className="relative">
-        <Input
-          type="text"
-          placeholder="Buscar no blog..."
-          className="pl-10 pr-4 py-2 border-gray-200 dark:border-gray-700 focus:border-[#4b7bb5] dark:focus:border-[#6b91c1] focus:ring-[#4b7bb5] dark:focus:ring-[#6b91c1]"
-        />
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Button className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 py-0 px-3 bg-[#4b7bb5] hover:bg-[#3d649e] text-white">
+    <div className="bg-white rounded-lg shadow-sm p-6">
+      <h3 className="text-xl font-bold text-[#4072b0] mb-4">Buscar</h3>
+      <form onSubmit={handleSearch} className="flex space-x-2">
+        <div className="relative flex-grow">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar no blog..."
+            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <Button type="submit" className="bg-[#4b7bb5] hover:bg-[#3d649e]">
           Buscar
         </Button>
-      </div>
+      </form>
     </div>
   )
 }

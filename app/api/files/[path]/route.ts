@@ -1,47 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { FileService } from "@/lib/file-service"
-import { logger } from "@/lib/logger"
+import { deleteBunnyFile } from "@/lib/bunny"
 
 export async function DELETE(request: NextRequest, { params }: { params: { path: string } }) {
   try {
-    const path = decodeURIComponent(params.path)
-    logger.info(`API Files Delete: Excluindo arquivo: ${path}`)
+    const path = params.path
+    const decodedPath = decodeURIComponent(path)
 
-    // Verificar se as variáveis de ambiente estão configuradas
-    if (!process.env.BUNNY_API_KEY || !process.env.BUNNY_STORAGE_ZONE) {
-      logger.error("API Files Delete: Configurações do Bunny.net incompletas")
-      return NextResponse.json(
-        {
-          error: "Configurações do Bunny.net incompletas. Verifique as variáveis de ambiente.",
-          details: "BUNNY_API_KEY e BUNNY_STORAGE_ZONE são necessários",
-        },
-        { status: 500 },
-      )
-    }
+    console.log(`API Delete File: Recebido caminho: ${path}`)
+    console.log(`API Delete File: Caminho decodificado: ${decodedPath}`)
 
-    // Usar o serviço de arquivos para excluir o arquivo
-    const result = await FileService.deleteFile(path)
+    // Garantir que o caminho esteja no formato correto
+    // Se o caminho não começar com 'documents/', adicionar
+    const normalizedPath = decodedPath.startsWith("documents/") ? decodedPath : `documents/${decodedPath}`
 
-    if (!result.success) {
-      logger.error(`API Files Delete: ${result.error}`, { data: result.details })
-      return NextResponse.json(
-        {
-          error: result.error,
-          details: result.details,
-          retryable: result.retryable,
-        },
-        { status: result.retryable ? 503 : 400 },
-      )
-    }
+    console.log(`API Delete File: Caminho normalizado: ${normalizedPath}`)
 
-    return NextResponse.json(result.data)
+    await deleteBunnyFile(normalizedPath)
+
+    return NextResponse.json({ success: true })
   } catch (error) {
-    logger.error("API Files Delete: Erro ao excluir arquivo:", { data: error })
+    console.error("Erro ao excluir arquivo:", error)
     return NextResponse.json(
       {
         error: "Erro ao excluir arquivo",
         message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 },
     )

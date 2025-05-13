@@ -1,7 +1,8 @@
 "use client"
 
 import type React from "react"
-import { usePathname, useRouter } from "next/navigation"
+
+import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import {
@@ -12,15 +13,12 @@ import {
   Search,
   Wrench,
   BarChart3,
+  Users,
   Calendar,
   MessageSquare,
   Globe,
   FileImage,
-  LogOut,
-  Users,
-  Share2,
 } from "lucide-react"
-import { getSupabaseClient } from "@/lib/supabase/client"
 
 interface DockItemProps {
   href: string
@@ -28,36 +26,9 @@ interface DockItemProps {
   label: string
   isActive: boolean
   badge?: number | string
-  onClick?: () => void
 }
 
-function DockItem({ href, icon, label, isActive, badge, onClick }: DockItemProps) {
-  if (onClick) {
-    return (
-      <button onClick={onClick} className="relative group">
-        <div
-          className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-200 ${
-            isActive ? "bg-[#4b7bb5] text-white" : "text-gray-600 hover:bg-[#4b7bb5]/10 hover:text-[#4b7bb5]"
-          }`}
-        >
-          <div className="text-current relative">
-            {icon}
-            {badge && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                {typeof badge === "number" && badge > 99 ? "99+" : badge}
-              </span>
-            )}
-          </div>
-          <span className="text-xs mt-1 text-current">{label}</span>
-        </div>
-        <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-          {label}
-          {badge && <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5">{badge}</span>}
-        </div>
-      </button>
-    )
-  }
-
+function DockItem({ href, icon, label, isActive, badge }: DockItemProps) {
   return (
     <Link href={href} className="relative group">
       <div
@@ -98,28 +69,10 @@ function DockItem({ href, icon, label, isActive, badge, onClick }: DockItemProps
 
 export function AppDock() {
   const pathname = usePathname()
-  const router = useRouter()
-
-  // Usamos o método getSupabaseClient do nosso singleton em vez de createClientComponentClient
-  const handleLogout = async () => {
-    try {
-      const supabase = getSupabaseClient()
-      await supabase.auth.signOut()
-      router.push("/admin/login")
-    } catch (error) {
-      console.error("Erro ao fazer logout:", error)
-    }
-  }
 
   const isActive = (path: string) => {
     if (path === "/admin" && pathname === "/admin") return true
     if (path === "/admin" && pathname === "/") return true
-
-    // Verificações específicas para projetos e tarefas
-    if (path === "/projetos" && pathname.startsWith("/projetos")) return true
-    if (path === "/tarefas" && pathname.startsWith("/tarefas")) return true
-    if (path === "/admin/clientes" && pathname.startsWith("/admin/clientes")) return true
-
     return pathname.startsWith(path)
   }
 
@@ -127,14 +80,13 @@ export function AppDock() {
   const mainItems = [
     { href: "/admin", icon: <LayoutDashboard size={24} />, label: "Dashboard" },
     { href: "/admin/arquivos", icon: <FileText size={24} />, label: "Arquivos" },
-    { href: "/projetos", icon: <FolderKanban size={24} />, label: "Projetos" },
-    { href: "/tarefas", icon: <BarChart3 size={24} />, label: "Tarefas" },
+    { href: "/admin/projetos", icon: <FolderKanban size={24} />, label: "Projetos", badge: 3 },
+    { href: "/admin/tarefas", icon: <BarChart3 size={24} />, label: "Tarefas", badge: 5 },
     { href: "/admin/blog", icon: <FileImage size={24} />, label: "Blog" },
   ]
 
   const marketingItems = [
-    { href: "/admin/crm", icon: <Users size={24} />, label: "CRM" },
-    { href: "/admin/smp", icon: <Share2 size={24} />, label: "SMP" },
+    { href: "/admin/clientes", icon: <Users size={24} />, label: "Clientes" },
     { href: "/admin/agenda", icon: <Calendar size={24} />, label: "Agenda" },
   ]
 
@@ -142,9 +94,14 @@ export function AppDock() {
     { href: "/admin/ferramentas", icon: <Wrench size={24} />, label: "Ferramentas" },
     { href: "/admin/chat", icon: <MessageSquare size={24} />, label: "Chat" },
     { href: "/search", icon: <Search size={24} />, label: "Busca" },
-    { href: "/admin/site", icon: <Globe size={24} />, label: "Site/" },
+    { href: "/admin/site", icon: <Globe size={24} />, label: "Site" },
     { href: "/admin/configuracoes", icon: <Settings size={24} />, label: "Config" },
   ]
+
+  // Determinar quais itens mostrar com base na largura da tela
+  // Em telas menores, mostrar apenas os itens principais
+  // Em telas médias, mostrar itens principais e de marketing
+  // Em telas grandes, mostrar todos os itens
 
   return (
     <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
@@ -188,9 +145,6 @@ export function AppDock() {
             />
           ))}
         </div>
-
-        {/* Botão de logout */}
-        <DockItem href="#" icon={<LogOut size={24} />} label="Sair" isActive={false} onClick={handleLogout} />
 
         {/* Menu de mais opções para telas menores */}
         <div className="md:hidden">

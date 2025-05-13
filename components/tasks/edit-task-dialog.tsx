@@ -12,7 +12,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { CalendarIcon, Loader2, AlertCircle } from "lucide-react"
+import { CalendarIcon, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -40,15 +40,6 @@ const COLOR_OPTIONS = [
   { id: "#64748b", name: "Cinza" },
 ]
 
-// Lista de status disponíveis - mantemos os mesmos IDs para a UI
-const STATUSES = [
-  { id: "backlog", name: "Backlog" },
-  { id: "todo", name: "A Fazer" },
-  { id: "in-progress", name: "Em Progresso" },
-  { id: "review", name: "Em Revisão" },
-  { id: "done", name: "Concluído" },
-]
-
 export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDialogProps) {
   const [task, setTask] = useState<any>(null)
   const [date, setDate] = useState<Date | undefined>(undefined)
@@ -56,8 +47,6 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [debugInfo, setDebugInfo] = useState<any>(null)
-  const [debugVisible, setDebugVisible] = useState(false)
   const { toast } = useToast()
 
   // Buscar dados da tarefa
@@ -114,26 +103,6 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
     fetchTaskData()
   }, [isOpen, taskId, toast])
 
-  // Buscar informações de depuração da tabela tasks
-  useEffect(() => {
-    if (isOpen && debugVisible) {
-      const fetchDebugInfo = async () => {
-        try {
-          const response = await fetch("/api/debug-tasks-table")
-          if (!response.ok) {
-            throw new Error("Falha ao buscar informações de depuração")
-          }
-          const data = await response.json()
-          setDebugInfo(data)
-        } catch (error) {
-          console.error("Erro ao buscar informações de depuração:", error)
-        }
-      }
-
-      fetchDebugInfo()
-    }
-  }, [isOpen, debugVisible])
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setTask((prev: any) => ({ ...prev, [name]: value }))
@@ -153,54 +122,6 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
     }
   }
 
-  const toggleDebugInfo = () => {
-    setDebugVisible(!debugVisible)
-  }
-
-  const handleDelete = async () => {
-    if (!confirm("Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita.")) {
-      return
-    }
-
-    setIsSaving(true)
-    setError(null)
-
-    try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: "DELETE",
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Erro ao excluir tarefa")
-      }
-
-      toast({
-        title: "Sucesso",
-        description: "Tarefa excluída com sucesso!",
-      })
-
-      // Notificar o componente pai sobre a exclusão
-      if (onSave) {
-        onSave({ deleted: true, id: taskId })
-      }
-
-      // Fechar o diálogo após sucesso
-      onClose()
-    } catch (err: any) {
-      console.error("Erro ao excluir tarefa:", err)
-      setError(err.message || "Ocorreu um erro ao excluir a tarefa. Por favor, tente novamente.")
-      toast({
-        title: "Erro",
-        description: err.message || "Não foi possível excluir a tarefa",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  // Modificar a função handleSubmit para remover o campo status ao enviar os dados
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -216,12 +137,9 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
 
     try {
       // Preparar dados para envio
-      // Remover campos que são apenas visuais ou que não existem na tabela
-      const { color, creator, assignee, status, ...updateData } = task
-
-      const dataToSend = {
-        ...updateData,
-        project_id: updateData.project_id || updateData.projectId, // Garantir compatibilidade
+      const updateData = {
+        ...task,
+        project_id: task.project_id || task.projectId, // Garantir compatibilidade
       }
 
       // Atualizar tarefa via API
@@ -230,7 +148,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(dataToSend),
+        body: JSON.stringify(updateData),
       })
 
       if (!response.ok) {
@@ -240,15 +158,6 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
 
       const updatedTask = await response.json()
 
-      // Adicionar os campos visuais de volta ao objeto retornado
-      const updatedTaskWithVisualFields = {
-        ...updatedTask,
-        color: color || "#4b7bb5",
-        creator: creator || null,
-        assignee: assignee || null,
-        status: status || "todo", // Manter o status visual
-      }
-
       toast({
         title: "Sucesso",
         description: "Tarefa atualizada com sucesso!",
@@ -256,7 +165,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
 
       // Notificar o componente pai sobre a atualização
       if (onSave) {
-        onSave(updatedTaskWithVisualFields)
+        onSave(updatedTask)
       }
 
       // Fechar o diálogo após sucesso
@@ -276,7 +185,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] bg-white dark:bg-gray-800 border dark:border-gray-700">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-[#4b7bb5]">Editar Tarefa</DialogTitle>
         </DialogHeader>
@@ -297,10 +206,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                 value={task.title || ""}
                 onChange={handleChange}
                 required
-                className={cn(
-                  "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 dark:text-white",
-                  error && "border-error-500 dark:border-error-500",
-                )}
+                className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
               />
             </div>
             <div className="space-y-2">
@@ -313,33 +219,26 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                 value={task.description || ""}
                 onChange={handleChange}
                 rows={3}
-                className={cn(
-                  "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 dark:text-white",
-                  error && "border-error-500 dark:border-error-500",
-                )}
+                className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="status" className="text-sm font-medium">
-                  Status (visual apenas)
+                  Status
                 </label>
                 <Select value={task.status} onValueChange={(value) => handleSelectChange("status", value)}>
-                  <SelectTrigger className="border-[#4b7bb5] bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                  <SelectTrigger className="border-[#4b7bb5]">
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 border dark:border-gray-700">
-                    {STATUSES.map((status) => (
-                      <SelectItem key={status.id} value={status.id}>
-                        {status.name}
-                      </SelectItem>
-                    ))}
+                  <SelectContent>
+                    <SelectItem value="backlog">Backlog</SelectItem>
+                    <SelectItem value="todo">A Fazer</SelectItem>
+                    <SelectItem value="in-progress">Em Progresso</SelectItem>
+                    <SelectItem value="review">Em Revisão</SelectItem>
+                    <SelectItem value="done">Concluído</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-amber-600 mt-1 flex items-center">
-                  <AlertCircle size={12} className="mr-1" />
-                  Este campo é apenas visual e não será salvo no banco de dados
-                </p>
               </div>
               <div className="space-y-2">
                 <label htmlFor="priority" className="text-sm font-medium">
@@ -349,10 +248,10 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                   value={task.priority || "medium"}
                   onValueChange={(value) => handleSelectChange("priority", value)}
                 >
-                  <SelectTrigger className="border-[#4b7bb5] bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                  <SelectTrigger className="border-[#4b7bb5]">
                     <SelectValue placeholder="Selecione a prioridade" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 border dark:border-gray-700">
+                  <SelectContent>
                     <SelectItem value="low">Baixa</SelectItem>
                     <SelectItem value="medium">Média</SelectItem>
                     <SelectItem value="high">Alta</SelectItem>
@@ -369,10 +268,10 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                   value={task.project_id?.toString() || task.projectId?.toString() || ""}
                   onValueChange={(value) => handleSelectChange("project_id", value)}
                 >
-                  <SelectTrigger className="border-[#4b7bb5] bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                  <SelectTrigger className="border-[#4b7bb5]">
                     <SelectValue placeholder="Selecione o projeto" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 border dark:border-gray-700">
+                  <SelectContent>
                     {projects.map((project) => (
                       <SelectItem key={project.id} value={project.id.toString()}>
                         {project.name}
@@ -398,14 +297,14 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                       {date ? format(date, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-white dark:bg-gray-800 border dark:border-gray-700">
+                  <PopoverContent className="w-auto p-0">
                     <Calendar mode="single" selected={date} onSelect={handleDateChange} initialFocus locale={ptBR} />
                   </PopoverContent>
                 </Popover>
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Cor da Tarefa (visual apenas)</label>
+              <label className="text-sm font-medium">Cor da Tarefa</label>
               <div className="grid grid-cols-5 gap-2">
                 {COLOR_OPTIONS.map((color) => (
                   <button
@@ -420,101 +319,47 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
                   />
                 ))}
               </div>
-              <div className="text-xs text-gray-500 flex items-center">
-                <span>
-                  Cor selecionada:{" "}
-                  <span className="font-medium">
-                    {COLOR_OPTIONS.find((c) => c.id === task.color)?.name || "Padrão"}
-                  </span>
-                </span>
-                <span className="text-amber-600 ml-2 flex items-center">
-                  <AlertCircle size={12} className="mr-1" />
-                  Visual apenas
-                </span>
+              <div className="text-xs text-gray-500">
+                Cor selecionada:{" "}
+                <span className="font-medium">{COLOR_OPTIONS.find((c) => c.id === task.color)?.name || "Padrão"}</span>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="creator" className="text-sm font-medium">
-                  Criador da Tarefa (visual apenas)
+                  Criador da Tarefa
                 </label>
                 <Input
                   id="creator"
                   name="creator"
                   value={task.creator || ""}
                   onChange={handleChange}
-                  className={cn(
-                    "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 dark:text-white",
-                    error && "border-error-500 dark:border-error-500",
-                  )}
+                  className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
                   placeholder="Nome do criador"
                 />
-                <p className="text-xs text-amber-600 mt-1 flex items-center">
-                  <AlertCircle size={12} className="mr-1" />
-                  Visual apenas
-                </p>
               </div>
               <div className="space-y-2">
                 <label htmlFor="assignee" className="text-sm font-medium">
-                  Responsável (visual apenas)
+                  Responsável
                 </label>
                 <Input
                   id="assignee"
                   name="assignee"
                   value={task.assignee || ""}
                   onChange={handleChange}
-                  className={cn(
-                    "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 dark:text-white",
-                    error && "border-error-500 dark:border-error-500",
-                  )}
+                  className="border-[#4b7bb5] focus:ring-[#4b7bb5]"
                   placeholder="Nome do responsável"
                 />
-                <p className="text-xs text-amber-600 mt-1 flex items-center">
-                  <AlertCircle size={12} className="mr-1" />
-                  Visual apenas
-                </p>
               </div>
             </div>
 
-            {error && (
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 rounded-md">
-                <p className="text-red-600 text-sm flex items-start">
-                  <AlertCircle size={16} className="mr-2 mt-0.5 flex-shrink-0" />
-                  <span>{error}</span>
-                </p>
-                <button type="button" onClick={toggleDebugInfo} className="text-xs text-blue-600 hover:underline mt-2">
-                  {debugVisible ? "Ocultar informações de depuração" : "Mostrar informações de depuração"}
-                </button>
-
-                {debugVisible && debugInfo && (
-                  <div className="mt-2 text-xs overflow-auto max-h-40 bg-gray-100 p-2 rounded">
-                    <p className="font-semibold">Informações da tabela tasks:</p>
-                    <pre className="whitespace-pre-wrap break-all">{JSON.stringify(debugInfo, null, 2)}</pre>
-                  </div>
-                )}
-              </div>
-            )}
+            {error && <p className="text-red-600 text-sm">{error}</p>}
 
             <DialogFooter className="mt-6">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                disabled={isSaving}
-                className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200"
-              >
+              <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
                 Cancelar
               </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={isSaving}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                Excluir
-              </Button>
-              <Button type="submit" className="bg-[#4b7bb5] hover:bg-[#3d649e] text-white" disabled={isSaving}>
+              <Button type="submit" className="bg-[#4b7bb5] hover:bg-[#3d649e]" disabled={isSaving}>
                 {isSaving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -1,77 +1,54 @@
 "use client"
 
-import * as React from "react"
-import { ThemeProvider as NextThemesProvider } from "next-themes"
+import type React from "react"
 
-interface ThemeProviderProps extends React.PropsWithChildren {
-  attribute?: string
-  defaultTheme?: string
-  enableSystem?: boolean
-  storageKey?: string
+import { createContext, useContext, useState, useEffect } from "react"
+
+type Theme = "light" | "dark"
+
+interface ThemeContextProps {
+  theme: Theme
+  setTheme: (theme: Theme) => void
 }
 
+const ThemeContext = createContext<ThemeContextProps>({
+  theme: "light",
+  setTheme: () => {},
+})
+
 export function ThemeProvider({
-  attribute = "class",
-  defaultTheme = "system",
-  enableSystem = true,
-  storageKey = "theme",
   children,
-}: ThemeProviderProps) {
-  return (
-    <NextThemesProvider
-      attribute={attribute}
-      defaultTheme={defaultTheme}
-      enableSystem={enableSystem}
-      storageKey={storageKey}
-    >
-      {children}
-    </NextThemesProvider>
-  )
+  attribute,
+  defaultTheme,
+}: {
+  children: React.ReactNode
+  attribute?: string
+  defaultTheme?: Theme
+}) {
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window !== "undefined") {
+      const storedTheme = localStorage.getItem("theme") as Theme | null
+      return storedTheme || defaultTheme || "light"
+    }
+    return defaultTheme || "light"
+  })
+
+  useEffect(() => {
+    if (attribute) {
+      document.documentElement.setAttribute(attribute, theme)
+    } else {
+      if (theme === "dark") {
+        document.documentElement.classList.add("dark")
+      } else {
+        document.documentElement.classList.remove("dark")
+      }
+    }
+    localStorage.setItem("theme", theme)
+  }, [theme, attribute])
+
+  return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>
 }
 
 export function useTheme() {
-  const [theme, setTheme] = React.useState("system")
-
-  React.useEffect(() => {
-    ensureOpaqueBackgrounds()
-  }, [theme])
-
-  // Garantir que os componentes de diálogo e popover tenham fundos opacos
-  const ensureOpaqueBackgrounds = () => {
-    // Adicionar estilos globais para garantir fundos opacos em componentes de UI
-    if (typeof document !== "undefined") {
-      const style = document.createElement("style")
-      style.innerHTML = `
-      .dark .shadcn-dialog,
-      .dark [role="dialog"],
-      .dark [role="combobox"],
-      .dark [data-state="open"],
-      .dark .popover-content {
-        background-color: rgb(31 41 55) !important;
-        border-color: rgb(55 65 81) !important;
-      }
-      
-      .dark input,
-      .dark textarea,
-      .dark select {
-        background-color: rgb(55 65 81) !important;
-        border-color: rgb(75 85 99) !important;
-        color: white !important;
-      }
-      
-      .dark .select-content,
-      .dark .popover-content,
-      .dark .dropdown-content {
-        background-color: rgb(31 41 55) !important;
-        border-color: rgb(55 65 81) !important;
-      }
-    `
-      document.head.appendChild(style)
-    }
-  }
-
-  return {
-    theme,
-    setTheme,
-  }
+  return useContext(ThemeContext)
 }

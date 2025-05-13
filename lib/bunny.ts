@@ -3,34 +3,6 @@ const BUNNY_API_KEY = process.env.BUNNY_API_KEY || ""
 const BUNNY_STORAGE_ZONE = process.env.BUNNY_STORAGE_ZONE || ""
 const BUNNY_STORAGE_REGION = process.env.BUNNY_STORAGE_REGION || ""
 
-// Adicionar estas constantes no início do arquivo, após as constantes existentes
-const DEFAULT_CACHE_TIME = 60 * 60 * 24 * 7 // 7 dias em segundos
-const DEFAULT_CACHE_CONTROL = `public, max-age=${DEFAULT_CACHE_TIME}`
-
-// Adicionar este objeto de configuração de cache por tipo de arquivo
-const CACHE_CONFIG = {
-  // Imagens - cache longo
-  image: {
-    maxAge: 60 * 60 * 24 * 30, // 30 dias
-    cacheControl: "public, max-age=2592000, stale-while-revalidate=86400",
-  },
-  // Documentos - cache médio
-  document: {
-    maxAge: 60 * 60 * 24 * 7, // 7 dias
-    cacheControl: "public, max-age=604800, stale-while-revalidate=86400",
-  },
-  // Arquivos de design - cache curto
-  design: {
-    maxAge: 60 * 60 * 24, // 1 dia
-    cacheControl: "public, max-age=86400, must-revalidate",
-  },
-  // Padrão para outros tipos
-  default: {
-    maxAge: 60 * 60 * 24 * 3, // 3 dias
-    cacheControl: "public, max-age=259200, stale-while-revalidate=86400",
-  },
-}
-
 // URLs corretas conforme configuração do Bunny.net
 const BUNNY_STORAGE_URL = `https://storage.bunnycdn.com/${BUNNY_STORAGE_ZONE}`
 // URL fixa da Pull Zone - sem incluir o nome da zona de armazenamento
@@ -94,73 +66,6 @@ export async function ensureFolderExists(folderPath: string): Promise<boolean> {
   }
 }
 
-// Função para determinar o tipo de conteúdo com base na extensão do arquivo
-function getContentTypeFromExtension(fileName: string): string {
-  const extension = fileName.split(".").pop()?.toLowerCase() || ""
-
-  // Mapear extensões comuns para tipos MIME
-  const mimeTypes: Record<string, string> = {
-    pdf: "application/pdf",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    gif: "image/gif",
-    webp: "image/webp",
-    svg: "image/svg+xml",
-    txt: "text/plain",
-    html: "text/html",
-    css: "text/css",
-    js: "application/javascript",
-    json: "application/json",
-    xml: "application/xml",
-    zip: "application/zip",
-    doc: "application/msword",
-    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    xls: "application/vnd.ms-excel",
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ppt: "application/vnd.ms-powerpoint",
-    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    psd: "application/vnd.adobe.photoshop",
-    ai: "application/illustrator",
-    indd: "application/x-indesign",
-    idml: "application/x-indesign",
-  }
-
-  return extension && extension in mimeTypes ? mimeTypes[extension] : "application/octet-stream"
-}
-
-// Função para determinar a categoria de cache com base no tipo de arquivo
-function getCacheCategory(filePath: string): string {
-  const extension = filePath.split(".").pop()?.toLowerCase() || ""
-
-  // Imagens
-  if (["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(extension)) {
-    return "image"
-  }
-
-  // Documentos
-  if (["pdf", "doc", "docx", "txt", "xls", "xlsx", "ppt", "pptx"].includes(extension)) {
-    return "document"
-  }
-
-  // Arquivos de design
-  if (["psd", "psb", "ai", "indd", "idml"].includes(extension)) {
-    return "design"
-  }
-
-  return "default"
-}
-
-// Função para obter os cabeçalhos de cache apropriados para um arquivo
-function getCacheHeaders(filePath: string): Record<string, string> {
-  const category = getCacheCategory(filePath)
-  const config = CACHE_CONFIG[category as keyof typeof CACHE_CONFIG] || CACHE_CONFIG.default
-
-  return {
-    "Cache-Control": config.cacheControl,
-  }
-}
-
 // Função para fazer upload de um arquivo para o Bunny.net Storage
 export async function uploadFileToBunny(
   filePath: string,
@@ -184,14 +89,6 @@ export async function uploadFileToBunny(
       await ensureFolderExists(folderOnly)
     }
 
-    // Determinar o tipo de conteúdo se não foi especificado
-    if (contentType === "application/octet-stream") {
-      contentType = getContentTypeFromExtension(normalizedPath)
-    }
-
-    // Obter cabeçalhos de cache apropriados
-    const cacheHeaders = getCacheHeaders(normalizedPath)
-
     const url = `${BUNNY_STORAGE_URL}/${normalizedPath}`
     console.log(`Bunny Upload: Tentando fazer upload para: ${url}`)
     console.log(
@@ -199,7 +96,6 @@ export async function uploadFileToBunny(
     )
     console.log(`Bunny Upload: Tipo de conteúdo: ${contentType}`)
     console.log(`Bunny Upload: Zona: ${BUNNY_STORAGE_ZONE}`)
-    console.log(`Bunny Upload: Cache-Control: ${cacheHeaders["Cache-Control"]}`)
 
     // Verificar se a URL é válida
     try {
@@ -214,7 +110,6 @@ export async function uploadFileToBunny(
         headers: {
           AccessKey: BUNNY_API_KEY,
           "Content-Type": contentType,
-          ...cacheHeaders,
         },
         body: fileContent,
       })
@@ -235,10 +130,6 @@ export async function uploadFileToBunny(
       // Não incluir o nome da zona de armazenamento na URL pública
       const publicUrl = `${BUNNY_PULLZONE_URL}/${normalizedPath}`
       console.log(`Bunny Upload: Upload concluído com sucesso. URL pública: ${publicUrl}`)
-
-      // Verificar se o arquivo foi realmente enviado
-      await verifyFileExists(normalizedPath)
-
       return publicUrl
     } catch (fetchError) {
       console.error("Bunny Upload: Erro na chamada fetch:", fetchError)
@@ -248,47 +139,6 @@ export async function uploadFileToBunny(
     console.error("Bunny Upload: Erro geral:", error)
     throw error
   }
-}
-
-// Adicionar esta nova função para verificar se um arquivo existe após o upload
-async function verifyFileExists(filePath: string, retries = 3, delay = 1000): Promise<boolean> {
-  console.log(`Bunny Verify: Verificando existência do arquivo: ${filePath}`)
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const url = `${BUNNY_STORAGE_URL}/${filePath}`
-      const response = await fetch(url, {
-        method: "HEAD",
-        headers: {
-          AccessKey: BUNNY_API_KEY,
-        },
-      })
-
-      if (response.ok) {
-        console.log(`Bunny Verify: Arquivo verificado com sucesso após ${attempt} tentativa(s)`)
-        return true
-      }
-
-      console.log(`Bunny Verify: Arquivo não encontrado na tentativa ${attempt}/${retries}`)
-
-      if (attempt < retries) {
-        console.log(`Bunny Verify: Aguardando ${delay}ms antes da próxima tentativa`)
-        await new Promise((resolve) => setTimeout(resolve, delay))
-        // Aumentar o tempo de espera para a próxima tentativa
-        delay *= 2
-      }
-    } catch (error) {
-      console.error(`Bunny Verify: Erro ao verificar arquivo na tentativa ${attempt}/${retries}:`, error)
-
-      if (attempt < retries) {
-        await new Promise((resolve) => setTimeout(resolve, delay))
-        delay *= 2
-      }
-    }
-  }
-
-  console.warn(`Bunny Verify: Não foi possível verificar o arquivo após ${retries} tentativas`)
-  return false
 }
 
 // Função para listar arquivos em um diretório - CORRIGIDA E MELHORADA
@@ -395,7 +245,7 @@ export async function listBunnyFiles(directory = ""): Promise<any[]> {
   }
 }
 
-// Modificar a função deleteBunnyFile para incluir verificação após a exclusão
+// Função para excluir um arquivo
 export async function deleteBunnyFile(filePath: string): Promise<boolean> {
   try {
     if (!BUNNY_API_KEY || !BUNNY_STORAGE_ZONE) {
@@ -462,14 +312,6 @@ export async function deleteBunnyFile(filePath: string): Promise<boolean> {
       }
 
       console.log(`Bunny Delete: Arquivo excluído com sucesso: ${normalizedPath}`)
-
-      // Verificar se o arquivo foi realmente excluído
-      const fileStillExists = await verifyFileDeleted(normalizedPath)
-      if (fileStillExists) {
-        console.warn(`Bunny Delete: Arquivo ainda existe após tentativa de exclusão: ${normalizedPath}`)
-        return false
-      }
-
       return true
     } catch (fetchError) {
       console.error("Bunny Delete: Erro na chamada fetch:", fetchError)
@@ -479,47 +321,6 @@ export async function deleteBunnyFile(filePath: string): Promise<boolean> {
     console.error("Bunny Delete: Erro geral:", error)
     throw error
   }
-}
-
-// Adicionar esta nova função para verificar se um arquivo foi excluído
-async function verifyFileDeleted(filePath: string, retries = 3, delay = 1000): Promise<boolean> {
-  console.log(`Bunny Verify Delete: Verificando exclusão do arquivo: ${filePath}`)
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const url = `${BUNNY_STORAGE_URL}/${filePath}`
-      const response = await fetch(url, {
-        method: "HEAD",
-        headers: {
-          AccessKey: BUNNY_API_KEY,
-        },
-      })
-
-      if (response.status === 404) {
-        console.log(`Bunny Verify Delete: Arquivo excluído com sucesso após ${attempt} tentativa(s)`)
-        return false // Arquivo não existe, exclusão bem-sucedida
-      }
-
-      console.log(`Bunny Verify Delete: Arquivo ainda existe na tentativa ${attempt}/${retries}`)
-
-      if (attempt < retries) {
-        console.log(`Bunny Verify Delete: Aguardando ${delay}ms antes da próxima tentativa`)
-        await new Promise((resolve) => setTimeout(resolve, delay))
-        // Aumentar o tempo de espera para a próxima tentativa
-        delay *= 2
-      }
-    } catch (error) {
-      console.error(`Bunny Verify Delete: Erro ao verificar exclusão na tentativa ${attempt}/${retries}:`, error)
-
-      if (attempt < retries) {
-        await new Promise((resolve) => setTimeout(resolve, delay))
-        delay *= 2
-      }
-    }
-  }
-
-  console.warn(`Bunny Verify Delete: Arquivo ainda pode existir após ${retries} tentativas de verificação`)
-  return true // Assumir que o arquivo ainda existe após todas as tentativas
 }
 
 // Função para baixar um arquivo
@@ -805,7 +606,6 @@ export async function renameBunnyFile(oldPath: string, newName: string): Promise
 }
 
 // Função para obter a URL pública de um arquivo - CORRIGIDA
-// Modificar a função getBunnyPublicUrl para garantir que os caminhos estejam corretos
 export function getBunnyPublicUrl(filePath: string): string {
   if (!filePath) {
     console.warn("Bunny URL: Caminho de arquivo vazio ou nulo")
@@ -814,17 +614,6 @@ export function getBunnyPublicUrl(filePath: string): string {
 
   // Normalizar o caminho do arquivo
   const normalizedPath = filePath.replace(/\/+/g, "/").replace(/^\//, "")
-
-  // CORREÇÃO CRÍTICA: Garantir que o caminho inclua "documents/clientes"
-  if (normalizedPath.includes("documents/") && !normalizedPath.includes("documents/clientes/")) {
-    // Se contém "documents" mas não "documents/clientes", inserir "clientes" após "documents"
-    const pathParts = normalizedPath.split("documents/")
-    if (pathParts.length > 1) {
-      const newPath = `documents/clientes/${pathParts[1]}`
-      console.log(`Bunny URL: Corrigindo caminho de ${normalizedPath} para ${newPath}`)
-      return `${BUNNY_PULLZONE_URL}/${newPath}`
-    }
-  }
 
   // Remover qualquer prefixo "zona-de-guardar/" se existir
   const cleanPath = normalizedPath.replace(/^zona-de-guardar\//, "")
@@ -947,52 +736,6 @@ export function fixBunnyUrl(url: string): string {
   }
 
   return url
-}
-
-// Adicionar esta nova função após a função fixBunnyUrl
-
-// Função para garantir que as URLs de documentos incluam o caminho correto para clientes
-export function ensureCorrectDocumentPath(url: string): string {
-  if (!url) return url
-
-  // Se a URL já estiver completa com http/https, extrair o caminho
-  let path = url
-  if (url.startsWith("http")) {
-    try {
-      const urlObj = new URL(url)
-      path = urlObj.pathname.replace(/^\//, "")
-    } catch (e) {
-      console.error("URL inválida:", url)
-      return url
-    }
-  }
-
-  // Verificar se o caminho já contém "documents/clientes"
-  if (!path.includes("documents/clientes") && path.includes("documents")) {
-    // Se contém "documents" mas não "documents/clientes", inserir "clientes" após "documents"
-    const pathParts = path.split("documents/")
-    if (pathParts.length > 1) {
-      const newPath = `documents/clientes/${pathParts[1]}`
-      console.log(`Corrigindo caminho de documento: ${path} -> ${newPath}`)
-
-      // Se a URL original era completa, reconstruir
-      if (url.startsWith("http")) {
-        try {
-          const urlObj = new URL(url)
-          urlObj.pathname = `/${newPath}`
-          return urlObj.toString()
-        } catch (e) {
-          console.error("Erro ao reconstruir URL:", e)
-          return `${BUNNY_PULLZONE_URL}/${newPath}`
-        }
-      }
-
-      return `${BUNNY_PULLZONE_URL}/${newPath}`
-    }
-  }
-
-  // Se já estiver correto ou não for um caminho de documento, retornar a URL original
-  return url.startsWith("http") ? url : `${BUNNY_PULLZONE_URL}/${path}`
 }
 
 // Nova função para extrair o nome do arquivo de um caminho
@@ -1127,107 +870,4 @@ export async function moveBunnyFile(sourcePath: string, destinationPath: string)
     console.error("Bunny Move: Erro geral:", error)
     throw error
   }
-}
-
-// Adicionar esta nova função para purgar o cache de um arquivo na Pull Zone
-export async function purgeBunnyCache(filePath: string): Promise<boolean> {
-  try {
-    if (!process.env.BUNNY_API_KEY) {
-      throw new Error("BUNNY_API_KEY não configurada")
-    }
-
-    // Normalizar o caminho do arquivo
-    const normalizedPath = filePath.replace(/\/+/g, "/").replace(/^\//, "")
-
-    console.log(`Bunny Purge: Purgando cache para: ${normalizedPath}`)
-
-    // Obter o ID da Pull Zone (você precisará configurar isso)
-    const pullZoneId = process.env.BUNNY_PULLZONE_ID
-    if (!pullZoneId) {
-      throw new Error("BUNNY_PULLZONE_ID não configurada")
-    }
-
-    // URL da API de purge do Bunny CDN
-    const purgeUrl = `https://api.bunny.net/pullzone/${pullZoneId}/purgeCache`
-
-    const response = await fetch(purgeUrl, {
-      method: "POST",
-      headers: {
-        AccessKey: process.env.BUNNY_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        urls: [`/${normalizedPath}`],
-      }),
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`Erro ao purgar cache: ${response.status} - ${errorText}`)
-    }
-
-    console.log(`Bunny Purge: Cache purgado com sucesso para: ${normalizedPath}`)
-    return true
-  } catch (error) {
-    console.error("Bunny Purge: Erro ao purgar cache:", error)
-    return false
-  }
-}
-
-// Adicionar esta nova função para verificar o status do cache de um arquivo
-export async function checkCacheStatus(url: string): Promise<{
-  cached: boolean
-  age?: number
-  expires?: number
-  cacheControl?: string
-}> {
-  try {
-    console.log(`Bunny Cache Check: Verificando status de cache para: ${url}`)
-
-    const response = await fetch(url, {
-      method: "HEAD",
-    })
-
-    const headers = Object.fromEntries(response.headers.entries())
-
-    const result = {
-      cached: headers["x-cache"] === "HIT",
-      age: headers["age"] ? Number.parseInt(headers["age"]) : undefined,
-      expires: headers["expires"] ? new Date(headers["expires"]).getTime() : undefined,
-      cacheControl: headers["cache-control"],
-    }
-
-    console.log(`Bunny Cache Check: Resultado para ${url}:`, result)
-    return result
-  } catch (error) {
-    console.error(`Bunny Cache Check: Erro ao verificar cache para ${url}:`, error)
-    return { cached: false }
-  }
-}
-
-// Adicionar esta nova função para obter a configuração de cache recomendada para um tipo de arquivo
-export function getRecommendedCacheConfig(fileType: string): {
-  maxAge: number
-  cacheControl: string
-} {
-  // Converter para minúsculo para comparação
-  const type = fileType.toLowerCase()
-
-  // Verificar se é uma imagem
-  if (type.startsWith("image/")) {
-    return CACHE_CONFIG.image
-  }
-
-  // Verificar se é um documento
-  if (type.includes("pdf") || type.includes("word") || type.includes("excel") || type.includes("text")) {
-    return CACHE_CONFIG.document
-  }
-
-  // Verificar se é um arquivo de design
-  if (type.includes("photoshop") || type.includes("illustrator") || type.includes("indesign")) {
-    return CACHE_CONFIG.design
-  }
-
-  // Padrão para outros tipos
-  return CACHE_CONFIG.default
 }

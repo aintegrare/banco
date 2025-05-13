@@ -2,8 +2,6 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getAIResponse } from "@/lib/api"
 import { generateSimpleEmbedding } from "@/lib/embeddings"
 import { selectRelevantDocuments, getDocumentContent, diagnoseDocumentAccess } from "@/lib/document-selection"
-import { fixBunnyUrl } from "@/lib/bunny"
-import { correctDocumentPath } from "@/lib/document-path-manager"
 
 export async function POST(request: NextRequest) {
   try {
@@ -105,22 +103,10 @@ export async function POST(request: NextRequest) {
             hasSimulatedContent = true
           }
 
-          // Corrigir a URL do documento para usar a URL pública com o caminho correto
-          let publicUrl = doc.url
-          if (doc.url) {
-            // Primeiro corrigir qualquer problema com a URL
-            publicUrl = fixBunnyUrl(doc.url)
-
-            // Depois corrigir o caminho do documento usando o novo sistema
-            publicUrl = await correctDocumentPath(publicUrl)
-
-            console.log(`API Search: URL original: ${doc.url}, URL corrigida: ${publicUrl}`)
-          }
-
           documentContents.push({
             id: doc.id,
             title: doc.title,
-            url: publicUrl, // Usar a URL pública corrigida
+            url: doc.url,
             source_type: doc.source_type,
             content: joinedContent,
             relevance_score: doc.relevance_score,
@@ -155,9 +141,7 @@ export async function POST(request: NextRequest) {
     const documentsToUse = realDocuments.length > 0 ? realDocuments : documentContents
 
     // 3. Preparar o contexto para a IA
-    const context = documentsToUse.map(
-      (doc) => `Fonte: ${doc.title} (${doc.source_type})\nURL: ${doc.url}\n${doc.content}`,
-    )
+    const context = documentsToUse.map((doc) => `Fonte: ${doc.title} (${doc.source_type})\n${doc.content}`)
 
     // 4. Gerar embeddings para a consulta (para compatibilidade com o código existente)
     let queryEmbedding
@@ -208,7 +192,7 @@ export async function POST(request: NextRequest) {
     const results = documentsToUse.map((doc) => ({
       id: doc.id,
       title: doc.title,
-      url: doc.url, // URL pública já corrigida
+      url: doc.url,
       snippet: doc.content.substring(0, 150) + "...",
       source: doc.source_type,
       sourceIcon: doc.source_type === "pdf" ? "FileText" : "Globe",
@@ -223,7 +207,7 @@ export async function POST(request: NextRequest) {
       results,
       aiResponse,
       documentCount: documentsToUse.length,
-      usedDocuments: documentsToUse.map((d) => ({ id: d.id, title: d.title, url: d.url })), // Incluir URLs públicas
+      usedDocuments: documentsToUse.map((d) => ({ id: d.id, title: d.title })),
       hasSimulatedContent: hasSimulatedContent,
       realDocumentsCount: realDocuments.length,
     })

@@ -5,7 +5,6 @@ import Link from "next/link"
 import { Loader2, Plus, Calendar, Users, BarChart2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog"
-import { ProjectTaskNav } from "@/components/shared/ProjectTaskNav"
 
 interface Project {
   id: number
@@ -110,7 +109,6 @@ export default function ProjectsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <ProjectTaskNav />
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-gray-800">Projetos</h1>
         <button

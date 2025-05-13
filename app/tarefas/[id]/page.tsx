@@ -238,11 +238,10 @@ export default function TaskDetailPage() {
                   </button>
                   <button
                     onClick={() => setShowDeleteConfirmation(true)}
-                    className="p-2 text-gray-500 hover:text-red-500 hover:bg-gray-100 rounded-full transition-colors flex items-center"
+                    className="p-2 text-gray-500 hover:text-red-500 hover:bg-gray-100 rounded-full transition-colors"
                     title="Excluir tarefa"
                   >
-                    <Trash2 size={18} className="mr-1" />
-                    <span className="hidden sm:inline">Excluir</span>
+                    <Trash2 size={18} />
                   </button>
                 </>
               ) : (

@@ -1,8 +1,12 @@
 // Sistema de embeddings com suporte a múltiplos provedores
 // Inclui fallback local para garantir funcionamento mesmo sem acesso às APIs
 
-// Importar o cliente Supabase já inicializado
-import { adminSupabase as supabase } from "./api"
+import { createClient } from "@supabase/supabase-js"
+
+// Configuração do cliente Supabase para vetores
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
 // Interface para provedores de embeddings
 export interface EmbeddingProvider {
@@ -195,7 +199,7 @@ export const SupabaseEmbeddingProvider: EmbeddingProvider = {
   generateEmbedding: async (text: string): Promise<number[]> => {
     try {
       // Verificar se o cliente Supabase está configurado
-      if (!supabase) {
+      if (!supabaseUrl || !supabaseServiceKey) {
         console.log("Configuração do Supabase não encontrada, usando fallback local")
         return generateSimpleEmbedding(text)
       }
@@ -204,7 +208,7 @@ export const SupabaseEmbeddingProvider: EmbeddingProvider = {
       const limitedText = text.slice(0, 10000)
 
       // Chamar a função RPC do Supabase para gerar embeddings
-      const { data, error } = await supabase.rpc("generate_embeddings", {
+      const { data, error } = await supabaseAdmin.rpc("generate_embeddings", {
         input_text: limitedText,
       })
 

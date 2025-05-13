@@ -1,65 +1,66 @@
-import type { Metadata } from "next"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { FileSearch, Link2, FolderSearch, FileWarning, FileCheck } from "lucide-react"
 
-export const metadata: Metadata = {
-  title: "Ferramentas Administrativas",
-  description: "Ferramentas administrativas para gerenciamento do sistema",
-}
-
-const tools = [
-  {
-    title: "Diagnóstico de URL",
-    description: "Verificar e diagnosticar problemas com URLs de documentos",
-    href: "/admin/ferramentas/diagnostico-url",
-    icon: <Link2 className="h-8 w-8 text-[#4b7bb5]" />,
-  },
-  {
-    title: "Verificar Documento",
-    description: "Verificar a integridade e processamento de documentos",
-    href: "/admin/ferramentas/verificar-documento",
-    icon: <FileSearch className="h-8 w-8 text-[#4b7bb5]" />,
-  },
-  {
-    title: "Extrator PDF",
-    description: "Testar a extração de conteúdo de arquivos PDF",
-    href: "/admin/ferramentas/pdf-extractor",
-    icon: <FileWarning className="h-8 w-8 text-[#4b7bb5]" />,
-  },
-  {
-    title: "Diagnóstico de Tarefas",
-    description: "Verificar e diagnosticar problemas com tarefas de pastas",
-    href: "/admin/ferramentas/diagnostico-tarefas",
-    icon: <FolderSearch className="h-8 w-8 text-[#4b7bb5]" />,
-  },
-  {
-    title: "Corrigir URLs",
-    description: "Corrigir URLs de documentos para incluir a pasta do cliente",
-    href: "/admin/ferramentas/corrigir-urls",
-    icon: <FileCheck className="h-8 w-8 text-[#4b7bb5]" />,
-  },
-]
-
-export default function ToolsPage() {
+export default function FerramentasPage() {
   return (
-    <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold text-[#4b7bb5] mb-6">Ferramentas Administrativas</h1>
+    <div className="min-h-screen bg-[#f2f1ef]">
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold text-[#4072b0] mb-6">Ferramentas de Diagnóstico</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {tools.map((tool, index) => (
-          <Link key={index} href={tool.href} className="block">
-            <Card className="h-full transition-all hover:shadow-md">
-              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-xl font-bold">{tool.title}</CardTitle>
-                {tool.icon}
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="text-sm text-gray-500">{tool.description}</CardDescription>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+        <div className="grid md:grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <h3 className="text-lg font-semibold text-[#4072b0] mb-2">Extrator de PDF</h3>
+            <p className="text-gray-600 mb-4">
+              Teste a extração de texto de documentos PDF para verificar se o processamento está funcionando
+              corretamente.
+            </p>
+            <Link
+              href="/admin/ferramentas/pdf-extractor"
+              className="inline-flex items-center px-4 py-2 bg-[#4072b0] text-white rounded-md hover:bg-[#3d649e]"
+            >
+              Acessar Ferramenta
+            </Link>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <h3 className="text-lg font-semibold text-[#4072b0] mb-2">Diagnóstico de URL</h3>
+            <p className="text-gray-600 mb-4">
+              Verifique e corrija URLs de documentos e arquivos que possam conter prefixos incorretos.
+            </p>
+            <Link
+              href="/admin/ferramentas/diagnostico-url"
+              className="inline-flex items-center px-4 py-2 bg-[#4072b0] text-white rounded-md hover:bg-[#3d649e]"
+            >
+              Acessar Ferramenta
+            </Link>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <h3 className="text-lg font-semibold text-[#4072b0] mb-2">Verificação de Integridade</h3>
+            <p className="text-gray-600 mb-4">
+              Verifique se um documento está completo e acessível, analisando seu conteúdo e metadados.
+            </p>
+            <Link
+              href="/admin/ferramentas/verificar-documento"
+              className="inline-flex items-center px-4 py-2 bg-[#4072b0] text-white rounded-md hover:bg-[#3d649e]"
+            >
+              Acessar Ferramenta
+            </Link>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <h3 className="text-lg font-semibold text-[#4072b0] mb-2">Diagnóstico de Tarefas</h3>
+            <p className="text-gray-600 mb-4">
+              Verifique e corrija problemas de acesso às tarefas no banco de dados, incluindo estrutura da tabela e
+              permissões.
+            </p>
+            <Link
+              href="/admin/ferramentas/diagnostico-tarefas"
+              className="inline-flex items-center px-4 py-2 bg-[#4072b0] text-white rounded-md hover:bg-[#3d649e]"
+            >
+              Acessar Ferramenta
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   )

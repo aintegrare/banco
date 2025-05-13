@@ -3,103 +3,15 @@ import { defaultEmbeddingProvider, generateSimpleEmbedding } from "./embeddings"
 import { extractPDFText } from "./pdf-extractor"
 
 // Configuração do cliente Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-// Verificar se estamos em ambiente de preview
-const isPreviewEnvironment = process.env.VERCEL_ENV === "preview" || process.env.NODE_ENV !== "production"
-
-// Criar um cliente mock para quando as variáveis de ambiente não estiverem disponíveis
-function createMockClient() {
-  console.warn("Usando cliente Supabase mock para ambiente de preview/desenvolvimento")
-
-  // Criar um objeto que simula a API do Supabase
-  return {
-    from: (table: string) => ({
-      select: (columns?: string) => ({
-        data: [],
-        error: null,
-        eq: (column: string, value: any) => ({
-          data: [],
-          error: null,
-          single: () => ({ data: null, error: null }),
-          order: (column: string, options: any) => ({ data: [], error: null }),
-        }),
-        single: () => ({ data: null, error: null }),
-        order: (column: string, options: any) => ({ data: [], error: null }),
-      }),
-      insert: (data: any) => ({
-        data: data,
-        error: null,
-        select: () => ({
-          data: data,
-          error: null,
-          single: () => ({ data: data, error: null }),
-        }),
-      }),
-      update: (data: any) => ({
-        data: data,
-        error: null,
-        eq: (column: string, value: any) => ({ data: data, error: null }),
-      }),
-      delete: () => ({
-        data: null,
-        error: null,
-        eq: (column: string, value: any) => ({ data: null, error: null }),
-      }),
-      eq: (column: string, value: any) => ({
-        data: null,
-        error: null,
-        single: () => ({ data: null, error: null }),
-      }),
-    }),
-    rpc: (func: string, params: any) => ({ data: [], error: null }),
-    auth: {
-      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-      signInWithPassword: () => Promise.resolve({ data: null, error: null }),
-      signOut: () => Promise.resolve({ error: null }),
-    },
-  } as any
-}
-
-// Função para criar cliente com verificação de segurança
-function createSupabaseClient(url: string | undefined, key: string | undefined, errorPrefix: string) {
-  // Verificar se URL e chave estão definidos
-  if (!url || !key) {
-    console.warn(`${errorPrefix}: URL ou chave não definidos`)
-
-    // Em ambiente de preview ou desenvolvimento, usar cliente mock
-    if (isPreviewEnvironment) {
-      return createMockClient()
-    }
-
-    throw new Error(`${errorPrefix}: URL e chave são obrigatórios`)
-  }
-
-  try {
-    return createClient(url, key)
-  } catch (error) {
-    console.error(`${errorPrefix}: Erro ao criar cliente`, error)
-
-    // Em ambiente de preview ou desenvolvimento, usar cliente mock em caso de erro
-    if (isPreviewEnvironment) {
-      return createMockClient()
-    }
-
-    throw error
-  }
-}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
 
 // Cliente para operações públicas (somente leitura)
-export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey, "Erro ao criar cliente Supabase público")
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Cliente para operações administrativas (com chave de serviço)
-export const adminSupabase = createSupabaseClient(
-  supabaseUrl,
-  supabaseServiceKey,
-  "Erro ao criar cliente Supabase admin",
-)
+export const adminSupabase = createClient(supabaseUrl, supabaseServiceKey)
 
 // Interface para metadados de documentos
 export interface DocumentMetadata {
