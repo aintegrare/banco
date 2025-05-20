@@ -1,181 +1,52 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Wifi, WifiOff, RefreshCw } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Wifi, WifiOff } from "lucide-react"
 import { useOfflineSync } from "@/lib/offline-sync"
+import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface OfflineIndicatorProps {
-  variant?: "badge" | "button" | "icon"
-  showCount?: boolean
-  pendingChanges?: number
-  onManualSync?: () => Promise<boolean>
   className?: string
+  showPendingChanges?: boolean
 }
 
-export function OfflineIndicator({
-  variant = "badge",
-  showCount = true,
-  pendingChanges,
-  onManualSync,
-  className = "",
-}: OfflineIndicatorProps) {
-  const { isOnline, pendingCount, isSyncing, synchronize } = useOfflineSync()
-  const [syncing, setSyncing] = useState(false)
+export function OfflineIndicator({ className = "", showPendingChanges = true }: OfflineIndicatorProps) {
+  const { isOnline, pendingChanges, isSyncing, sync } = useOfflineSync()
+  const [showTooltip, setShowTooltip] = useState(false)
 
-  // Usar pendingChanges do prop se fornecido, caso contrário usar do hook
-  const pendingItems = pendingChanges !== undefined ? pendingChanges : pendingCount
-
+  // Mostrar tooltip por 3 segundos quando o status de conexão mudar
   useEffect(() => {
-    setSyncing(isSyncing)
-  }, [isSyncing])
+    setShowTooltip(true)
+    const timer = setTimeout(() => setShowTooltip(false), 3000)
+    return () => clearTimeout(timer)
+  }, [isOnline])
 
-  // Função para sincronização manual
-  const handleSync = async () => {
-    if (syncing) return
+  return (
+    <TooltipProvider>
+      <Tooltip open={showTooltip} onOpenChange={setShowTooltip}>
+        <TooltipTrigger asChild>
+          <div
+            className={`flex items-center gap-2 cursor-pointer ${className}`}
+            onClick={() => (isOnline && pendingChanges > 0 ? sync() : null)}
+          >
+            {isOnline ? <Wifi className="h-4 w-4 text-green-500" /> : <WifiOff className="h-4 w-4 text-red-500" />}
 
-    setSyncing(true)
-
-    try {
-      if (onManualSync) {
-        await onManualSync()
-      } else {
-        await synchronize()
-      }
-    } finally {
-      setSyncing(false)
-    }
-  }
-
-  // Renderizar com base na variante
-  const renderIndicator = () => {
-    switch (variant) {
-      case "badge":
-        return (
-          <div className={`flex items-center gap-1 ${className}`}>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge
-                    className={`${
-                      isOnline
-                        ? "bg-green-100 text-green-800 hover:bg-green-200"
-                        : "bg-red-100 text-red-800 hover:bg-red-200"
-                    }`}
-                  >
-                    {isOnline ? <Wifi className="h-3 w-3 mr-1" /> : <WifiOff className="h-3 w-3 mr-1" />}
-                    {isOnline ? "Online" : "Offline"}
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>{isOnline ? "Conectado ao servidor" : "Trabalhando no modo offline"}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            {showCount && pendingItems > 0 && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge
-                      className={`cursor-pointer bg-amber-100 text-amber-800 hover:bg-amber-200`}
-                      onClick={handleSync}
-                    >
-                      {syncing ? (
-                        <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-3 w-3 mr-1" />
-                      )}
-                      {pendingItems}
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {syncing
-                      ? "Sincronizando alterações..."
-                      : `${pendingItems} alteração(ões) pendente(s). Clique para sincronizar.`}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+            {showPendingChanges && pendingChanges > 0 && (
+              <Badge variant="outline" className="text-xs py-0 h-5">
+                {isSyncing ? "Sincronizando..." : `${pendingChanges} pendente${pendingChanges !== 1 ? "s" : ""}`}
+              </Badge>
             )}
           </div>
-        )
-
-      case "button":
-        return (
-          <div className={`flex items-center gap-2 ${className}`}>
-            <Button
-              variant={isOnline ? "outline" : "destructive"}
-              size="sm"
-              className={isOnline ? "bg-green-50" : ""}
-              disabled={true}
-            >
-              {isOnline ? <Wifi className="h-4 w-4 mr-2" /> : <WifiOff className="h-4 w-4 mr-2" />}
-              {isOnline ? "Online" : "Offline"}
-            </Button>
-
-            {showCount && pendingItems > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSync}
-                disabled={syncing || !isOnline}
-                className="bg-amber-50"
-              >
-                {syncing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-                Sincronizar ({pendingItems})
-              </Button>
-            )}
-          </div>
-        )
-
-      case "icon":
-        return (
-          <div className={`flex items-center gap-1 ${className}`}>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`h-8 w-8 ${!isOnline ? "text-red-500 hover:text-red-600 hover:bg-red-50" : ""}`}
-                    disabled={true}
-                  >
-                    {isOnline ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{isOnline ? "Conectado ao servidor" : "Trabalhando no modo offline"}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            {showCount && pendingItems > 0 && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 relative"
-                      onClick={handleSync}
-                      disabled={syncing || !isOnline}
-                    >
-                      <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-                      <span className="absolute top-0 right-0 h-4 w-4 rounded-full bg-amber-500 text-[10px] text-white flex items-center justify-center">
-                        {pendingItems > 9 ? "9+" : pendingItems}
-                      </span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {syncing
-                      ? "Sincronizando alterações..."
-                      : `${pendingItems} alteração(ões) pendente(s). Clique para sincronizar.`}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
-        )
-    }
-  }
-
-  return renderIndicator()
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          {isOnline
+            ? pendingChanges > 0
+              ? "Online - Clique para sincronizar alterações pendentes"
+              : "Online - Todas as alterações estão sincronizadas"
+            : "Offline - As alterações serão sincronizadas quando a conexão for restaurada"}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
 }
