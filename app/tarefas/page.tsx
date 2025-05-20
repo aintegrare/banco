@@ -17,10 +17,10 @@ import { TasksKanbanView } from "@/components/tasks/tasks-kanban-view"
 interface Task {
   id: string | number
   title: string
-  description: string
+  description?: string
   status: string
   priority: string
-  project_id: string | number
+  project_id: string | number | null
   assignee?: string
   due_date?: string
 }
@@ -132,9 +132,10 @@ export default function TasksPage() {
 
   // Filtrar tarefas
   const filteredTasks = tasks.filter((task) => {
-    // Filtro de texto
+    // Filtro de texto - Corrigido para lidar com valores undefined
     const matchesSearch =
-      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      searchTerm === "" ||
+      (task.title && task.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()))
 
     // Filtro de status
@@ -444,8 +445,8 @@ export default function TasksPage() {
                         onClick={() => setEditTaskId(task.id)}
                       >
                         <td className="py-3 px-4">
-                          <div className="font-medium text-gray-800">{task.title}</div>
-                          <div className="text-sm text-gray-500 line-clamp-1">{task.description}</div>
+                          <div className="font-medium text-gray-800">{task.title || "Sem título"}</div>
+                          <div className="text-sm text-gray-500 line-clamp-1">{task.description || ""}</div>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center">
@@ -484,7 +485,7 @@ export default function TasksPage() {
                   >
                     <CardHeader className="pb-2">
                       <div className="flex justify-between items-start">
-                        <CardTitle className="text-lg">{task.title}</CardTitle>
+                        <CardTitle className="text-lg">{task.title || "Sem título"}</CardTitle>
                         <Badge
                           className={getPriorityColor(task.priority)
                             .replace("bg-", "bg-opacity-20 text-")
@@ -493,7 +494,7 @@ export default function TasksPage() {
                           {getPriorityLabel(task.priority)}
                         </Badge>
                       </div>
-                      <CardDescription className="line-clamp-2">{task.description}</CardDescription>
+                      <CardDescription className="line-clamp-2">{task.description || ""}</CardDescription>
                     </CardHeader>
                     <CardContent className="pb-2">
                       <div className="flex flex-col gap-2">
@@ -508,7 +509,7 @@ export default function TasksPage() {
                           <span className="text-sm text-gray-500">Projeto:</span>
                           <span className="text-sm font-medium">
                             {task.project_id != null
-                              ? projects.find((p) => p.id.toString() === task.project_id.toString())?.name || "Projeto"
+                              ? projects.find((p) => p.id.toString() === task.project_id?.toString())?.name || "Projeto"
                               : "Sem projeto"}
                           </span>
                         </div>
@@ -556,8 +557,8 @@ export default function TasksPage() {
                               onClick={() => setEditTaskId(task.id)}
                             >
                               <td className="py-3 px-4">
-                                <div className="font-medium text-gray-800">{task.title}</div>
-                                <div className="text-sm text-gray-500 line-clamp-1">{task.description}</div>
+                                <div className="font-medium text-gray-800">{task.title || "Sem título"}</div>
+                                <div className="text-sm text-gray-500 line-clamp-1">{task.description || ""}</div>
                               </td>
                               <td className="py-3 px-4">
                                 <div className="flex items-center">
