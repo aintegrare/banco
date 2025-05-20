@@ -70,11 +70,17 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
 
       try {
         // Buscar tarefa
+        console.log(`Buscando tarefa com ID: ${taskId}`)
         const taskResponse = await fetch(`/api/tasks/${taskId}`)
+
         if (!taskResponse.ok) {
-          throw new Error("Falha ao buscar dados da tarefa")
+          const errorText = await taskResponse.text()
+          console.error(`Resposta da API não-OK: ${taskResponse.status}`, errorText)
+          throw new Error(`Falha ao buscar dados da tarefa: ${taskResponse.status} ${errorText}`)
         }
+
         const taskData = await taskResponse.json()
+        console.log("Dados da tarefa recebidos:", taskData)
 
         if (taskData.color) {
           // Se a tarefa já tem uma cor
@@ -147,7 +153,7 @@ export function EditTaskDialog({ isOpen, onClose, taskId, onSave }: EditTaskDial
     setDate(date)
     if (date) {
       const formattedDate = format(date, "yyyy-MM-dd")
-      setTask((prev: any) => ({ ...prev, [name]: formattedDate }))
+      setTask((prev: any) => ({ ...prev, due_date: formattedDate }))
     } else {
       setTask((prev: any) => ({ ...prev, due_date: null }))
     }

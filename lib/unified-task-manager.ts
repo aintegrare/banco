@@ -168,23 +168,35 @@ export async function getTasks(filters: TaskFilter = {}): Promise<Task[]> {
  */
 export async function getTaskById(id: number): Promise<Task> {
   try {
+    console.log(`Buscando tarefa com ID: ${id}`)
     const supabase = createClient()
-    const { data, error } = await supabase.from("tasks").select("*").eq("id", id).single()
+
+    // Modificado para não usar .single() e tratar o resultado manualmente
+    const { data, error } = await supabase.from("tasks").select("*").eq("id", id)
 
     if (error) {
       console.error(`Erro ao buscar tarefa ${id}:`, error)
       throw new Error(error.message)
     }
 
-    if (!data) {
-      throw new Error("Tarefa não encontrada")
+    if (!data || data.length === 0) {
+      console.error(`Tarefa com ID ${id} não encontrada`)
+      throw new Error(`Tarefa com ID ${id} não encontrada`)
     }
 
+    if (data.length > 1) {
+      console.warn(`Múltiplas tarefas encontradas com ID ${id}, usando a primeira`)
+    }
+
+    // Usar o primeiro resultado encontrado
+    const taskData = data[0]
+    console.log(`Tarefa encontrada:`, taskData)
+
     // Mapear os dados do banco para o formato do frontend
-    return mapDbTaskToFrontend(data)
-  } catch (error) {
+    return mapDbTaskToFrontend(taskData)
+  } catch (error: any) {
     console.error(`Erro ao buscar tarefa ${id}:`, error)
-    throw error
+    throw new Error(`Erro ao buscar tarefa ${id}: ${error.message}`)
   }
 }
 
@@ -234,18 +246,26 @@ export async function updateTask(id: number, input: UpdateTaskInput): Promise<Ta
     // Adicionar timestamp de atualização
     dbTask.updated_at = new Date().toISOString()
 
-    const { data, error } = await supabase.from("tasks").update(dbTask).eq("id", id).select().single()
+    // Modificado para não usar .single() e tratar o resultado manualmente
+    const { data, error } = await supabase.from("tasks").update(dbTask).eq("id", id).select()
 
     if (error) {
       console.error(`Erro ao atualizar tarefa ${id}:`, error)
       throw new Error(error.message)
     }
 
+    if (!data || data.length === 0) {
+      throw new Error(`Tarefa com ID ${id} não encontrada para atualização`)
+    }
+
+    // Usar o primeiro resultado encontrado
+    const updatedData = data[0]
+
     // Mapear os dados do banco para o formato do frontend
-    return mapDbTaskToFrontend(data)
-  } catch (error) {
+    return mapDbTaskToFrontend(updatedData)
+  } catch (error: any) {
     console.error(`Erro ao atualizar tarefa ${id}:`, error)
-    throw error
+    throw new Error(`Erro ao atualizar tarefa ${id}: ${error.message}`)
   }
 }
 
@@ -276,6 +296,8 @@ export async function updateTaskStatus(id: number, status: string): Promise<Task
     const dbStatus = frontendToDbStatusMap[status] || status
 
     const supabase = createClient()
+
+    // Modificado para não usar .single() e tratar o resultado manualmente
     const { data, error } = await supabase
       .from("tasks")
       .update({
@@ -284,18 +306,24 @@ export async function updateTaskStatus(id: number, status: string): Promise<Task
       })
       .eq("id", id)
       .select()
-      .single()
 
     if (error) {
       console.error(`Erro ao atualizar status da tarefa ${id}:`, error)
       throw new Error(error.message)
     }
 
+    if (!data || data.length === 0) {
+      throw new Error(`Tarefa com ID ${id} não encontrada para atualização de status`)
+    }
+
+    // Usar o primeiro resultado encontrado
+    const updatedData = data[0]
+
     // Mapear os dados do banco para o formato do frontend
-    return mapDbTaskToFrontend(data)
-  } catch (error) {
+    return mapDbTaskToFrontend(updatedData)
+  } catch (error: any) {
     console.error(`Erro ao atualizar status da tarefa ${id}:`, error)
-    throw error
+    throw new Error(`Erro ao atualizar status da tarefa ${id}: ${error.message}`)
   }
 }
 
