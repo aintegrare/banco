@@ -1,6 +1,7 @@
+"use client"
+
 import dynamic from "next/dynamic"
 import { Skeleton } from "@/components/ui/skeleton"
-import { SMPClientWrapper } from "./client-wrapper"
 
 // Importar o componente dinamicamente com SSR desativado
 const SocialMediaPlatformClient = dynamic(
@@ -21,10 +22,10 @@ const SocialMediaPlatformClient = dynamic(
   },
 )
 
-export default function SMPPage() {
+export function SMPClientWrapper() {
   return (
     <div className="container-fluid p-0">
-      <SMPClientWrapper />
+      <SocialMediaPlatformClient />
     </div>
   )
 }
