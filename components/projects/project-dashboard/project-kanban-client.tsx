@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { DragDropContext } from "react-beautiful-dnd"
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd"
 import Link from "next/link"
 import { ArrowRight, Plus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -28,12 +28,12 @@ interface Task {
   project_id: string | number
 }
 
-interface ProjectKanbanProps {
+interface ProjectKanbanClientProps {
   tasks: Task[]
   projectId: string | number
 }
 
-export function ProjectKanban({ tasks: initialTasks, projectId }: ProjectKanbanProps) {
+export function ProjectKanbanClient({ tasks: initialTasks, projectId }: ProjectKanbanClientProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks || [])
   const [isLoading, setIsLoading] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -243,28 +243,48 @@ export function ProjectKanban({ tasks: initialTasks, projectId }: ProjectKanbanP
                     </span>
                   </div>
 
-                  <div className="flex-grow p-2 overflow-y-auto" style={{ maxHeight: "300px", minHeight: "100px" }}>
-                    {tasksByColumn[column.id]?.map((task: Task, index: number) => (
-                      <div key={task.id} className="mb-2 last:mb-0" onClick={() => setEditTaskId(task.id)}>
-                        <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200 cursor-pointer">
-                          <div className="flex items-start justify-between">
-                            <h3 className="text-sm font-medium text-gray-800 line-clamp-2">{task.title}</h3>
-                            <div
-                              className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)} ml-2 flex-shrink-0`}
-                            ></div>
-                          </div>
-                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-                            <div className="flex items-center">
-                              <div className="w-5 h-5 rounded-full bg-[#4b7bb5] flex items-center justify-center text-white text-xs">
-                                {task.assignee ? task.assignee.charAt(0).toUpperCase() : "?"}
+                  <Droppable droppableId={column.id}>
+                    {(provided) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className="flex-grow p-2 overflow-y-auto"
+                        style={{ maxHeight: "300px", minHeight: "100px" }}
+                      >
+                        {tasksByColumn[column.id]?.map((task: Task, index: number) => (
+                          <Draggable key={task.id} draggableId={task.id.toString()} index={index}>
+                            {(provided) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                className="mb-2 last:mb-0"
+                                onClick={() => setEditTaskId(task.id)}
+                              >
+                                <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200 cursor-pointer">
+                                  <div className="flex items-start justify-between">
+                                    <h3 className="text-sm font-medium text-gray-800 line-clamp-2">{task.title}</h3>
+                                    <div
+                                      className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)} ml-2 flex-shrink-0`}
+                                    ></div>
+                                  </div>
+                                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                                    <div className="flex items-center">
+                                      <div className="w-5 h-5 rounded-full bg-[#4b7bb5] flex items-center justify-center text-white text-xs">
+                                        {task.assignee ? task.assignee.charAt(0).toUpperCase() : "?"}
+                                      </div>
+                                    </div>
+                                    <div className="text-xs text-gray-500">{formatDate(task.due_date)}</div>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                            <div className="text-xs text-gray-500">{formatDate(task.due_date)}</div>
-                          </div>
-                        </div>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </Droppable>
                 </div>
               </div>
             ))}
