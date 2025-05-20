@@ -113,6 +113,7 @@ export function TasksKanbanView({
     }
   }
 
+  // Atualizar a função onDragEnd para usar o método PATCH
   const onDragEnd = (result: any) => {
     if (!result) return
 
@@ -125,6 +126,7 @@ export function TasksKanbanView({
 
     // Atualizar o status da tarefa
     if (draggableId) {
+      console.log(`Atualizando status da tarefa ${draggableId} para ${destination.droppableId}`)
       onTaskStatusChange(draggableId, destination.droppableId)
     }
   }

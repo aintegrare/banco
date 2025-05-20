@@ -134,14 +134,13 @@ export function ProjectKanbanClient({ tasks: initialTasks, projectId }: ProjectK
       setTasks(updatedTasks)
       setIsUpdating(true)
 
-      // Atualizar o status da tarefa no servidor
+      // Atualizar o status da tarefa no servidor usando PATCH
       const response = await fetch(`/api/tasks/${draggableId}`, {
-        method: "PUT",
+        method: "PATCH", // Alterado de PUT para PATCH
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          ...taskToUpdate,
           status: destination.droppableId,
         }),
       })

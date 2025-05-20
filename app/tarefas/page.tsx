@@ -254,9 +254,9 @@ export default function TasksPage() {
     try {
       console.log(`Atualizando status da tarefa ${taskId} para ${newStatus}`)
 
-      // Corrigindo a chamada da API - usando PUT em vez de PATCH e enviando o objeto completo
+      // Usar PATCH em vez de PUT e enviar apenas o status
       const response = await fetch(`/api/tasks/${taskId}`, {
-        method: "PUT", // Alterado de PATCH para PUT conforme implementado na API
+        method: "PATCH", // Alterado de PUT para PATCH
         headers: {
           "Content-Type": "application/json",
         },
