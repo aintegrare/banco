@@ -22,6 +22,6 @@ const SocialMediaPlatformClient = dynamic(
   },
 )
 
-export function SMPClientWrapper() {
+export function SMPClient() {
   return <SocialMediaPlatformClient />
 }
