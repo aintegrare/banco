@@ -10,7 +10,7 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 214 42% 49%;
+    --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -22,8 +22,9 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 214 42% 49%;
+    --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
+    --chat-bg: 222 47% 11%;
   }
 
   .dark {
@@ -33,7 +34,7 @@
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 214 42% 56%;
+    --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 47.4% 11.2%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
@@ -45,7 +46,8 @@
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 214 42% 56%;
+    --ring: 224.3 76.3% 48%;
+    --chat-bg: 222 47% 11%;
   }
 }
 
@@ -56,17 +58,169 @@
   body {
     @apply bg-background text-foreground;
   }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-bold tracking-tight;
+  }
+  h1 {
+    @apply text-4xl md:text-5xl lg:text-6xl;
+  }
+  h2 {
+    @apply text-3xl md:text-4xl;
+  }
+  h3 {
+    @apply text-xl md:text-2xl;
+  }
+  section {
+    @apply py-10 md:py-16; /* Reduced from py-16 md:py-24 */
+  }
+  .container {
+    @apply px-4 md:px-6 mx-auto max-w-7xl;
+  }
+
+  /* Vertical spacing adjustments */
+  .section-title {
+    @apply mb-8; /* Reduced from mb-12 */
+  }
+
+  .section-content {
+    @apply mt-6; /* Reduced from mt-8 or similar */
+  }
+
+  /* Center alignment helpers */
+  .center-content {
+    @apply flex flex-col items-center justify-center text-center;
+  }
 }
 
-@keyframes fade-in {
-  0% {
+/* Smooth scrolling for anchor links */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Subtle hover transitions */
+a,
+button {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Header height adjustment */
+.header-height {
+  height: 4.5rem; /* 72px - consistent height */
+}
+
+/* Vertical centering for hero */
+.hero-container {
+  @apply flex flex-col justify-center;
+  min-height: calc(100vh - 4.5rem); /* Full viewport height minus header */
+}
+
+/* Reduced spacing between elements */
+.compact-spacing > * + * {
+  @apply mt-4;
+}
+
+/* Animation keyframes */
+@keyframes fadeInUp {
+  from {
     opacity: 0;
+    transform: translateY(20px);
   }
-  100% {
+  to {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
-.animate-fade-in {
-  animation: fade-in 0.5s ease-in-out;
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+/* Estilos para garantir fundos opacos em formulários */
+.dark input,
+.dark textarea,
+.dark select,
+.dark [role="combobox"] {
+  background-color: rgb(55 65 81) !important;
+  border-color: rgb(75 85 99) !important;
+  color: white !important;
+}
+
+.dark [role="dialog"],
+.dark [data-state="open"],
+.dark .popover-content,
+.dark .select-content,
+.dark .dropdown-content {
+  background-color: rgb(31 41 55) !important;
+  border-color: rgb(55 65 81) !important;
+}
+
+/* Garantir que os botões tenham cores adequadas */
+.dark button[type="submit"],
+.dark button[type="button"] {
+  background-color: var(--color-primary-600);
+  color: white;
+}
+
+.dark button[type="submit"]:hover,
+.dark button[type="button"]:hover {
+  background-color: var(--color-primary-700);
+}
+
+/* Melhorar contraste de textos em modo escuro */
+.dark label,
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6,
+.dark p {
+  color: rgb(229 231 235) !important;
+}
+
+/* Garantir que os diálogos e modais tenham fundos opacos */
+.DialogContent,
+.DialogOverlay,
+[role="dialog"],
+[data-state="open"] {
+  @apply bg-white dark:bg-gray-800;
+}
+
+/* Corrigir transparência em modais e diálogos */
+.dark [role="dialog"],
+.dark [data-state="open"] {
+  background-color: rgb(31 41 55) !important;
+  backdrop-filter: blur(8px);
+}
+
+/* Garantir que o conteúdo do diálogo seja visível */
+.dark [role="dialog"] *,
+.dark [data-state="open"] * {
+  color: rgb(229 231 235);
+}
+
+/* Melhorar visibilidade de inputs em diálogos no modo escuro */
+.dark [role="dialog"] input,
+.dark [role="dialog"] textarea,
+.dark [role="dialog"] select,
+.dark [data-state="open"] input,
+.dark [data-state="open"] textarea,
+.dark [data-state="open"] select {
+  background-color: rgb(55 65 81) !important;
+  border-color: rgb(75 85 99) !important;
+}
+
+/* Esconder a barra de rolagem mas manter a funcionalidade */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
 }

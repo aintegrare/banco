@@ -1,74 +1,79 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getTaskById, updateTask, deleteTask } from "@/lib/unified-task-manager"
+import type { UpdateTaskInput } from "@/lib/unified-task-manager"
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const taskId = params.id
-
-    const supabase = createClient()
-
-    const { data, error } = await supabase.from("tasks").select("*").eq("id", taskId).single()
-
-    if (error) {
-      console.error(`Erro ao buscar tarefa ${taskId}:`, error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    const id = Number.parseInt(params.id)
+    if (isNaN(id)) {
+      return NextResponse.json({ error: "ID de tarefa inválido" }, { status: 400 })
     }
 
-    if (!data) {
-      return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 })
-    }
-
-    return NextResponse.json(data)
+    const task = await getTaskById(id)
+    return NextResponse.json(task)
   } catch (error: any) {
-    console.error("Erro ao processar requisição de tarefa:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error(`Erro ao buscar tarefa ${params.id}:`, error)
+    return NextResponse.json({ error: error.message || "Erro ao buscar tarefa" }, { status: 500 })
   }
 }
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const taskId = params.id
+    const id = Number.parseInt(params.id)
+    if (isNaN(id)) {
+      return NextResponse.json({ error: "ID de tarefa inválido" }, { status: 400 })
+    }
+
     const body = await request.json()
+    console.log(`Atualizando tarefa ${id} com dados:`, body)
 
-    // Remover campos que não devem ser atualizados
-    const { id, created_at, ...updateData } = body
+    const {
+      title,
+      description,
+      status,
+      priority,
+      project_id,
+      assigned_to,
+      due_date,
+      estimated_hours,
+      actual_hours,
+      tags,
+      subtasks,
+    } = body
 
-    if (!updateData.title) {
-      return NextResponse.json({ error: "Título da tarefa é obrigatório" }, { status: 400 })
+    const taskData: UpdateTaskInput = {
+      title,
+      description,
+      status,
+      priority,
+      project_id,
+      assigned_to,
+      due_date,
+      estimated_hours,
+      actual_hours,
+      tags,
+      subtasks,
     }
 
-    const supabase = createClient()
-
-    const { data, error } = await supabase.from("tasks").update(updateData).eq("id", taskId).select().single()
-
-    if (error) {
-      console.error(`Erro ao atualizar tarefa ${taskId}:`, error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json(data)
+    const updatedTask = await updateTask(id, taskData)
+    return NextResponse.json(updatedTask)
   } catch (error: any) {
-    console.error("Erro ao processar requisição de atualização de tarefa:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error(`Erro ao atualizar tarefa ${params.id}:`, error)
+    return NextResponse.json({ error: error.message || "Erro ao atualizar tarefa" }, { status: 500 })
   }
 }
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const taskId = params.id
-
-    const supabase = createClient()
-
-    const { error } = await supabase.from("tasks").delete().eq("id", taskId)
-
-    if (error) {
-      console.error(`Erro ao excluir tarefa ${taskId}:`, error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    const id = Number.parseInt(params.id)
+    if (isNaN(id)) {
+      return NextResponse.json({ error: "ID de tarefa inválido" }, { status: 400 })
     }
 
+    await deleteTask(id)
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error("Erro ao processar requisição de exclusão de tarefa:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error(`Erro ao excluir tarefa ${params.id}:`, error)
+    return NextResponse.json({ error: error.message || "Erro ao excluir tarefa" }, { status: 500 })
   }
 }

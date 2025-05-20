@@ -1,119 +1,89 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getTasks, createTask } from "@/lib/unified-task-manager"
+import type { TaskStatus, TaskPriority, CreateTaskInput } from "@/lib/unified-task-manager"
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const projectId = searchParams.get("projectId")
 
-    console.log("API tasks: Buscando tarefas", projectId ? `para o projeto ${projectId}` : "para todos os projetos")
+    // Extrair parâmetros de consulta
+    const projectId = searchParams.get("project_id") ? Number.parseInt(searchParams.get("project_id")!) : undefined
+    console.log("Buscando tarefas para o projeto:", projectId)
 
-    const supabase = createClient()
+    const status = searchParams.get("status") as TaskStatus | undefined
 
-    let query = supabase.from("tasks").select("*")
+    const priority = searchParams.get("priority") as TaskPriority | undefined
 
-    if (projectId) {
-      query = query.eq("project_id", projectId)
-    }
+    const assignedTo = searchParams.get("assigned_to") ? Number.parseInt(searchParams.get("assigned_to")!) : undefined
 
-    const { data, error } = await query.order("created_at", { ascending: false })
+    const search = searchParams.get("search") || undefined
 
-    if (error) {
-      console.error("API tasks: Erro ao buscar tarefas:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    // Parâmetros de paginação
+    const limit = searchParams.get("limit") ? Number.parseInt(searchParams.get("limit")!) : undefined
 
-    console.log(`API tasks: ${data?.length || 0} tarefas encontradas`)
+    const offset = searchParams.get("offset") ? Number.parseInt(searchParams.get("offset")!) : undefined
 
-    // Se não houver dados do banco de dados, use o fallback
-    if (!data || data.length === 0) {
-      console.log("API tasks: Usando dados de fallback")
-      return NextResponse.json(fallbackTasks)
-    }
+    // Buscar tarefas com base nos filtros
+    const tasks = await getTasks({
+      project_id: projectId,
+      status,
+      priority,
+      assigned_to: assignedTo,
+      search,
+      limit,
+      offset,
+    })
 
-    return NextResponse.json(data)
+    return NextResponse.json(tasks)
   } catch (error: any) {
-    console.error("API tasks: Erro ao processar requisição de tarefas:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error("Erro ao processar requisição de tarefas:", error)
+    return NextResponse.json({ error: error.message || "Erro ao buscar tarefas" }, { status: 500 })
   }
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { title, description, status, priority, project_id, due_date, color, creator, assignee } = body
 
-    if (!title || !project_id) {
-      return NextResponse.json({ error: "Título e ID do projeto são obrigatórios" }, { status: 400 })
-    }
-
-    const supabase = createClient()
-
-    // Verificar se a tabela tasks existe usando uma abordagem mais direta
-    try {
-      // Tentar fazer uma consulta simples para verificar se a tabela existe
-      const { count, error: countError } = await supabase.from("tasks").select("*", { count: "exact", head: true })
-
-      if (countError) {
-        console.error("Erro ao verificar tabela tasks:", countError)
-        // Se houver erro, provavelmente a tabela não existe ou há um problema de permissão
-        return NextResponse.json({ error: "Erro ao verificar tabela de tarefas" }, { status: 500 })
-      }
-
-      console.log("Tabela tasks verificada com sucesso")
-    } catch (tableError) {
-      console.error("Exceção ao verificar tabela tasks:", tableError)
-      return NextResponse.json({ error: "Erro ao verificar estrutura da tabela" }, { status: 500 })
-    }
-
-    // Criar objeto com os dados da tarefa
-    const taskData = {
+    const {
       title,
-      description: description || null,
+      description,
+      status,
+      priority,
+      project_id,
+      assigned_to,
+      due_date,
+      estimated_hours,
+      tags,
+      color,
+      creator,
+      assignee,
+    } = body
+
+    if (!title) {
+      return NextResponse.json({ error: "Título da tarefa é obrigatório" }, { status: 400 })
+    }
+
+    const taskData: CreateTaskInput = {
+      title,
+      description,
       status: status || "todo",
       priority: priority || "medium",
       project_id,
-      due_date: due_date || null,
+      assigned_to,
+      due_date,
+      estimated_hours,
+      tags,
       color: color || "#4b7bb5",
-      creator: creator || null,
-      assignee: assignee || null,
-      created_at: new Date().toISOString(),
+      creator,
+      assignee,
     }
 
-    const { data, error } = await supabase.from("tasks").insert(taskData).select().single()
+    const newTask = await createTask(taskData)
 
-    if (error) {
-      console.error("Erro ao criar tarefa:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json(data)
+    return NextResponse.json(newTask)
   } catch (error: any) {
     console.error("Erro ao processar requisição de criação de tarefa:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message || "Erro ao criar tarefa" }, { status: 500 })
   }
 }
-
-// Dados de exemplo para fallback
-const fallbackTasks = [
-  {
-    id: "fallback-1",
-    title: "Revisar conteúdo do site",
-    description: "Verificar textos e imagens da página inicial",
-    status: "todo",
-    priority: "high",
-    project_id: "fallback",
-    created_at: new Date().toISOString(),
-    due_date: new Date().toISOString(),
-  },
-  {
-    id: "fallback-2",
-    title: "Preparar relatório mensal",
-    description: "Compilar métricas de desempenho para o cliente",
-    status: "in-progress",
-    priority: "medium",
-    project_id: "fallback",
-    created_at: new Date().toISOString(),
-    due_date: new Date(Date.now() + 86400000 * 3).toISOString(),
-  },
-]

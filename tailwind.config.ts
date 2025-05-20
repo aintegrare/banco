@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss"
+import { colors, spacing, typography, borderRadius, shadows, transitions, zIndex } from "./lib/design-system/tokens"
 
-const config = {
+const config: Config = {
   darkMode: ["class"],
   content: [
     "./pages/**/*.{ts,tsx}",
@@ -9,7 +10,6 @@ const config = {
     "./src/**/*.{ts,tsx}",
     "*.{js,ts,jsx,tsx,mdx}",
   ],
-  prefix: "",
   theme: {
     container: {
       center: true,
@@ -20,26 +20,17 @@ const config = {
     },
     extend: {
       colors: {
-        // Integrare brand colors
-        "integrare-blue-1": "#4b7bb5",
-        "integrare-blue-2": "#527eb7",
-        "integrare-blue-3": "#3d649e",
-        "integrare-blue-4": "#4072b0",
-        "integrare-blue-5": "#6b91c1",
-        "integrare-white": "#f2f1ef",
+        brand: colors.brand,
+        neutral: colors.neutral,
+        success: colors.success,
+        warning: colors.warning,
+        error: colors.error,
+        info: colors.info,
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
@@ -61,11 +52,24 @@ const config = {
           foreground: "hsl(var(--card-foreground))",
         },
       },
-      borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+      spacing,
+      borderRadius,
+      boxShadow: shadows,
+      fontFamily: typography.fontFamily,
+      fontSize: typography.fontSize,
+      fontWeight: typography.fontWeight,
+      lineHeight: typography.lineHeight,
+      transitionProperty: {
+        height: "height",
+        spacing: "margin, padding",
       },
+      transitionTimingFunction: transitions.timing,
+      transitionDuration: {
+        DEFAULT: "150ms",
+        fast: "100ms",
+        slow: "300ms",
+      },
+      zIndex,
       keyframes: {
         "accordion-down": {
           from: { height: "0" },
@@ -75,14 +79,29 @@ const config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
+        "float-delayed": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
+        fadeIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        float: "float 6s ease-in-out infinite",
+        "float-delayed": "float-delayed 6s ease-in-out 2s infinite",
+        fadeIn: "fadeIn 1s ease-out",
       },
     },
   },
   plugins: [require("tailwindcss-animate")],
-} satisfies Config
+}
 
 export default config

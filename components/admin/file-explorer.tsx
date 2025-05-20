@@ -1,5 +1,6 @@
 "use client"
 
+import { CardFooter } from "@/components/ui/card"
 import { DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 import type React from "react"
@@ -50,6 +51,12 @@ import {
   Save,
   Calendar,
   Info,
+  Palette,
+  FileImage,
+  BookOpen,
+  File,
+  MoveIcon,
+  Eye,
 } from "lucide-react"
 import { FileCard } from "./file-card"
 import { FileRow } from "./file-row"
@@ -68,17 +75,21 @@ import { FileUploader } from "./file-uploader"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ShareLinkDialog } from "./share-link-dialog"
-import { ToastNotification } from "./toast-notification"
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { getSupabaseClient } from "@/lib/supabase/client"
 
 // Adicionar importações para os componentes de tarefas
 import { fetchFolderTaskCounts } from "@/lib/folder-tasks-manager"
+
+// Importar o novo sistema de notificações
+import { useNotification } from "./notification-manager"
+import { logger } from "@/lib/logger"
+import { FolderSelector } from "./folder-selector"
 
 interface FileItem {
   id: string
@@ -107,6 +118,7 @@ interface TaskCount {
 }
 
 export function FileExplorer() {
+  const notification = useNotification()
   const [files, setFiles] = useState<FileItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -126,11 +138,6 @@ export function FileExplorer() {
   const [itemToDelete, setItemToDelete] = useState<FileItem | null>(null)
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [itemToShare, setItemToShare] = useState<FileItem | null>(null)
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: "success" | "error" }>({
-    visible: false,
-    message: "",
-    type: "success",
-  })
   const [favorites, setFavorites] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<"all" | "recent" | "favorites" | "shared">("all")
   const [recentFiles, setRecentFiles] = useState<FileItem[]>([])
@@ -155,6 +162,13 @@ export function FileExplorer() {
   const [taskFilter, setTaskFilter] = useState<"all" | "pending" | "completed">("all")
   const [taskSearchQuery, setTaskSearchQuery] = useState("")
   const [showTasks, setShowTasks] = useState<boolean>(false)
+  const [showMoveFileModal, setShowMoveFileModal] = useState(false)
+  const [itemToMove, setItemToMove] = useState<FileItem | null>(null)
+  const [destinationPath, setDestinationPath] = useState<string>("")
+  const [isMovingFile, setIsMovingFile] = useState(false)
+  const [moveFileError, setMoveFileError] = useState<string | null>(null)
+  const [showPreview, setShowPreview] = useState(false)
+  const [fileToPreview, setFileToPreview] = useState<FileItem | null>(null)
 
   // Função para buscar arquivos e pastas
   const fetchFiles = useCallback(async () => {
@@ -326,6 +340,8 @@ export function FileExplorer() {
   const confirmDelete = async () => {
     if (!itemToDelete) return
 
+    const loadingId = notification.loading(`Excluindo ${itemToDelete.type === "folder" ? "pasta" : "arquivo"}...`)
+
     try {
       let cleanPath = itemToDelete.path
       if (cleanPath.startsWith("http")) {
@@ -333,36 +349,65 @@ export function FileExplorer() {
         cleanPath = url.pathname.replace(/^\//, "")
       }
 
+      logger.info(`FileExplorer: Excluindo ${itemToDelete.type}: ${cleanPath}`)
+
       const response = await fetch(`/api/files/${encodeURIComponent(cleanPath)}`, {
         method: "DELETE",
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const data = await response.json()
         throw new Error(data.message || data.error || `Erro ao excluir: ${response.status}`)
       }
 
       // Remover o arquivo da lista
       setFiles((prev) => prev.filter((file) => file.path !== itemToDelete.path))
 
-      // Mostrar toast de sucesso
-      setToast({
-        visible: true,
-        message: `${itemToDelete.type === "folder" ? "Pasta" : "Arquivo"} excluído com sucesso!`,
-        type: "success",
-      })
+      // Remover a notificação de carregamento
+      notification.removeNotification(loadingId)
 
-      // Esconder o toast após 3 segundos
-      setTimeout(() => {
-        setToast((prev) => ({ ...prev, visible: false }))
-      }, 3000)
+      // Mostrar notificação de sucesso
+      notification.success(
+        `${itemToDelete.type === "folder" ? "Pasta" : "Arquivo"} excluído com sucesso!`,
+        `${itemToDelete.name} foi excluído permanentemente.`,
+      )
+
+      // Verificar se o arquivo foi realmente excluído
+      setTimeout(async () => {
+        try {
+          const verifyResponse = await fetch(`/api/check-file?path=${encodeURIComponent(cleanPath)}`)
+          const verifyData = await verifyResponse.json()
+
+          if (verifyData.exists) {
+            notification.warning(
+              "Verificação pós-exclusão falhou",
+              `O arquivo ainda aparece no servidor. Pode ser necessário atualizar a lista manualmente.`,
+              {
+                actionLabel: "Atualizar Agora",
+                onAction: () => fetchFiles(),
+              },
+            )
+          }
+        } catch (verifyError) {
+          logger.error("Erro na verificação pós-exclusão:", { data: verifyError })
+        }
+      }, 2000)
     } catch (err) {
-      console.error("Erro ao excluir:", err)
-      setToast({
-        visible: true,
-        message: err instanceof Error ? err.message : "Erro ao excluir",
-        type: "error",
-      })
+      logger.error("Erro ao excluir:", { data: err })
+
+      // Remover a notificação de carregamento
+      notification.removeNotification(loadingId)
+
+      // Mostrar notificação de erro
+      notification.error(
+        "Erro ao excluir",
+        err instanceof Error ? err.message : "Erro desconhecido ao excluir o arquivo",
+        {
+          actionLabel: "Tentar Novamente",
+          onAction: () => confirmDelete(),
+        },
+      )
     } finally {
       setShowDeleteConfirmation(false)
       setItemToDelete(null)
@@ -371,7 +416,11 @@ export function FileExplorer() {
 
   // Renomear um arquivo ou pasta
   const handleRename = async (oldPath: string, newName: string) => {
+    const loadingId = notification.loading(`Renomeando arquivo...`)
+
     try {
+      logger.info(`FileExplorer: Renomeando arquivo: ${oldPath} para ${newName}`)
+
       // Atualizar a UI imediatamente para feedback rápido
       setFiles((prev) =>
         prev.map((file) => {
@@ -391,29 +440,88 @@ export function FileExplorer() {
         }),
       )
 
+      // Fazer a chamada à API para renomear o arquivo
+      const response = await fetch("/api/files/rename", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          oldPath,
+          newName,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || "Erro ao renomear arquivo")
+      }
+
+      // Remover a notificação de carregamento
+      notification.removeNotification(loadingId)
+
+      // Mostrar notificação de sucesso
+      notification.success("Arquivo renomeado com sucesso!", `O arquivo foi renomeado para "${newName}".`)
+
       // Buscar arquivos novamente para garantir que tudo esteja atualizado
       setTimeout(() => {
         fetchFiles()
-      }, 500)
+      }, 1000)
 
-      // Mostrar toast de sucesso
-      setToast({
-        visible: true,
-        message: "Item renomeado com sucesso!",
-        type: "success",
-      })
+      // Verificar se o arquivo foi realmente renomeado
+      setTimeout(async () => {
+        try {
+          // Extrair o diretório e construir o novo caminho
+          const lastSlashIndex = oldPath.lastIndexOf("/")
+          const directory = lastSlashIndex >= 0 ? oldPath.substring(0, lastSlashIndex + 1) : ""
+          const newPath = directory + newName
 
-      // Esconder o toast após 3 segundos
-      setTimeout(() => {
-        setToast((prev) => ({ ...prev, visible: false }))
-      }, 3000)
+          const verifyOldResponse = await fetch(`/api/check-file?path=${encodeURIComponent(oldPath)}`)
+          const verifyNewResponse = await fetch(`/api/check-file?path=${encodeURIComponent(newPath)}`)
+
+          const verifyOldData = await verifyOldResponse.json()
+          const verifyNewData = await verifyNewResponse.json()
+
+          if (verifyOldData.exists) {
+            notification.warning(
+              "Arquivo original ainda existe",
+              `O arquivo original "${oldPath}" ainda existe no servidor.`,
+              {
+                actionLabel: "Atualizar Agora",
+                onAction: () => fetchFiles(),
+              },
+            )
+          }
+
+          if (!verifyNewData.exists) {
+            notification.error(
+              "Novo arquivo não encontrado",
+              `O arquivo renomeado "${newPath}" não foi encontrado no servidor.`,
+              {
+                actionLabel: "Atualizar Agora",
+                onAction: () => fetchFiles(),
+              },
+            )
+          }
+        } catch (verifyError) {
+          logger.error("Erro na verificação pós-renomeação:", { data: verifyError })
+        }
+      }, 2000)
     } catch (err) {
-      console.error("Erro ao renomear:", err)
-      setToast({
-        visible: true,
-        message: err instanceof Error ? err.message : "Erro ao renomear",
-        type: "error",
-      })
+      logger.error("Erro ao renomear:", { data: err })
+
+      // Remover a notificação de carregamento
+      notification.removeNotification(loadingId)
+
+      // Mostrar notificação de erro
+      notification.error(
+        "Erro ao renomear arquivo",
+        err instanceof Error ? err.message : "Erro desconhecido ao renomear o arquivo",
+      )
+
+      // Reverter a alteração local
+      fetchFiles()
     }
   }
 
@@ -426,11 +534,7 @@ export function FileExplorer() {
     }
 
     if (/[\\/:*?"<>|]/.test(newFolderName)) {
-      setToast({
-        visible: true,
-        message: "O nome da pasta contém caracteres inválidos",
-        type: "error",
-      })
+      notification.error("O nome da pasta contém caracteres inválidos")
       return
     }
 
@@ -473,23 +577,15 @@ export function FileExplorer() {
       }, 500)
 
       // Mostrar toast de sucesso
-      setToast({
-        visible: true,
-        message: "Pasta criada com sucesso!",
-        type: "success",
-      })
+      notification.success("Pasta criada com sucesso!")
 
       // Esconder o toast após 3 segundos
       setTimeout(() => {
-        setToast((prev) => ({ ...prev, visible: false }))
+        //setToast((prev) => ({ ...prev, visible: false }))
       }, 3000)
     } catch (err) {
       console.error("Erro ao criar pasta:", err)
-      setToast({
-        visible: true,
-        message: err instanceof Error ? err.message : "Erro ao criar pasta",
-        type: "error",
-      })
+      notification.error(err instanceof Error ? err.message : "Erro ao criar pasta")
     } finally {
       setIsCreatingFolder(false)
     }
@@ -499,6 +595,138 @@ export function FileExplorer() {
   const handleShare = (file: FileItem) => {
     setItemToShare(file)
     setShowShareDialog(true)
+  }
+
+  // Função para mover arquivo
+  const handleMove = (file: FileItem) => {
+    setItemToMove(file)
+    setDestinationPath("")
+    setMoveFileError(null)
+    setShowMoveFileModal(true)
+  }
+
+  // Função para visualizar arquivo
+  const handlePreview = (file: FileItem) => {
+    setFileToPreview(file)
+    setShowPreview(true)
+  }
+
+  // Mover arquivo
+  const handleMoveFile = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!itemToMove) {
+      setMoveFileError("Nenhum arquivo selecionado para mover")
+      return
+    }
+
+    if (destinationPath === undefined || destinationPath === null) {
+      setMoveFileError("Selecione um destino para mover o arquivo")
+      return
+    }
+
+    setIsMovingFile(true)
+    setMoveFileError(null)
+
+    const loadingId = notification.loading(`Movendo arquivo...`)
+
+    try {
+      const fileName = itemToMove.name
+      // Garantir que o caminho de destino esteja formatado corretamente
+      const formattedDestPath = destinationPath.trim()
+      const newPath = formattedDestPath ? `${formattedDestPath}/${fileName}` : fileName
+
+      logger.info(`FileExplorer: Movendo arquivo: ${itemToMove.path} para ${newPath}`)
+      console.log(`Movendo de "${itemToMove.path}" para "${newPath}"`)
+
+      const response = await fetch("/api/files/move", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sourcePath: itemToMove.path,
+          destinationPath: newPath,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || "Erro ao mover arquivo")
+      }
+
+      logger.info("Resposta da API:", { data })
+
+      setFiles((prevFiles) => prevFiles.filter((file) => file.path !== itemToMove.path))
+
+      setShowMoveFileModal(false)
+
+      // Remover a notificação de carregamento
+      notification.removeNotification(loadingId)
+
+      // Mostrar notificação de sucesso
+      notification.success(
+        "Arquivo movido com sucesso!",
+        `"${fileName}" foi movido para "${formattedDestPath || "pasta raiz"}".`,
+        {
+          actionLabel: "Ir para o destino",
+          onAction: () => navigateToFolder(formattedDestPath),
+        },
+      )
+
+      // Verificar se o arquivo foi realmente movido
+      setTimeout(async () => {
+        try {
+          const verifySourceResponse = await fetch(`/api/check-file?path=${encodeURIComponent(itemToMove.path)}`)
+          const verifyDestResponse = await fetch(`/api/check-file?path=${encodeURIComponent(newPath)}`)
+
+          const verifySourceData = await verifySourceResponse.json()
+          const verifyDestData = await verifyDestResponse.json()
+
+          if (verifySourceData.exists) {
+            notification.warning(
+              "Arquivo original ainda existe",
+              `O arquivo original "${itemToMove.path}" ainda existe no servidor.`,
+              {
+                actionLabel: "Atualizar Agora",
+                onAction: () => fetchFiles(),
+              },
+            )
+          }
+
+          if (!verifyDestData.exists) {
+            notification.error(
+              "Arquivo movido não encontrado",
+              `O arquivo movido "${newPath}" não foi encontrado no servidor.`,
+              {
+                actionLabel: "Atualizar Agora",
+                onAction: () => fetchFiles(),
+              },
+            )
+          }
+        } catch (verifyError) {
+          logger.error("Erro na verificação pós-movimentação:", { data: verifyError })
+        }
+      }, 2000)
+
+      await fetchFiles()
+    } catch (error) {
+      logger.error("Erro ao mover arquivo:", { data: error })
+
+      // Remover a notificação de carregamento
+      notification.removeNotification(loadingId)
+
+      // Mostrar notificação de erro
+      notification.error(
+        "Erro ao mover arquivo",
+        error instanceof Error ? error.message : "Erro desconhecido ao mover o arquivo",
+      )
+
+      setMoveFileError(error instanceof Error ? error.message : "Erro ao mover arquivo")
+    } finally {
+      setIsMovingFile(false)
+    }
   }
 
   // Alternar favorito
@@ -521,15 +749,11 @@ export function FileExplorer() {
     )
 
     // Mostrar toast
-    setToast({
-      visible: true,
-      message: favorites.includes(file.path) ? "Removido dos favoritos" : "Adicionado aos favoritos",
-      type: "success",
-    })
+    notification.success(favorites.includes(file.path) ? "Removido dos favoritos" : "Adicionado aos favoritos")
 
     // Esconder o toast após 3 segundos
     setTimeout(() => {
-      setToast((prev) => ({ ...prev, visible: false }))
+      //setToast((prev) => ({ ...prev, visible: false }))
     }, 3000)
   }
 
@@ -610,30 +834,25 @@ export function FileExplorer() {
         // Atualizar contagem de tarefas
         setTaskCounts((prev) => ({
           ...prev,
-          [folderPath]: (prev[folderPath] || 0) + 1,
+          [folderPath]: {
+            pending: (prev[folderPath]?.pending || 0) + 1,
+            overdue: prev[folderPath]?.overdue || 0,
+          },
         }))
       }
 
       setNewTaskDescription("")
 
       // Mostrar toast de sucesso
-      setToast({
-        visible: true,
-        message: "Tarefa adicionada com sucesso!",
-        type: "success",
-      })
+      notification.success("Tarefa adicionada com sucesso!")
 
       // Esconder o toast após 3 segundos
       setTimeout(() => {
-        setToast((prev) => ({ ...prev, visible: false }))
+        //setToast((prev) => ({ ...prev, visible: false }))
       }, 3000)
     } catch (err) {
       console.error("Erro ao adicionar tarefa:", err)
-      setToast({
-        visible: true,
-        message: "Erro ao adicionar tarefa",
-        type: "error",
-      })
+      notification.error("Erro ao adicionar tarefa")
     } finally {
       setIsAddingTask(false)
     }
@@ -663,15 +882,14 @@ export function FileExplorer() {
 
       setTaskCounts((prev) => ({
         ...prev,
-        [folderPath]: pendingCount,
+        [folderPath]: {
+          pending: pendingCount,
+          overdue: prev[folderPath]?.overdue || 0,
+        },
       }))
     } catch (err) {
       console.error("Erro ao atualizar status da tarefa:", err)
-      setToast({
-        visible: true,
-        message: "Erro ao atualizar status da tarefa",
-        type: "error",
-      })
+      notification.error("Erro ao atualizar status da tarefa")
     }
   }
 
@@ -694,28 +912,23 @@ export function FileExplorer() {
 
         setTaskCounts((prev) => ({
           ...prev,
-          [folderPath]: pendingCount,
+          [folderPath]: {
+            pending: pendingCount,
+            overdue: prev[folderPath]?.overdue || 0,
+          },
         }))
       }
 
       // Mostrar toast de sucesso
-      setToast({
-        visible: true,
-        message: "Tarefa excluída com sucesso!",
-        type: "success",
-      })
+      notification.success("Tarefa excluída com sucesso!")
 
       // Esconder o toast após 3 segundos
       setTimeout(() => {
-        setToast((prev) => ({ ...prev, visible: false }))
+        //setToast((prev) => ({ ...prev, visible: false }))
       }, 3000)
     } catch (err) {
       console.error("Erro ao excluir tarefa:", err)
-      setToast({
-        visible: true,
-        message: "Erro ao excluir tarefa",
-        type: "error",
-      })
+      notification.error("Erro ao excluir tarefa")
     }
   }
 
@@ -751,23 +964,15 @@ export function FileExplorer() {
       setEditDescription("")
 
       // Mostrar toast de sucesso
-      setToast({
-        visible: true,
-        message: "Tarefa atualizada com sucesso!",
-        type: "success",
-      })
+      notification.success("Tarefa atualizada com sucesso!")
 
       // Esconder o toast após 3 segundos
       setTimeout(() => {
-        setToast((prev) => ({ ...prev, visible: false }))
+        //setToast((prev) => ({ ...prev, visible: false }))
       }, 3000)
     } catch (err) {
       console.error("Erro ao atualizar tarefa:", err)
-      setToast({
-        visible: true,
-        message: "Erro ao atualizar tarefa",
-        type: "error",
-      })
+      notification.error("Erro ao atualizar tarefa")
     }
   }
 
@@ -968,6 +1173,305 @@ export function FileExplorer() {
   const toggleTasksPanel = useCallback(() => {
     setShowTasks((prev) => !prev)
   }, [])
+
+  // Função para obter o ícone do arquivo
+  const getFileIcon = (fileName: string) => {
+    const extension = fileName.split(".").pop()?.toLowerCase()
+
+    switch (extension) {
+      case "pdf":
+        return (
+          <div className="w-6 h-6 bg-red-500 rounded-sm flex items-center justify-center">
+            <FileText className="h-4 w-4 text-white" />
+          </div>
+        )
+      case "jpg":
+      case "jpeg":
+      case "png":
+      case "gif":
+      case "webp":
+        return <ImageIcon className="h-5 w-5 text-blue-500" />
+      case "mp4":
+      case "webm":
+      case "avi":
+        return <Film className="h-5 w-5 text-purple-500" />
+      case "mp3":
+      case "wav":
+      case "ogg":
+        return <Music className="h-5 w-5 text-green-500" />
+      case "zip":
+      case "rar":
+      case "7z":
+        return <Archive className="h-5 w-5 text-yellow-500" />
+      case "psd":
+      case "psb":
+        return <Palette className="h-5 w-5 text-purple-600" />
+      case "ai":
+        return <FileImage className="h-5 w-5 text-orange-500" />
+      case "indd":
+      case "idml":
+        return <BookOpen className="h-5 w-5 text-pink-500" />
+      default:
+        return <File className="h-5 w-5 text-gray-500" />
+    }
+  }
+
+  // Renderizar arquivos
+  const renderFiles = () => {
+    if (viewMode === "grid") {
+      return (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          {sortedFiles.map((file) => (
+            <FileCard
+              key={file.id}
+              file={file}
+              onFolderClick={() => navigateToFolder(file.path)}
+              onDelete={() => handleDelete(file)}
+              onRename={handleRename}
+              onShare={() => handleShare(file)}
+              onToggleFavorite={() => toggleFavorite(file)}
+              isSelected={selectedFiles.some((f) => f.id === file.id)}
+              onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
+              taskCount={file.type === "folder" ? taskCounts[file.path]?.pending : undefined}
+              overdueCount={file.type === "folder" ? taskCounts[file.path]?.overdue : undefined}
+              onOpenTasks={
+                file.type === "folder"
+                  ? () => {
+                      navigateToFolder(file.path)
+                      setViewType("tasks")
+                    }
+                  : undefined
+              }
+              onMove={() => handleMove(file)}
+              onPreview={file.type === "file" ? () => handlePreview(file) : undefined}
+            />
+          ))}
+        </div>
+      )
+    } else if (viewMode === "list") {
+      return (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                {isSelectionMode && (
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedFiles.length > 0 && selectedFiles.length === filteredFiles.length}
+                      onChange={selectAllFiles}
+                      className="rounded border-gray-300 text-[#4b7bb5] focus:ring-[#4b7bb5]"
+                    />
+                  </th>
+                )}
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Nome
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Data
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Tamanho
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Tipo
+                </th>
+                <th scope="col" className="relative px-6 py-3">
+                  <span className="sr-only">Ações</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {sortedFiles.map((file) => (
+                <FileRow
+                  key={file.id}
+                  file={file}
+                  onFolderClick={() => navigateToFolder(file.path)}
+                  onDelete={() => handleDelete(file)}
+                  onShare={() => handleShare(file)}
+                  onToggleFavorite={() => toggleFavorite(file)}
+                  isSelected={selectedFiles.some((f) => f.id === file.id)}
+                  onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
+                  showCheckbox={isSelectionMode}
+                  taskCount={file.type === "folder" ? taskCounts[file.path]?.pending : undefined}
+                  overdueCount={file.type === "folder" ? taskCounts[file.path]?.overdue : undefined}
+                  onOpenTasks={
+                    file.type === "folder"
+                      ? () => {
+                          navigateToFolder(file.path)
+                          setViewType("tasks")
+                        }
+                      : undefined
+                  }
+                  onMove={() => handleMove(file)}
+                  onPreview={file.type === "file" ? () => handlePreview(file) : undefined}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+    } else {
+      return (
+        <div className="space-y-2">
+          {sortedFiles.map((file) => (
+            <Card
+              key={file.id}
+              className={`hover:bg-gray-50 transition-colors ${
+                selectedFiles.some((f) => f.id === file.id) ? "bg-blue-50 border-blue-200" : ""
+              }`}
+            >
+              <CardHeader className="p-4 pb-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {isSelectionMode && (
+                      <input
+                        type="checkbox"
+                        checked={selectedFiles.some((f) => f.id === file.id)}
+                        onChange={() => toggleFileSelection(file)}
+                        className="rounded border-gray-300 text-[#4b7bb5] focus:ring-[#4b7bb5]"
+                      />
+                    )}
+                    <div className="p-2 bg-gray-100 rounded-md">
+                      {file.type === "folder" ? <Folder className="h-5 w-5 text-[#4b7bb5]" /> : getFileIcon(file.name)}
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-medium">
+                        <button
+                          onClick={file.type === "folder" ? () => navigateToFolder(file.path) : undefined}
+                          className={file.type === "folder" ? "hover:text-[#4b7bb5] transition-colors" : ""}
+                        >
+                          {file.name}
+                        </button>
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        {file.type === "folder" ? "Pasta" : file.fileType?.toUpperCase()}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {file.isFavorite && (
+                      <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200">
+                        <Star className="h-3 w-3 mr-1 fill-amber-500 text-amber-500" />
+                        Favorito
+                      </Badge>
+                    )}
+                    {file.type === "folder" && taskCounts[file.path]?.pending > 0 && (
+                      <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
+                        <ClipboardList className="h-3 w-3 mr-1" />
+                        {taskCounts[file.path]?.pending} tarefa{taskCounts[file.path]?.pending !== 1 ? "s" : ""}
+                      </Badge>
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical size={16} />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuGroup>
+                          {file.type === "file" && (
+                            <>
+                              <DropdownMenuItem onClick={() => window.open(file.url, "_blank")} title="Abrir">
+                                <ExternalLink className="h-4 w-4 mr-2" />
+                                <span className="sr-only">Abrir</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handlePreview(file)} title="Visualizar">
+                                <Eye className="h-4 w-4 mr-2" />
+                                <span className="sr-only">Visualizar</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleShare(file)} title="Compartilhar">
+                                <Share2 className="h-4 w-4 mr-2" />
+                                <span className="sr-only">Compartilhar</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild title="Download">
+                                <a href={file.url} download>
+                                  <Download className="h-4 w-4 mr-2" />
+                                  <span className="sr-only">Download</span>
+                                </a>
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {file.type === "folder" && (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  navigateToFolder(file.path)
+                                  setViewType("tasks")
+                                }}
+                                title="Ver Tarefas"
+                              >
+                                <ClipboardList className="h-4 w-4 mr-2" />
+                                <span className="sr-only">Ver Tarefas</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleShare(file)} title="Compartilhar">
+                                <Share2 className="h-4 w-4 mr-2" />
+                                <span className="sr-only">Compartilhar</span>
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          <DropdownMenuItem
+                            onClick={() => toggleFavorite(file)}
+                            title={file.isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                          >
+                            {file.isFavorite ? <StarOff className="h-4 w-4 mr-2" /> : <Star className="h-4 w-4 mr-2" />}
+                            <span className="sr-only">
+                              {file.isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                            </span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleMove(file)} title="Mover">
+                            <MoveIcon className="h-4 w-4 mr-2" />
+                            <span className="sr-only">Mover</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDelete(file)} className="text-red-600" title="Excluir">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            <span className="sr-only">Excluir</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="flex justify-between text-xs text-gray-500">
+                  <div className="flex items-center">
+                    <Clock className="h-3 w-3 mr-1" />
+                    {new Date(file.modified).toLocaleDateString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })}
+                  </div>
+                  {file.type === "file" && file.size && <div>{formatBytes(file.size)}</div>}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )
+    }
+  }
+
+  const getCurrentPathString = () => {
+    return currentPath.join("/")
+  }
 
   return (
     <div
@@ -1591,252 +2095,7 @@ export function FileExplorer() {
                     </div>
                   </div>
                 ) : (
-                  <div>
-                    {viewMode === "grid" ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                        {sortedFiles.map((file) => (
-                          <FileCard
-                            key={file.id}
-                            file={file}
-                            onFolderClick={() => navigateToFolder(file.path)}
-                            onDelete={() => handleDelete(file)}
-                            onRename={handleRename}
-                            onShare={() => handleShare(file)}
-                            onToggleFavorite={() => toggleFavorite(file)}
-                            isSelected={selectedFiles.some((f) => f.id === file.id)}
-                            onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
-                            taskCount={file.type === "folder" ? taskCounts[file.path]?.pending : undefined}
-                            overdueCount={file.type === "folder" ? taskCounts[file.path]?.overdue : undefined}
-                            onOpenTasks={
-                              file.type === "folder"
-                                ? () => {
-                                    navigateToFolder(file.path)
-                                    setViewType("tasks")
-                                  }
-                                : undefined
-                            }
-                          />
-                        ))}
-                      </div>
-                    ) : viewMode === "list" ? (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              {isSelectionMode && (
-                                <th
-                                  scope="col"
-                                  className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedFiles.length > 0 && selectedFiles.length === filteredFiles.length}
-                                    onChange={selectAllFiles}
-                                    className="rounded border-gray-300 text-[#4b7bb5] focus:ring-[#4b7bb5]"
-                                  />
-                                </th>
-                              )}
-                              <th
-                                scope="col"
-                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                              >
-                                Nome
-                              </th>
-                              <th
-                                scope="col"
-                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                              >
-                                Data
-                              </th>
-                              <th
-                                scope="col"
-                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                              >
-                                Tamanho
-                              </th>
-                              <th
-                                scope="col"
-                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                              >
-                                Tipo
-                              </th>
-                              <th scope="col" className="relative px-6 py-3">
-                                <span className="sr-only">Ações</span>
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {sortedFiles.map((file) => (
-                              <FileRow
-                                key={file.id}
-                                file={file}
-                                onFolderClick={() => navigateToFolder(file.path)}
-                                onDelete={() => handleDelete(file)}
-                                onShare={() => handleShare(file)}
-                                onToggleFavorite={() => toggleFavorite(file)}
-                                isSelected={selectedFiles.some((f) => f.id === file.id)}
-                                onToggleSelect={isSelectionMode ? () => toggleFileSelection(file) : undefined}
-                                showCheckbox={isSelectionMode}
-                                taskCount={file.type === "folder" ? taskCounts[file.path]?.pending : undefined}
-                                overdueCount={file.type === "folder" ? taskCounts[file.path]?.overdue : undefined}
-                                onOpenTasks={
-                                  file.type === "folder"
-                                    ? () => {
-                                        navigateToFolder(file.path)
-                                        setViewType("tasks")
-                                      }
-                                    : undefined
-                                }
-                              />
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {sortedFiles.map((file) => (
-                          <Card
-                            key={file.id}
-                            className={`hover:bg-gray-50 transition-colors ${
-                              selectedFiles.some((f) => f.id === file.id) ? "bg-blue-50 border-blue-200" : ""
-                            }`}
-                          >
-                            <CardHeader className="p-4 pb-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  {isSelectionMode && (
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedFiles.some((f) => f.id === file.id)}
-                                      onChange={() => toggleFileSelection(file)}
-                                      className="rounded border-gray-300 text-[#4b7bb5] focus:ring-[#4b7bb5]"
-                                    />
-                                  )}
-                                  <div className="p-2 bg-gray-100 rounded-md">
-                                    {file.type === "folder" ? (
-                                      <Folder className="h-5 w-5 text-[#4b7bb5]" />
-                                    ) : file.fileType === "pdf" ? (
-                                      <FileText className="h-5 w-5 text-red-500" />
-                                    ) : ["jpg", "jpeg", "png", "gif", "webp"].includes(file.fileType || "") ? (
-                                      <ImageIcon className="h-5 w-5 text-green-500" />
-                                    ) : ["mp4", "avi", "mov", "webm"].includes(file.fileType || "") ? (
-                                      <Film className="h-5 w-5 text-purple-500" />
-                                    ) : ["mp3", "wav", "ogg"].includes(file.fileType || "") ? (
-                                      <Music className="h-5 w-5 text-blue-500" />
-                                    ) : ["zip", "rar", "7z", "tar", "gz"].includes(file.fileType || "") ? (
-                                      <Archive className="h-5 w-5 text-amber-500" />
-                                    ) : (
-                                      <FileIcon className="h-5 w-5 text-gray-500" />
-                                    )}
-                                  </div>
-                                  <div>
-                                    <CardTitle className="text-base font-medium">
-                                      <button
-                                        onClick={file.type === "folder" ? () => navigateToFolder(file.path) : undefined}
-                                        className={
-                                          file.type === "folder" ? "hover:text-[#4b7bb5] transition-colors" : ""
-                                        }
-                                      >
-                                        {file.name}
-                                      </button>
-                                    </CardTitle>
-                                    <CardDescription className="text-xs">
-                                      {file.type === "folder" ? "Pasta" : file.fileType?.toUpperCase()}
-                                    </CardDescription>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {file.isFavorite && (
-                                    <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200">
-                                      <Star className="h-3 w-3 mr-1 fill-amber-500 text-amber-500" />
-                                      Favorito
-                                    </Badge>
-                                  )}
-                                  {file.type === "folder" && taskCounts[file.path] > 0 && (
-                                    <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
-                                      <ClipboardList className="h-3 w-3 mr-1" />
-                                      {taskCounts[file.path]} tarefa{taskCounts[file.path] !== 1 ? "s" : ""}
-                                    </Badge>
-                                  )}
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon">
-                                        <MoreVertical size={16} />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuGroup>
-                                        {file.type === "file" && (
-                                          <>
-                                            <DropdownMenuItem onClick={() => window.open(file.url, "_blank")}>
-                                              <ExternalLink className="h-4 w-4 mr-2" />
-                                              Abrir
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleShare(file)}>
-                                              <Share2 className="h-4 w-4 mr-2" />
-                                              Compartilhar
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem asChild>
-                                              <a href={file.url} download>
-                                                <Download className="h-4 w-4 mr-2" />
-                                                Download
-                                              </a>
-                                            </DropdownMenuItem>
-                                          </>
-                                        )}
-                                        {file.type === "folder" && (
-                                          <DropdownMenuItem
-                                            onClick={() => {
-                                              navigateToFolder(file.path)
-                                              setViewType("tasks")
-                                            }}
-                                          >
-                                            <ClipboardList className="h-4 w-4 mr-2" />
-                                            Ver Tarefas
-                                          </DropdownMenuItem>
-                                        )}
-                                        <DropdownMenuItem onClick={() => toggleFavorite(file)}>
-                                          {file.isFavorite ? (
-                                            <>
-                                              <StarOff className="h-4 w-4 mr-2" />
-                                              Remover dos favoritos
-                                            </>
-                                          ) : (
-                                            <>
-                                              <Star className="h-4 w-4 mr-2" />
-                                              Adicionar aos favoritos
-                                            </>
-                                          )}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => handleDelete(file)} className="text-red-600">
-                                          <Trash2 className="h-4 w-4 mr-2" />
-                                          Excluir
-                                        </DropdownMenuItem>
-                                      </DropdownMenuGroup>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
-                              </div>
-                            </CardHeader>
-                            <CardContent className="p-4 pt-0">
-                              <div className="flex justify-between text-xs text-gray-500">
-                                <div className="flex items-center">
-                                  <Clock className="h-3 w-3 mr-1" />
-                                  {new Date(file.modified).toLocaleDateString("pt-BR", {
-                                    day: "2-digit",
-                                    month: "2-digit",
-                                    year: "numeric",
-                                  })}
-                                </div>
-                                {file.type === "file" && file.size && <div>{formatBytes(file.size)}</div>}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <div>{renderFiles()}</div>
                 )}
               </div>
             </div>
@@ -2018,7 +2277,6 @@ export function FileExplorer() {
           </div>
         )}
       </div>
-
       {/* Modal de upload */}
       <Dialog open={showUploader} onOpenChange={setShowUploader}>
         <DialogContent className="sm:max-w-[600px]">
@@ -2033,7 +2291,6 @@ export function FileExplorer() {
           />
         </DialogContent>
       </Dialog>
-
       {/* Modal de criar pasta */}
       <Dialog open={showCreateFolderDialog} onOpenChange={setShowCreateFolderDialog}>
         <DialogContent className="sm:max-w-[425px]">
@@ -2082,7 +2339,84 @@ export function FileExplorer() {
           </form>
         </DialogContent>
       </Dialog>
-
+      {/* Modal de mover arquivo */}
+      <Dialog
+        open={showMoveFileModal}
+        onOpenChange={(open) => {
+          setShowMoveFileModal(open)
+          if (!open) {
+            // Limpar estado quando o modal for fechado
+            setMoveFileError(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Mover Arquivo</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleMoveFile}>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">
+                  Selecione a pasta de destino para mover {itemToMove ? `"${itemToMove.name}"` : "o arquivo"}
+                </label>
+                <div className="h-60 border rounded-md overflow-hidden bg-white">
+                  <FolderSelector
+                    onSelect={(path) => {
+                      console.log(`Pasta selecionada: "${path}"`)
+                      setDestinationPath(path)
+                      setMoveFileError(null)
+                    }}
+                    currentPath={destinationPath}
+                    excludePaths={
+                      itemToMove ? [itemToMove.path.substring(0, itemToMove.path.lastIndexOf("/") || 0)] : []
+                    }
+                  />
+                </div>
+                <div className="mt-2 text-sm">
+                  <span className="font-medium">Pasta selecionada:</span>{" "}
+                  {destinationPath === "" ? (
+                    <span className="italic text-gray-500">Pasta raiz</span>
+                  ) : destinationPath ? (
+                    <span className="text-[#4b7bb5]">{destinationPath}</span>
+                  ) : (
+                    <span className="text-amber-600 italic">Nenhuma pasta selecionada</span>
+                  )}
+                </div>
+                {moveFileError && (
+                  <div className="p-2 mt-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+                    {moveFileError}
+                  </div>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowMoveFileModal(false)}
+                disabled={isMovingFile}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={isMovingFile || destinationPath === undefined || destinationPath === null}
+                className="bg-[#4b7bb5] hover:bg-[#3d649e]"
+              >
+                {isMovingFile ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Movendo...
+                  </>
+                ) : (
+                  "Mover"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       {/* Diálogo de confirmação de exclusão */}
       {showDeleteConfirmation && itemToDelete && (
         <DeleteConfirmationDialog
@@ -2093,7 +2427,6 @@ export function FileExplorer() {
           isFolder={itemToDelete.type === "folder"}
         />
       )}
-
       {/* Diálogo de compartilhamento */}
       {showShareDialog && itemToShare && (
         <ShareLinkDialog
@@ -2103,7 +2436,6 @@ export function FileExplorer() {
           fileName={itemToShare.name}
         />
       )}
-
       {/* Diálogo de detalhes da tarefa */}
       <Dialog open={showTaskDetails} onOpenChange={setShowTaskDetails}>
         <DialogContent className="sm:max-w-[500px]">
@@ -2176,7 +2508,6 @@ export function FileExplorer() {
           )}
         </DialogContent>
       </Dialog>
-
       {/* Diálogo de ajuda */}
       <Dialog open={showHelp} onOpenChange={setShowHelp}>
         <DialogContent className="sm:max-w-[600px]">
@@ -2271,15 +2602,7 @@ export function FileExplorer() {
           </div>
         </DialogContent>
       </Dialog>
-
       {/* Toast de notificação */}
-      {toast.visible && (
-        <ToastNotification
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
-        />
-      )}
     </div>
   )
 }

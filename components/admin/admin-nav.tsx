@@ -12,6 +12,7 @@ import {
   Database,
   MessageSquare,
   FileText,
+  Users,
 } from "lucide-react"
 
 const navItems = [
@@ -36,6 +37,11 @@ const navItems = [
     icon: FolderOpen,
   },
   {
+    title: "Clientes",
+    href: "/admin/clientes",
+    icon: Users,
+  },
+  {
     title: "Ferramentas",
     href: "/admin/ferramentas",
     icon: Tool,
@@ -51,8 +57,8 @@ const navItems = [
     icon: Database,
   },
   {
-    href: "/admin/configuracoes/chat",
     title: "Chat (Jaque)",
+    href: "/admin/configuracoes/chat",
     icon: MessageSquare,
   },
 ]

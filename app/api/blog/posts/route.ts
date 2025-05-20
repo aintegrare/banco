@@ -61,20 +61,30 @@ export async function POST(request: Request) {
     const body = await request.json()
     const supabase = createClient()
 
-    // Remover campos que não existem na tabela
-    const { featured, ...postData } = body
+    // Verificar se o slug já existe
+    const { data: existingPost, error: checkError } = await supabase
+      .from("blog_posts")
+      .select("id")
+      .eq("slug", body.slug)
+      .maybeSingle()
 
-    // Adicionar campos obrigatórios se não existirem
-    if (!postData.created_at) {
-      postData.created_at = new Date().toISOString()
+    if (checkError) throw checkError
+
+    if (existingPost) {
+      return NextResponse.json({ error: "Já existe um post com este slug. Por favor, escolha outro." }, { status: 400 })
     }
 
-    if (!postData.updated_at) {
-      postData.updated_at = new Date().toISOString()
+    // Adicionar campos obrigatórios se não existirem
+    if (!body.created_at) {
+      body.created_at = new Date().toISOString()
+    }
+
+    if (!body.updated_at) {
+      body.updated_at = new Date().toISOString()
     }
 
     // Inserir o post
-    const { data, error } = await supabase.from("blog_posts").insert(postData).select().single()
+    const { data, error } = await supabase.from("blog_posts").insert(body).select().single()
 
     if (error) throw error
 

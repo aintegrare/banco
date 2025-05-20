@@ -1,81 +1,55 @@
 import Link from "next/link"
-import { Calendar, Clock } from "lucide-react"
-
-interface Author {
-  name: string
-  avatar: string
-}
-
-interface BlogPost {
-  id: string
-  title: string
-  slug: string
-  excerpt: string
-  coverImage: string
-  author: Author
-  category: string
-  publishedAt: string
-  readTime: string
-}
 
 interface BlogFeaturedPostProps {
-  post: BlogPost
+  post: any
 }
 
 export function BlogFeaturedPost({ post }: BlogFeaturedPostProps) {
-  // Formatar a data de publicação
-  const publishDate = new Date(post.publishedAt)
-  const formattedDate = publishDate.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  })
-
   return (
-    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden group">
       <div className="grid grid-cols-1 md:grid-cols-2">
         <div className="h-64 md:h-auto overflow-hidden">
           <img
-            src={post.coverImage || "/placeholder.svg"}
+            src={post.featured_image || "/placeholder.svg?height=400&width=600&query=marketing digital"}
             alt={post.title}
-            className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
         </div>
 
         <div className="p-6 flex flex-col justify-between">
           <div>
             <div className="inline-block px-3 py-1 bg-[#4b7bb5] text-white text-sm rounded-md mb-4">
-              {post.category}
+              {post.category?.name || "Sem categoria"}
             </div>
 
             <Link href={`/blog/${post.slug}`}>
-              <h2 className="text-2xl font-bold text-[#4072b0] mb-3 hover:text-[#3d649e]">{post.title}</h2>
+              <h2 className="text-2xl font-bold text-[#4072b0] dark:text-[#6b91c1] mb-3 hover:text-[#3d649e] transition-colors">
+                {post.title}
+              </h2>
             </Link>
 
-            <p className="text-gray-600 mb-4">{post.excerpt}</p>
+            <p className="text-gray-600 dark:text-gray-300 mb-4">{post.excerpt}</p>
           </div>
 
           <div>
             <div className="flex items-center mb-4">
               <img
-                src={post.author.avatar || "/placeholder.svg"}
-                alt={post.author.name}
+                src={post.author?.avatar_url || "/placeholder.svg?height=100&width=100&query=profile"}
+                alt={post.author?.name || "Autor"}
                 className="w-10 h-10 rounded-full mr-3"
               />
               <div>
-                <div className="font-medium text-[#4b7bb5]">{post.author.name}</div>
-                <div className="text-xs text-gray-500">Autor</div>
+                <div className="font-medium text-[#4b7bb5] dark:text-[#6b91c1]">{post.author?.name || "Autor"}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Autor</div>
               </div>
             </div>
 
-            <div className="flex items-center text-sm text-gray-600 space-x-4">
+            <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 space-x-4">
               <div className="flex items-center">
-                <Calendar className="h-4 w-4 mr-1" />
-                <span>{formattedDate}</span>
+                <span>{new Date(post.published_at).toLocaleDateString("pt-BR")}</span>
               </div>
               <div className="flex items-center">
-                <Clock className="h-4 w-4 mr-1" />
-                <span>{post.readTime} de leitura</span>
+                <span>{post.read_time} de leitura</span>
               </div>
             </div>
           </div>

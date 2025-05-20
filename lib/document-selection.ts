@@ -96,6 +96,14 @@ export async function selectRelevantDocuments(query: string, minDocs = 2, maxDoc
       sortedDocuments.map((d) => ({ id: d.id, title: d.title, score: d.relevance_score })),
     )
 
+    // Corrigir as URLs dos documentos
+    for (let i = 0; i < sortedDocuments.length; i++) {
+      if (sortedDocuments[i].url) {
+        const { ensureCorrectDocumentPath } = require("@/lib/bunny")
+        sortedDocuments[i].url = ensureCorrectDocumentPath(sortedDocuments[i].url)
+      }
+    }
+
     return sortedDocuments
   } catch (error) {
     console.error("DocumentSelection: Erro ao selecionar documentos:", error)
@@ -133,6 +141,12 @@ export async function getDocumentContent(documentId: number): Promise<string[]> 
       if (docError) {
         console.error(`DocumentSelection: Erro ao buscar informações do documento ${documentId}:`, docError)
       } else if (docInfo) {
+        // Corrigir a URL do documento se existir
+        if (docInfo && docInfo.url) {
+          // Importar a função se necessário
+          const { ensureCorrectDocumentPath } = require("@/lib/bunny")
+          docInfo.url = ensureCorrectDocumentPath(docInfo.url)
+        }
         console.log(`DocumentSelection: Informações do documento ${documentId}:`, {
           title: docInfo.title,
           url: docInfo.url,

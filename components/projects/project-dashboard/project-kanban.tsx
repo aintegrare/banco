@@ -48,12 +48,21 @@ export function ProjectKanban({ tasks: initialTasks, projectId }: ProjectKanbanP
 
       setIsLoading(true)
       try {
-        const response = await fetch(`/api/tasks?projectId=${projectId}`)
+        // Corrigido: Usar project_id em vez de projectId no parâmetro da URL
+        const response = await fetch(`/api/tasks?project_id=${projectId}`)
         if (!response.ok) {
           throw new Error("Falha ao buscar tarefas")
         }
         const data = await response.json()
-        setTasks(data)
+        console.log("Tarefas carregadas para o projeto", projectId, ":", data.length, "tarefas")
+
+        // Filtrar explicitamente para garantir que apenas tarefas deste projeto sejam exibidas
+        const filteredTasks = data.filter(
+          (task: Task) => task.project_id && task.project_id.toString() === projectId.toString(),
+        )
+        console.log("Tarefas filtradas:", filteredTasks.length, "tarefas")
+
+        setTasks(filteredTasks)
       } catch (error: any) {
         console.error("Erro ao buscar tarefas:", error)
         toast({
@@ -163,19 +172,32 @@ export function ProjectKanban({ tasks: initialTasks, projectId }: ProjectKanbanP
   }
 
   const handleTaskCreated = (newTask: Task) => {
-    setTasks((prevTasks) => [newTask, ...prevTasks])
-    toast({
-      title: "Tarefa criada",
-      description: "A tarefa foi criada com sucesso!",
-    })
+    // Verificar se a tarefa pertence a este projeto antes de adicioná-la
+    if (newTask.project_id && newTask.project_id.toString() === projectId.toString()) {
+      setTasks((prevTasks) => [newTask, ...prevTasks])
+      toast({
+        title: "Tarefa criada",
+        description: "A tarefa foi criada com sucesso!",
+      })
+    }
   }
 
   const handleTaskUpdated = (updatedTask: Task) => {
-    setTasks((prevTasks) => prevTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task)))
-    toast({
-      title: "Tarefa atualizada",
-      description: "A tarefa foi atualizada com sucesso!",
-    })
+    // Verificar se a tarefa pertence a este projeto
+    if (updatedTask.project_id && updatedTask.project_id.toString() === projectId.toString()) {
+      setTasks((prevTasks) => prevTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task)))
+      toast({
+        title: "Tarefa atualizada",
+        description: "A tarefa foi atualizada com sucesso!",
+      })
+    } else {
+      // Se a tarefa foi movida para outro projeto, removê-la da lista
+      setTasks((prevTasks) => prevTasks.filter((task) => task.id !== updatedTask.id))
+      toast({
+        title: "Tarefa movida",
+        description: "A tarefa foi movida para outro projeto!",
+      })
+    }
   }
 
   // Organizar tarefas por coluna
