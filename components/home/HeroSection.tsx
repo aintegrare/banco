@@ -44,7 +44,7 @@ export function HeroSection() {
   }
 
   return (
-    <section ref={sectionRef} className="relative py-24 md:py-32 lg:py-40 overflow-hidden text-white">
+    <section ref={sectionRef} className="relative py-8 md:py-12 lg:py-16 overflow-hidden text-white">
       {/* Nova imagem de fundo com nuvem */}
       <div className="absolute inset-0 z-0">
         <Image
@@ -65,7 +65,7 @@ export function HeroSection() {
         <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-[#527eb7]/20 rounded-full blur-3xl animate-pulse"></div>
       </div>
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 relative z-10">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <div
             className={`transition-all duration-1000 delay-300 ${
@@ -73,7 +73,7 @@ export function HeroSection() {
             }`}
           >
             <div className="mb-4">
-              <div className="inline-block py-1 px-3 rounded-full bg-white/20 backdrop-blur-sm text-sm font-medium mb-4 animate-fadeIn">
+              <div className="inline-block py-1 px-3 rounded-full bg-white/20 backdrop-blur-sm text-sm font-medium mb-2 animate-fadeIn">
                 Agência de Marketing Digital
               </div>
             </div>
@@ -83,11 +83,11 @@ export function HeroSection() {
                 Maringá Curitiba São Paulo
               </span>
             </h1>
-            <p className="mt-6 text-lg md:text-xl text-white/90 max-w-lg leading-relaxed">
+            <p className="mt-3 text-lg md:text-xl text-white/90 max-w-lg leading-relaxed">
               Transformamos negócios através de estratégias de marketing baseadas em dados e focadas em resultados
               mensuráveis.
             </p>
-            <div className="mt-10 flex flex-col sm:flex-row gap-4">
+            <div className="mt-5 flex flex-col sm:flex-row gap-4">
               <Button
                 size="lg"
                 className="bg-white text-[#3d649e] hover:bg-white/90 dark:bg-white/90 dark:hover:bg-white shadow-lg hover:shadow-xl transition-all"
@@ -97,8 +97,7 @@ export function HeroSection() {
               </Button>
               <Button
                 size="lg"
-                variant="outline"
-                className="border-white text-white hover:bg-white/10 transition-colors"
+                className="bg-[#4b7bb5] hover:bg-[#3d649e] text-white shadow-lg hover:shadow-xl transition-all"
                 onClick={() => scrollToSection("contato")}
               >
                 Fale Conosco
@@ -145,13 +144,16 @@ export function HeroSection() {
         </div>
       </div>
 
+      {/* Aumentei o espaço para o conteúdo e abaixei o corte branco */}
+      <div className="pb-24 md:pb-32 lg:pb-40"></div>
+
       <div className="absolute bottom-0 left-0 right-0">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320" className="w-full h-auto">
           <path
             fill="currentColor"
             fillOpacity="1"
             className="text-white dark:text-gray-900"
-            d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,149.3C960,160,1056,160,1152,138.7C1248,117,1344,75,1392,53.3L1440,32L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
+            d="M0,160L48,170.7C96,181,192,203,288,202.7C384,203,480,181,576,165.3C672,149,768,139,864,149.3C960,160,1056,192,1152,197.3C1248,203,1344,181,1392,170.7L1440,160L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
           ></path>
         </svg>
       </div>

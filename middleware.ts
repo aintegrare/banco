@@ -27,11 +27,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Verificar se a rota é /admin ou subpasta
-  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin")
+  // Verificar se a rota é /admin, /projetos ou /tarefas ou subpastas
+  const isProtectedRoute =
+    request.nextUrl.pathname.startsWith("/admin") ||
+    request.nextUrl.pathname.startsWith("/projetos") ||
+    request.nextUrl.pathname.startsWith("/tarefas")
 
-  // Se não for rota admin, permitir acesso (não proteger outras rotas)
-  if (!isAdminRoute) {
+  // Se não for rota protegida, permitir acesso
+  if (!isProtectedRoute) {
     return NextResponse.next()
   }
 
