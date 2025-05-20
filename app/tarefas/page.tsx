@@ -251,8 +251,11 @@ export default function TasksPage() {
 
   const handleTaskStatusChanged = async (taskId: string | number, newStatus: string) => {
     try {
+      console.log(`Atualizando status da tarefa ${taskId} para ${newStatus}`)
+
+      // Corrigindo a chamada da API - usando PUT em vez de PATCH e enviando o objeto completo
       const response = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
+        method: "PUT", // Alterado de PATCH para PUT conforme implementado na API
         headers: {
           "Content-Type": "application/json",
         },
@@ -260,7 +263,9 @@ export default function TasksPage() {
       })
 
       if (!response.ok) {
-        throw new Error("Falha ao atualizar status da tarefa")
+        const errorText = await response.text()
+        console.error("Resposta de erro:", errorText)
+        throw new Error(`Falha ao atualizar status da tarefa: ${response.status} ${response.statusText}`)
       }
 
       const updatedTask = await response.json()
@@ -270,11 +275,11 @@ export default function TasksPage() {
         title: "Status atualizado",
         description: "O status da tarefa foi atualizado com sucesso!",
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao atualizar status da tarefa:", error)
       toast({
         title: "Erro",
-        description: "Não foi possível atualizar o status da tarefa",
+        description: "Não foi possível atualizar o status da tarefa: " + error.message,
         variant: "destructive",
       })
     }

@@ -1,426 +1,158 @@
-"use client"
+import { saveAs } from "file-saver"
+import { offlineSync } from "./offline-sync"
 
-import { toast } from "@/components/ui/use-toast"
+// Tipos de entidades que podem ser exportadas/importadas
+export type ExportableEntity = "tasks" | "projects" | "clients" | "documents" | "posts"
 
-// Interface para configuração de exportação
-export interface ExportConfig {
-  collections: string[]
-  format: "json" | "csv"
-  includeMetadata: boolean
-  fileName?: string
-}
-
-// Interface para configuração de importação
-export interface ImportConfig {
-  validateData: boolean
-  overwriteExisting: boolean
-  collections?: string[] // Se definido, importa apenas estas coleções
-}
-
-// Interface para metadados de exportação
-export interface ExportMetadata {
+// Interface para o arquivo de exportação
+export interface ExportFile {
   version: string
   timestamp: number
-  collections: string[]
-  counts: Record<string, number>
-  appVersion?: string
+  entities: {
+    [key in ExportableEntity]?: any[]
+  }
+  metadata: {
+    exportedBy?: string
+    description?: string
+    appVersion: string
+  }
 }
 
-// Interface para dados exportados
-export interface ExportData {
-  metadata: ExportMetadata
-  data: Record<string, any[]>
-}
-
-// Funções para exportação e importação de dados
-export const DataExportImport = {
-  // Exportar dados
-  exportData: async (config: ExportConfig): Promise<Blob | null> => {
-    try {
-      const collections = config.collections || []
-      if (collections.length === 0) {
-        if (typeof window !== "undefined") {
-          toast({
-            title: "Erro na exportação",
-            description: "Nenhuma coleção selecionada para exportação.",
-            variant: "destructive",
-          })
-        }
-        return null
-      }
-
-      // Coletar dados de cada coleção
-      const data: Record<string, any[]> = {}
-      const counts: Record<string, number> = {}
-
-      for (const collection of collections) {
-        try {
-          // Buscar dados da coleção
-          // Aqui você implementaria a lógica real para buscar dados
-          // Por exemplo, usando fetch para chamar suas APIs
-
-          if (typeof window !== "undefined") {
-            const storedData = localStorage.getItem(`smp_${collection}`)
-            data[collection] = storedData ? JSON.parse(storedData) : []
-            counts[collection] = data[collection].length
-          } else {
-            data[collection] = []
-            counts[collection] = 0
-          }
-        } catch (error) {
-          console.error(`Erro ao exportar coleção ${collection}:`, error)
-          if (typeof window !== "undefined") {
-            toast({
-              title: "Aviso",
-              description: `Não foi possível exportar a coleção ${collection}.`,
-              variant: "destructive",
-            })
-          }
-
-          // Continuar com outras coleções
-          data[collection] = []
-          counts[collection] = 0
-        }
-      }
-
-      // Criar metadados
-      const metadata: ExportMetadata = {
-        version: "1.0",
-        timestamp: Date.now(),
-        collections: Object.keys(data),
-        counts,
-        appVersion: (typeof process !== "undefined" && process.env.NEXT_PUBLIC_APP_VERSION) || "1.0.0",
-      }
-
-      // Criar objeto de exportação
-      const exportObject: ExportData = {
-        metadata: config.includeMetadata ? metadata : null,
-        data,
-      }
-
-      // Converter para o formato desejado
-      let blob: Blob
-
-      if (config.format === "csv") {
-        // Converter para CSV
-        // Nota: Esta é uma implementação simplificada para CSV
-        // Para dados complexos, você pode precisar de uma biblioteca mais robusta
-
-        let csvContent = ""
-
-        // Para cada coleção
-        for (const collection of Object.keys(data)) {
-          csvContent += `# Collection: ${collection}\n`
-
-          const items = data[collection]
-          if (items.length === 0) {
-            csvContent += "No data\n\n"
-            continue
-          }
-
-          // Cabeçalhos
-          const headers = Object.keys(items[0])
-          csvContent += headers.join(",") + "\n"
-
-          // Dados
-          for (const item of items) {
-            const row = headers.map((header) => {
-              const value = item[header]
-              if (value === null || value === undefined) return ""
-              if (typeof value === "object") return JSON.stringify(value).replace(/"/g, '""')
-              return `"${String(value).replace(/"/g, '""')}"`
-            })
-            csvContent += row.join(",") + "\n"
-          }
-
-          csvContent += "\n"
-        }
-
-        blob = new Blob([csvContent], { type: "text/csv" })
-      } else {
-        // JSON é o formato padrão
-        const jsonContent = JSON.stringify(exportObject, null, 2)
-        blob = new Blob([jsonContent], { type: "application/json" })
-      }
-
-      return blob
-    } catch (error) {
-      console.error("Erro durante exportação:", error)
-      if (typeof window !== "undefined") {
-        toast({
-          title: "Erro na exportação",
-          description: "Ocorreu um erro ao exportar os dados. Tente novamente.",
-          variant: "destructive",
-        })
-      }
-      return null
-    }
+// Função para exportar dados
+export async function exportData(
+  entities: ExportableEntity[],
+  options?: {
+    fileName?: string
+    description?: string
+    exportedBy?: string
   },
+): Promise<Blob> {
+  const exportData: ExportFile = {
+    version: "1.0",
+    timestamp: Date.now(),
+    entities: {},
+    metadata: {
+      appVersion: process.env.NEXT_PUBLIC_APP_VERSION || "unknown",
+      description: options?.description,
+      exportedBy: options?.exportedBy,
+    },
+  }
 
-  // Importar dados
-  importData: async (file: File, config: ImportConfig): Promise<boolean> => {
-    if (typeof window === "undefined") {
-      return false
+  // Coletar dados para cada entidade
+  for (const entity of entities) {
+    try {
+      // Tentar buscar do servidor primeiro
+      const response = await fetch(`/api/export/${entity}`)
+
+      if (response.ok) {
+        const data = await response.json()
+        exportData.entities[entity] = data
+      } else {
+        // Se falhar, tentar dados offline
+        const offlineData = await offlineSync.getAllOfflineData(entity)
+        if (offlineData && offlineData.length > 0) {
+          exportData.entities[entity] = offlineData
+        } else {
+          console.warn(`Não foi possível exportar dados para ${entity}`)
+        }
+      }
+    } catch (error) {
+      console.error(`Erro ao exportar ${entity}:`, error)
+    }
+  }
+
+  // Converter para JSON e criar blob
+  const jsonString = JSON.stringify(exportData, null, 2)
+  const blob = new Blob([jsonString], { type: "application/json" })
+
+  // Salvar arquivo se fileName for fornecido
+  if (options?.fileName) {
+    const fileName = options.fileName.endsWith(".json") ? options.fileName : `${options.fileName}.json`
+    saveAs(blob, fileName)
+  }
+
+  return blob
+}
+
+// Função para importar dados
+export async function importData(
+  file: File,
+  options?: {
+    entities?: ExportableEntity[]
+    onProgress?: (progress: number) => void
+  },
+): Promise<{ success: boolean; message: string; importedEntities: ExportableEntity[] }> {
+  try {
+    // Ler o arquivo
+    const fileContent = await file.text()
+    const importData = JSON.parse(fileContent) as ExportFile
+
+    // Validar o formato do arquivo
+    if (!importData.version || !importData.entities || !importData.metadata) {
+      return {
+        success: false,
+        message: "Formato de arquivo inválido",
+        importedEntities: [],
+      }
     }
 
-    try {
-      // Verificar tipo de arquivo
-      const isJson = file.type === "application/json" || file.name.endsWith(".json")
-      const isCsv = file.type === "text/csv" || file.name.endsWith(".csv")
+    // Filtrar entidades se necessário
+    const entitiesToImport = options?.entities || (Object.keys(importData.entities) as ExportableEntity[])
+    const importedEntities: ExportableEntity[] = []
 
-      if (!isJson && !isCsv) {
-        toast({
-          title: "Formato não suportado",
-          description: "Por favor, selecione um arquivo JSON ou CSV.",
-          variant: "destructive",
-        })
-        return false
-      }
+    // Processar cada entidade
+    let processedEntities = 0
+    const totalEntities = entitiesToImport.length
 
-      // Ler conteúdo do arquivo
-      const fileContent = await file.text()
-
-      // Processar dados com base no formato
-      let importData: ExportData
-
-      if (isJson) {
+    for (const entity of entitiesToImport) {
+      if (importData.entities[entity]) {
         try {
-          importData = JSON.parse(fileContent)
-
-          // Validar estrutura básica
-          if (!importData.data || typeof importData.data !== "object") {
-            throw new Error("Estrutura de dados inválida")
-          }
-        } catch (error) {
-          toast({
-            title: "Arquivo JSON inválido",
-            description: "O arquivo não contém um JSON válido ou está em formato incorreto.",
-            variant: "destructive",
+          // Tentar importar para o servidor
+          const response = await fetch(`/api/import/${entity}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(importData.entities[entity]),
           })
-          return false
-        }
-      } else {
-        // Processar CSV
-        // Esta é uma implementação simplificada
-        // Para CSV complexos, considere usar uma biblioteca como PapaParse
 
-        const lines = fileContent.split("\n")
-        const data: Record<string, any[]> = {}
-
-        let currentCollection = ""
-        let headers: string[] = []
-
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim()
-
-          if (line.startsWith("# Collection:")) {
-            currentCollection = line.replace("# Collection:", "").trim()
-            data[currentCollection] = []
-            headers = []
-          } else if (line && currentCollection && !headers.length) {
-            // Esta linha contém os cabeçalhos
-            headers = line.split(",").map((h) => h.trim())
-          } else if (line && currentCollection && headers.length) {
-            // Esta linha contém dados
-            const values = line.split(",")
-
-            if (values.length === headers.length) {
-              const item: Record<string, any> = {}
-
-              for (let j = 0; j < headers.length; j++) {
-                let value = values[j].trim()
-
-                // Tentar converter para tipos apropriados
-                if (value === "") {
-                  item[headers[j]] = null
-                } else if (value === "true") {
-                  item[headers[j]] = true
-                } else if (value === "false") {
-                  item[headers[j]] = false
-                } else if (!isNaN(Number(value))) {
-                  item[headers[j]] = Number(value)
-                } else {
-                  // Remover aspas se estiver entre aspas
-                  if (value.startsWith('"') && value.endsWith('"')) {
-                    value = value.substring(1, value.length - 1).replace(/""/g, '"')
-                  }
-                  item[headers[j]] = value
-                }
-              }
-
-              data[currentCollection].push(item)
-            }
-          }
-        }
-
-        importData = {
-          metadata: {
-            version: "1.0",
-            timestamp: Date.now(),
-            collections: Object.keys(data),
-            counts: Object.fromEntries(Object.entries(data).map(([key, value]) => [key, value.length])),
-          },
-          data,
-        }
-      }
-
-      // Filtrar coleções se necessário
-      if (config.collections && config.collections.length > 0) {
-        const filteredData: Record<string, any[]> = {}
-
-        for (const collection of config.collections) {
-          if (importData.data[collection]) {
-            filteredData[collection] = importData.data[collection]
-          }
-        }
-
-        importData.data = filteredData
-        importData.metadata.collections = Object.keys(filteredData)
-        importData.metadata.counts = Object.fromEntries(
-          Object.entries(filteredData).map(([key, value]) => [key, value.length]),
-        )
-      }
-
-      // Validar dados se configurado
-      if (config.validateData) {
-        // Aqui você implementaria a validação específica para seus dados
-        // Por exemplo, verificar se campos obrigatórios estão presentes
-
-        for (const collection of Object.keys(importData.data)) {
-          for (const item of importData.data[collection]) {
-            // Exemplo de validação: verificar se tem ID
-            if (!item.id) {
-              toast({
-                title: "Dados inválidos",
-                description: `Item na coleção ${collection} não possui ID.`,
-                variant: "destructive",
-              })
-              return false
-            }
-
-            // Adicione mais validações conforme necessário
-          }
-        }
-      }
-
-      // Importar dados para cada coleção
-      let totalImported = 0
-
-      for (const collection of Object.keys(importData.data)) {
-        const items = importData.data[collection]
-
-        if (items.length === 0) continue
-
-        try {
-          // Salvar no localStorage
-          const storageKey = `smp_${collection}`
-
-          if (config.overwriteExisting) {
-            // Substituir dados existentes
-            localStorage.setItem(storageKey, JSON.stringify(items))
-            totalImported += items.length
+          if (response.ok) {
+            importedEntities.push(entity)
           } else {
-            // Mesclar com dados existentes
-            const existingDataStr = localStorage.getItem(storageKey)
-            const existingData = existingDataStr ? JSON.parse(existingDataStr) : []
-
-            // Criar um mapa de IDs existentes para verificação rápida
-            const existingIds = new Set(existingData.map((item: any) => item.id))
-
-            // Adicionar apenas novos itens
-            let newItems = 0
+            // Se falhar, armazenar offline para sincronização posterior
+            const items = importData.entities[entity] || []
             for (const item of items) {
-              if (!existingIds.has(item.id)) {
-                existingData.push(item)
-                existingIds.add(item.id)
-                newItems++
-              }
+              await offlineSync.storeOfflineData(entity, item.id, item)
+              await offlineSync.queueItem(entity, item, "update")
             }
-
-            // Salvar dados mesclados
-            localStorage.setItem(storageKey, JSON.stringify(existingData))
-            totalImported += newItems
+            importedEntities.push(entity)
           }
         } catch (error) {
-          console.error(`Erro ao importar coleção ${collection}:`, error)
-          toast({
-            title: "Erro na importação",
-            description: `Falha ao importar dados para ${collection}.`,
-            variant: "destructive",
-          })
+          console.error(`Erro ao importar ${entity}:`, error)
         }
       }
 
-      // Notificar resultado
-      if (totalImported > 0) {
-        toast({
-          title: "Importação concluída",
-          description: `${totalImported} item(s) importado(s) com sucesso.`,
-        })
-        return true
-      } else {
-        toast({
-          title: "Nenhum dado importado",
-          description: "Não havia dados para importar ou todos os itens já existem.",
-        })
-        return true
+      // Atualizar progresso
+      processedEntities++
+      if (options?.onProgress) {
+        options.onProgress(Math.round((processedEntities / totalEntities) * 100))
       }
-    } catch (error) {
-      console.error("Erro durante importação:", error)
-      toast({
-        title: "Erro na importação",
-        description: "Ocorreu um erro ao importar os dados. Tente novamente.",
-        variant: "destructive",
-      })
-      return false
-    }
-  },
-
-  // Baixar arquivo
-  downloadFile: (blob: Blob, fileName: string): void => {
-    if (typeof window === "undefined") {
-      return
     }
 
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = fileName
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  },
-}
-
-// Hook para usar exportação/importação em componentes
-export function useExportImport() {
-  const exportData = async (config: ExportConfig): Promise<boolean> => {
-    if (typeof window === "undefined") {
-      return false
+    return {
+      success: importedEntities.length > 0,
+      message:
+        importedEntities.length > 0
+          ? `Importação concluída com sucesso para ${importedEntities.length} entidades`
+          : "Nenhuma entidade foi importada",
+      importedEntities,
     }
-
-    const blob = await DataExportImport.exportData(config)
-
-    if (blob) {
-      const fileName = config.fileName || `export_${Date.now()}.${config.format}`
-      DataExportImport.downloadFile(blob, fileName)
-      return true
+  } catch (error) {
+    console.error("Erro ao importar dados:", error)
+    return {
+      success: false,
+      message: `Erro ao importar dados: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+      importedEntities: [],
     }
-
-    return false
-  }
-
-  const importData = async (file: File, config: ImportConfig): Promise<boolean> => {
-    if (typeof window === "undefined") {
-      return false
-    }
-
-    return await DataExportImport.importData(file, config)
-  }
-
-  return {
-    exportData,
-    importData,
   }
 }

@@ -1,353 +1,242 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
 
-// Interface para configuração da sincronização offline
-export interface OfflineSyncConfig {
-  enabled: boolean
-  syncInterval: number // em milissegundos
-  maxRetries: number
-  collections: string[]
+import { openDB, type IDBPDatabase } from "idb"
+import { useToast } from "@/components/ui/use-toast"
+
+// Definição de tipos
+export interface SyncItem {
+  id: string | number
+  collection: string
+  data: any
+  operation: "create" | "update" | "delete"
+  timestamp: number
+  synced: boolean
 }
 
-// Estado da sincronização
-export interface SyncState {
-  lastSync: Date | null
-  pendingChanges: number
-  isOnline: boolean
-  isSyncing: boolean
-  error: string | null
+// Nome do banco de dados
+const DB_NAME = "integrare-offline-db"
+const DB_VERSION = 1
+
+// Inicializar o banco de dados
+async function initDB(): Promise<IDBPDatabase> {
+  return openDB(DB_NAME, DB_VERSION, {
+    upgrade(db) {
+      // Armazenar itens para sincronização
+      if (!db.objectStoreNames.contains("sync_queue")) {
+        const syncStore = db.createObjectStore("sync_queue", { keyPath: "id" })
+        syncStore.createIndex("collection", "collection", { unique: false })
+        syncStore.createIndex("timestamp", "timestamp", { unique: false })
+        syncStore.createIndex("synced", "synced", { unique: false })
+      }
+
+      // Armazenar dados offline
+      if (!db.objectStoreNames.contains("offline_data")) {
+        const dataStore = db.createObjectStore("offline_data", { keyPath: "id" })
+        dataStore.createIndex("collection", "collection", { unique: false })
+        dataStore.createIndex("lastUpdated", "lastUpdated", { unique: false })
+      }
+    },
+  })
 }
 
-// Configuração padrão
-const defaultConfig: OfflineSyncConfig = {
-  enabled: true,
-  syncInterval: 60000, // 1 minuto
-  maxRetries: 5,
-  collections: ["posts", "projects", "tasks", "clients"],
-}
-
-// Classe para gerenciar sincronização offline
+// Classe principal de sincronização
 export class OfflineSync {
-  private config: OfflineSyncConfig
-  private syncState: SyncState
-  private syncInterval: NodeJS.Timeout | null = null
-  private listeners: ((state: SyncState) => void)[] = []
+  private db: Promise<IDBPDatabase>
+  private syncInProgress = false
+  private toast: ReturnType<typeof useToast> | null = null
 
-  constructor(config?: Partial<OfflineSyncConfig>) {
-    this.config = { ...defaultConfig, ...config }
-    this.syncState = {
-      lastSync: null,
-      pendingChanges: 0,
-      isOnline: typeof navigator !== "undefined" ? navigator.onLine : true,
-      isSyncing: false,
-      error: null,
-    }
-
-    // Inicializar apenas no cliente
-    if (typeof window !== "undefined") {
-      this.initialize()
-    }
+  constructor() {
+    this.db = initDB()
   }
 
-  // Inicializar eventos e sincronização
-  private initialize() {
-    // Monitorar estado da conexão
-    window.addEventListener("online", this.handleOnline)
-    window.addEventListener("offline", this.handleOffline)
-
-    // Carregar estado do localStorage
-    this.loadState()
-
-    // Iniciar sincronização periódica se estiver online
-    if (this.config.enabled && this.syncState.isOnline) {
-      this.startSyncInterval()
-    }
+  setToast(toast: ReturnType<typeof useToast>) {
+    this.toast = toast
   }
 
-  // Manipulador para evento online
-  private handleOnline = () => {
-    this.syncState.isOnline = true
-    this.notifyListeners()
+  // Adicionar item à fila de sincronização
+  async queueItem(collection: string, data: any, operation: "create" | "update" | "delete"): Promise<string> {
+    const db = await this.db
+    const id = `${collection}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
-    // Tentar sincronizar imediatamente quando ficar online
-    if (this.config.enabled && this.syncState.pendingChanges > 0) {
-      this.sync()
+    const syncItem: SyncItem = {
+      id,
+      collection,
+      data,
+      operation,
+      timestamp: Date.now(),
+      synced: false,
     }
 
-    // Reiniciar intervalo de sincronização
-    this.startSyncInterval()
-  }
+    await db.add("sync_queue", syncItem)
 
-  // Manipulador para evento offline
-  private handleOffline = () => {
-    this.syncState.isOnline = false
-    this.notifyListeners()
-
-    // Parar intervalo de sincronização
-    this.stopSyncInterval()
-  }
-
-  // Iniciar intervalo de sincronização
-  private startSyncInterval() {
-    if (this.syncInterval) {
-      clearInterval(this.syncInterval)
+    // Se estiver online, tente sincronizar imediatamente
+    if (navigator.onLine) {
+      this.syncQueue()
     }
 
-    this.syncInterval = setInterval(() => {
-      if (this.config.enabled && this.syncState.isOnline) {
-        this.sync()
-      }
-    }, this.config.syncInterval)
+    return id
   }
 
-  // Parar intervalo de sincronização
-  private stopSyncInterval() {
-    if (this.syncInterval) {
-      clearInterval(this.syncInterval)
-      this.syncInterval = null
-    }
+  // Armazenar dados para uso offline
+  async storeOfflineData(collection: string, id: string | number, data: any): Promise<void> {
+    const db = await this.db
+    await db.put("offline_data", {
+      id: `${collection}_${id}`,
+      collection,
+      data,
+      lastUpdated: Date.now(),
+    })
   }
 
-  // Carregar estado do localStorage
-  private loadState() {
+  // Obter dados offline
+  async getOfflineData(collection: string, id: string | number): Promise<any | null> {
+    const db = await this.db
     try {
-      const savedState = localStorage.getItem("offline_sync_state")
-      if (savedState) {
-        const parsedState = JSON.parse(savedState)
-        this.syncState = {
-          ...this.syncState,
-          lastSync: parsedState.lastSync ? new Date(parsedState.lastSync) : null,
-          pendingChanges: parsedState.pendingChanges || 0,
+      const item = await db.get("offline_data", `${collection}_${id}`)
+      return item ? item.data : null
+    } catch (error) {
+      console.error("Erro ao obter dados offline:", error)
+      return null
+    }
+  }
+
+  // Obter todos os dados de uma coleção
+  async getAllOfflineData(collection: string): Promise<any[]> {
+    const db = await this.db
+    const tx = db.transaction("offline_data", "readonly")
+    const index = tx.store.index("collection")
+    const items = await index.getAll(collection)
+    return items.map((item) => item.data)
+  }
+
+  // Sincronizar a fila com o servidor
+  async syncQueue(): Promise<void> {
+    // Evitar múltiplas sincronizações simultâneas
+    if (this.syncInProgress || !navigator.onLine) return
+
+    this.syncInProgress = true
+    const db = await this.db
+
+    try {
+      // Obter itens não sincronizados
+      const tx = db.transaction("sync_queue", "readwrite")
+      const index = tx.store.index("synced")
+      const unsyncedItems = await index.getAll(false)
+
+      if (unsyncedItems.length === 0) {
+        this.syncInProgress = false
+        return
+      }
+
+      // Processar cada item
+      for (const item of unsyncedItems) {
+        try {
+          await this.processSyncItem(item)
+          // Marcar como sincronizado
+          item.synced = true
+          await tx.store.put(item)
+        } catch (error) {
+          console.error(`Erro ao sincronizar item ${item.id}:`, error)
+          // Manter o item na fila para tentar novamente
         }
       }
 
-      // Carregar mudanças pendentes
-      this.loadPendingChanges()
-    } catch (error) {
-      console.error("Erro ao carregar estado de sincronização:", error)
-    }
-  }
-
-  // Salvar estado no localStorage
-  private saveState() {
-    try {
-      localStorage.setItem(
-        "offline_sync_state",
-        JSON.stringify({
-          lastSync: this.syncState.lastSync?.toISOString(),
-          pendingChanges: this.syncState.pendingChanges,
-        }),
-      )
-    } catch (error) {
-      console.error("Erro ao salvar estado de sincronização:", error)
-    }
-  }
-
-  // Carregar mudanças pendentes
-  private loadPendingChanges() {
-    let totalChanges = 0
-
-    this.config.collections.forEach((collection) => {
-      try {
-        const pendingChanges = localStorage.getItem(`offline_changes_${collection}`)
-        if (pendingChanges) {
-          const changes = JSON.parse(pendingChanges)
-          totalChanges += changes.length
-        }
-      } catch (error) {
-        console.error(`Erro ao carregar mudanças pendentes para ${collection}:`, error)
+      // Notificar o usuário
+      if (this.toast) {
+        this.toast.toast({
+          title: "Sincronização concluída",
+          description: `${unsyncedItems.length} itens sincronizados com sucesso.`,
+          duration: 3000,
+        })
       }
+    } catch (error) {
+      console.error("Erro durante a sincronização:", error)
+      if (this.toast) {
+        this.toast.toast({
+          title: "Erro de sincronização",
+          description: "Não foi possível sincronizar alguns itens. Tentaremos novamente mais tarde.",
+          variant: "destructive",
+          duration: 5000,
+        })
+      }
+    } finally {
+      this.syncInProgress = false
+    }
+  }
+
+  // Processar um item da fila de sincronização
+  private async processSyncItem(item: SyncItem): Promise<void> {
+    const { collection, data, operation } = item
+
+    // Construir a URL da API
+    let url = `/api/sync/${collection}`
+    let method = "POST"
+
+    if (operation === "update") {
+      url = `${url}/${data.id}`
+      method = "PUT"
+    } else if (operation === "delete") {
+      url = `${url}/${data.id}`
+      method = "DELETE"
+    }
+
+    // Enviar para o servidor
+    const response = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: operation !== "delete" ? JSON.stringify(data) : undefined,
     })
 
-    this.syncState.pendingChanges = totalChanges
-    this.notifyListeners()
-  }
-
-  // Sincronizar dados com o servidor
-  public async sync(): Promise<boolean> {
-    // Não sincronizar se já estiver sincronizando ou offline
-    if (this.syncState.isSyncing || !this.syncState.isOnline) {
-      return false
-    }
-
-    try {
-      this.syncState.isSyncing = true
-      this.syncState.error = null
-      this.notifyListeners()
-
-      // Processar cada coleção
-      for (const collection of this.config.collections) {
-        await this.syncCollection(collection)
-      }
-
-      // Atualizar estado após sincronização bem-sucedida
-      this.syncState.lastSync = new Date()
-      this.syncState.pendingChanges = 0
-      this.syncState.isSyncing = false
-      this.saveState()
-      this.notifyListeners()
-
-      return true
-    } catch (error) {
-      this.syncState.isSyncing = false
-      this.syncState.error = error instanceof Error ? error.message : "Erro desconhecido durante sincronização"
-      this.notifyListeners()
-      console.error("Erro durante sincronização:", error)
-      return false
+    if (!response.ok) {
+      throw new Error(`Erro ao sincronizar: ${response.status} ${response.statusText}`)
     }
   }
 
-  // Sincronizar uma coleção específica
-  private async syncCollection(collection: string): Promise<void> {
-    try {
-      const pendingChangesKey = `offline_changes_${collection}`
-      const pendingChanges = localStorage.getItem(pendingChangesKey)
+  // Limpar itens sincronizados antigos
+  async cleanupSyncedItems(olderThanDays = 7): Promise<void> {
+    const db = await this.db
+    const tx = db.transaction("sync_queue", "readwrite")
+    const index = tx.store.index("synced")
+    const syncedItems = await index.getAll(true)
 
-      if (!pendingChanges) {
-        return // Nenhuma mudança pendente
+    const cutoffTime = Date.now() - olderThanDays * 24 * 60 * 60 * 1000
+
+    for (const item of syncedItems) {
+      if (item.timestamp < cutoffTime) {
+        await tx.store.delete(item.id)
       }
-
-      const changes = JSON.parse(pendingChanges)
-      if (changes.length === 0) {
-        return // Array vazio
-      }
-
-      // Enviar mudanças para o servidor
-      const response = await fetch(`/api/sync/${collection}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ changes }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`Erro ao sincronizar ${collection}: ${response.statusText}`)
-      }
-
-      // Limpar mudanças sincronizadas
-      localStorage.removeItem(pendingChangesKey)
-    } catch (error) {
-      console.error(`Erro ao sincronizar coleção ${collection}:`, error)
-      throw error
-    }
-  }
-
-  // Adicionar uma mudança para sincronização posterior
-  public addChange(collection: string, change: any): void {
-    try {
-      const pendingChangesKey = `offline_changes_${collection}`
-      let changes = []
-
-      // Carregar mudanças existentes
-      const existingChanges = localStorage.getItem(pendingChangesKey)
-      if (existingChanges) {
-        changes = JSON.parse(existingChanges)
-      }
-
-      // Adicionar nova mudança
-      changes.push({
-        ...change,
-        timestamp: new Date().toISOString(),
-      })
-
-      // Salvar mudanças
-      localStorage.setItem(pendingChangesKey, JSON.stringify(changes))
-
-      // Atualizar estado
-      this.syncState.pendingChanges += 1
-      this.saveState()
-      this.notifyListeners()
-
-      // Tentar sincronizar se estiver online
-      if (this.config.enabled && this.syncState.isOnline) {
-        this.sync()
-      }
-    } catch (error) {
-      console.error(`Erro ao adicionar mudança para ${collection}:`, error)
-    }
-  }
-
-  // Registrar listener para mudanças de estado
-  public subscribe(listener: (state: SyncState) => void): () => void {
-    this.listeners.push(listener)
-
-    // Notificar imediatamente com o estado atual
-    listener({ ...this.syncState })
-
-    // Retornar função para cancelar inscrição
-    return () => {
-      this.listeners = this.listeners.filter((l) => l !== listener)
-    }
-  }
-
-  // Notificar todos os listeners
-  private notifyListeners(): void {
-    const state = { ...this.syncState }
-    this.listeners.forEach((listener) => listener(state))
-  }
-
-  // Limpar recursos ao desmontar
-  public dispose(): void {
-    if (typeof window !== "undefined") {
-      window.removeEventListener("online", this.handleOnline)
-      window.removeEventListener("offline", this.handleOffline)
-    }
-
-    this.stopSyncInterval()
-  }
-
-  // Obter estado atual
-  public getState(): SyncState {
-    return { ...this.syncState }
-  }
-
-  // Habilitar/desabilitar sincronização
-  public setEnabled(enabled: boolean): void {
-    this.config.enabled = enabled
-
-    if (enabled && this.syncState.isOnline) {
-      this.startSyncInterval()
-    } else {
-      this.stopSyncInterval()
     }
   }
 }
 
-// Instância global
-let syncInstance: OfflineSync | null = null
+// Instância singleton
+export const offlineSync = new OfflineSync()
 
-// Obter instância singleton
-export function getOfflineSync(config?: Partial<OfflineSyncConfig>): OfflineSync {
-  if (!syncInstance && typeof window !== "undefined") {
-    syncInstance = new OfflineSync(config)
-  }
-  return syncInstance as OfflineSync
-}
-
-// Hook para usar sincronização offline em componentes
+// Hook para usar a sincronização em componentes
 export function useOfflineSync() {
-  const [syncState, setSyncState] = useState<SyncState>({
-    lastSync: null,
-    pendingChanges: 0,
-    isOnline: typeof navigator !== "undefined" ? navigator.onLine : true,
-    isSyncing: false,
-    error: null,
-  })
+  const toast = useToast()
 
   useEffect(() => {
-    const sync = getOfflineSync()
-    const unsubscribe = sync.subscribe(setSyncState)
+    offlineSync.setToast(toast)
+
+    // Tentar sincronizar quando a conexão for restaurada
+    const handleOnline = () => {
+      offlineSync.syncQueue()
+    }
+
+    window.addEventListener("online", handleOnline)
+
+    // Limpar itens antigos na inicialização
+    offlineSync.cleanupSyncedItems()
 
     return () => {
-      unsubscribe()
+      window.removeEventListener("online", handleOnline)
     }
-  }, [])
+  }, [toast])
 
-  return {
-    ...syncState,
-    sync: () => getOfflineSync().sync(),
-    addChange: (collection: string, change: any) => getOfflineSync().addChange(collection, change),
-  }
+  return offlineSync
 }

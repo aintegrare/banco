@@ -1,6 +1,6 @@
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { getSupabaseClient } from "@/lib/supabase/client"
+import { createClient } from "@supabase/supabase-js"
 
 export async function POST(request: Request) {
   try {
@@ -8,13 +8,12 @@ export async function POST(request: Request) {
 
     const { email, password } = await request.json()
 
-    // Usar o cliente Supabase já configurado em vez de criar um novo
-    let supabase
-    try {
-      supabase = getSupabaseClient()
-      console.log("API login: Cliente Supabase obtido com sucesso")
-    } catch (error) {
-      console.error("API login: Erro ao obter cliente Supabase:", error)
+    // Verificar se as variáveis de ambiente estão definidas
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error("API login: Variáveis de ambiente do Supabase não encontradas")
       return NextResponse.json(
         {
           error: "Configuração do Supabase não encontrada. Verifique as variáveis de ambiente.",
@@ -22,6 +21,13 @@ export async function POST(request: Request) {
         { status: 500 },
       )
     }
+
+    console.log("API login: Criando cliente Supabase")
+    console.log("API login: URL do Supabase:", supabaseUrl)
+    console.log("API login: Chave anônima definida:", !!supabaseAnonKey)
+
+    // Criar cliente Supabase diretamente
+    const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
     console.log("API login: Tentando fazer login com email:", email)
 

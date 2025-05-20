@@ -1,360 +1,153 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { toast } from "@/components/ui/use-toast"
+import { useState, useEffect } from "react"
 
-// Interface para configuração do modo de demonstração
-export interface DemoModeConfig {
-  enabled: boolean
-  demoData: {
-    posts: any[]
-    projects: any[]
-    analytics: any
-    [key: string]: any
-  }
-  restrictions: {
-    allowEditing: boolean
-    allowDeleting: boolean
-    allowCreating: boolean
-    allowExporting: boolean
-    maxItems: number
-  }
-}
+// Chave para armazenar o estado do modo de demonstração
+const DEMO_MODE_KEY = "integrare-demo-mode"
 
-// Estado global do modo de demonstração
-let demoModeState: DemoModeConfig = {
-  enabled: false,
-  demoData: {
-    posts: [],
-    projects: [],
-    analytics: {},
-  },
-  restrictions: {
-    allowEditing: true,
-    allowDeleting: false,
-    allowCreating: true,
-    allowExporting: true,
-    maxItems: 10,
-  },
-}
-
-// Dados de demonstração padrão
-const DEFAULT_DEMO_DATA = {
-  posts: [
+// Dados de demonstração para diferentes entidades
+const demoData = {
+  tasks: [
     {
-      id: "demo-post-1",
-      title: "Lançamento de Produto",
-      content: "Estamos animados em anunciar o lançamento do nosso novo produto! Fiquem ligados para mais informações.",
-      platform: "instagram",
-      status: "scheduled",
-      scheduledDate: new Date(Date.now() + 86400000).toISOString(), // Amanhã
-      mediaUrls: ["/product-launch-excitement.png"],
-      analytics: {
-        likes: 0,
-        comments: 0,
-        shares: 0,
-      },
+      id: "demo-1",
+      title: "Criar campanha para redes sociais",
+      description: "Desenvolver estratégia e conteúdo para campanha de lançamento no Instagram e Facebook",
+      status: "in-progress",
+      priority: "high",
+      project_id: "demo-project-1",
+      assigned_to: "Ana Silva",
+      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      estimated_hours: 8,
+      tags: ["marketing", "social-media", "campaign"],
     },
     {
-      id: "demo-post-2",
-      title: "Promoção de Verão",
-      content: "Aproveite nossos descontos especiais de verão! Todos os produtos com até 40% de desconto.",
-      platform: "facebook",
-      status: "published",
-      scheduledDate: new Date(Date.now() - 86400000).toISOString(), // Ontem
-      mediaUrls: ["/summer-sale-display.png"],
-      analytics: {
-        likes: 245,
-        comments: 56,
-        shares: 78,
-      },
+      id: "demo-2",
+      title: "Otimizar SEO do site",
+      description: "Analisar e implementar melhorias de SEO para aumentar o ranking nos motores de busca",
+      status: "todo",
+      priority: "medium",
+      project_id: "demo-project-1",
+      assigned_to: "Carlos Mendes",
+      due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      estimated_hours: 12,
+      tags: ["seo", "website", "optimization"],
     },
     {
-      id: "demo-post-3",
-      title: "Dicas de Sustentabilidade",
-      content: "Confira nossas 5 dicas para um estilo de vida mais sustentável! #Sustentabilidade #MeioAmbiente",
-      platform: "twitter",
-      status: "draft",
-      mediaUrls: [],
-      analytics: {
-        likes: 0,
-        comments: 0,
-        shares: 0,
-      },
+      id: "demo-3",
+      title: "Relatório mensal de desempenho",
+      description: "Compilar dados e preparar relatório de desempenho para o cliente",
+      status: "done",
+      priority: "medium",
+      project_id: "demo-project-2",
+      assigned_to: "Mariana Costa",
+      due_date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      estimated_hours: 4,
+      tags: ["report", "analytics", "client"],
     },
   ],
   projects: [
     {
       id: "demo-project-1",
-      name: "Campanha de Verão 2023",
-      description: "Campanha promocional para produtos de verão",
-      startDate: new Date(Date.now() - 7 * 86400000).toISOString(),
-      endDate: new Date(Date.now() + 30 * 86400000).toISOString(),
+      name: "Lançamento E-commerce",
+      description: "Estratégia de marketing digital para lançamento de loja online",
+      client_id: "demo-client-1",
       status: "active",
-      platforms: ["instagram", "facebook", "twitter"],
-      team: ["user1", "user2"],
+      start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      end_date: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
     },
     {
       id: "demo-project-2",
-      name: "Lançamento Linha Eco",
-      description: "Lançamento da nova linha de produtos sustentáveis",
-      startDate: new Date(Date.now() + 15 * 86400000).toISOString(),
-      endDate: new Date(Date.now() + 45 * 86400000).toISOString(),
-      status: "planning",
-      platforms: ["instagram", "facebook"],
-      team: ["user1", "user3"],
+      name: "Gestão de Redes Sociais",
+      description: "Criação de conteúdo e gestão de comunidade para redes sociais",
+      client_id: "demo-client-2",
+      status: "active",
+      start_date: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+      end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
     },
   ],
-  analytics: {
-    overview: {
-      totalReach: 12456,
-      totalEngagement: 3872,
-      totalConversions: 945,
-      growthRate: 12.5,
+  clients: [
+    {
+      id: "demo-client-1",
+      name: "Moda Express",
+      email: "contato@modaexpress.exemplo",
+      phone: "(11) 98765-4321",
+      address: "Av. Paulista, 1000, São Paulo - SP",
+      industry: "E-commerce",
+      status: "active",
     },
-    platforms: {
-      instagram: {
-        followers: 5280,
-        engagement: 3.2,
-        reach: 7500,
-        topPosts: ["demo-post-1"],
-      },
-      facebook: {
-        followers: 8750,
-        engagement: 2.8,
-        reach: 12000,
-        topPosts: ["demo-post-2"],
-      },
-      twitter: {
-        followers: 3200,
-        engagement: 1.9,
-        reach: 5000,
-        topPosts: [],
-      },
+    {
+      id: "demo-client-2",
+      name: "Café Especial",
+      email: "contato@cafeespecial.exemplo",
+      phone: "(11) 91234-5678",
+      address: "Rua Augusta, 500, São Paulo - SP",
+      industry: "Alimentação",
+      status: "active",
     },
-    trends: [
-      { date: "2023-01-01", reach: 5000, engagement: 1500 },
-      { date: "2023-02-01", reach: 5500, engagement: 1700 },
-      { date: "2023-03-01", reach: 6200, engagement: 2100 },
-      { date: "2023-04-01", reach: 7000, engagement: 2400 },
-      { date: "2023-05-01", reach: 7800, engagement: 2900 },
-      { date: "2023-06-01", reach: 8500, engagement: 3200 },
-    ],
-  },
+  ],
 }
 
-// Funções para gerenciar o modo de demonstração
-export const DemoMode = {
-  // Verificar se o modo de demonstração está ativado
-  isEnabled: (): boolean => {
-    return demoModeState.enabled
-  },
+// Função para ativar o modo de demonstração
+export function enableDemoMode(): void {
+  localStorage.setItem(DEMO_MODE_KEY, "true")
 
-  // Ativar o modo de demonstração
-  enable: (config?: Partial<DemoModeConfig>): void => {
-    // Mesclar configuração fornecida com padrões
-    demoModeState = {
-      ...demoModeState,
-      enabled: true,
-      ...config,
-      demoData: {
-        ...DEFAULT_DEMO_DATA,
-        ...(config?.demoData || {}),
-      },
-    }
+  // Armazenar dados de demonstração no localStorage
+  Object.entries(demoData).forEach(([key, value]) => {
+    localStorage.setItem(`demo-data-${key}`, JSON.stringify(value))
+  })
+}
 
-    // Salvar estado no localStorage
-    if (typeof window !== "undefined") {
-      localStorage.setItem("demo_mode", JSON.stringify(demoModeState))
-    }
+// Função para desativar o modo de demonstração
+export function disableDemoMode(): void {
+  localStorage.setItem(DEMO_MODE_KEY, "false")
 
-    // Notificar o usuário
-    toast({
-      title: "Modo de Demonstração Ativado",
-      description: "Você está usando dados de demonstração. Suas alterações não afetarão dados reais.",
-      duration: 5000,
-    })
-  },
+  // Limpar dados de demonstração
+  Object.keys(demoData).forEach((key) => {
+    localStorage.removeItem(`demo-data-${key}`)
+  })
+}
 
-  // Desativar o modo de demonstração
-  disable: (): void => {
-    demoModeState.enabled = false
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("demo_mode")
-    }
+// Verificar se o modo de demonstração está ativo
+export function isDemoMode(): boolean {
+  return localStorage.getItem(DEMO_MODE_KEY) === "true"
+}
 
-    toast({
-      title: "Modo de Demonstração Desativado",
-      description: "Você voltou ao modo normal de operação.",
-      duration: 3000,
-    })
-  },
-
-  // Obter dados de demonstração
-  getData: <T,>(collection: string): T[] => (demoModeState.demoData[collection] || []) as T[],
-
-  // Adicionar ou atualizar item nos dados de demonstração
-  updateData: <T extends { id: string }>(collection: string, item: T): T => {
-    if (!demoModeState.enabled) {
-      throw new Error("Modo de demonstração não está ativado")
-    }
-
-    // Verificar restrições
-    if (!demoModeState.restrictions.allowEditing && !demoModeState.restrictions.allowCreating) {
-      toast({
-        title: "Operação não permitida",
-        description: "Edição não é permitida no modo de demonstração atual.",
-        variant: "destructive",
-      })
-      throw new Error("Edição não permitida no modo de demonstração")
-    }
-
-    // Verificar limite de itens
-    const isNew = !demoModeState.demoData[collection]?.some((i: any) => i.id === item.id)
-    if (isNew && demoModeState.demoData[collection]?.length >= demoModeState.restrictions.maxItems) {
-      toast({
-        title: "Limite atingido",
-        description: `Você atingiu o limite de ${demoModeState.restrictions.maxItems} itens no modo de demonstração.`,
-        variant: "destructive",
-      })
-      throw new Error("Limite de itens atingido no modo de demonstração")
-    }
-
-    // Inicializar array se não existir
-    if (!demoModeState.demoData[collection]) {
-      demoModeState.demoData[collection] = []
-    }
-
-    // Atualizar ou adicionar item
-    const items = demoModeState.demoData[collection] as any[]
-    const index = items.findIndex((i: any) => i.id === item.id)
-
-    if (index >= 0) {
-      items[index] = { ...items[index], ...item }
-    } else {
-      items.push(item)
-    }
-
-    // Atualizar localStorage
-    if (typeof window !== "undefined") {
-      localStorage.setItem("demo_mode", JSON.stringify(demoModeState))
-    }
-
-    return item
-  },
-
-  // Remover item dos dados de demonstração
-  removeData: (collection: string, id: string): boolean => {
-    if (!demoModeState.enabled) {
-      throw new Error("Modo de demonstração não está ativado")
-    }
-
-    // Verificar restrições
-    if (!demoModeState.restrictions.allowDeleting) {
-      toast({
-        title: "Operação não permitida",
-        description: "Exclusão não é permitida no modo de demonstração atual.",
-        variant: "destructive",
-      })
-      throw new Error("Exclusão não permitida no modo de demonstração")
-    }
-
-    // Verificar se a coleção existe
-    if (!demoModeState.demoData[collection]) {
-      return false
-    }
-
-    // Remover item
-    const items = demoModeState.demoData[collection] as any[]
-    const initialLength = items.length
-    demoModeState.demoData[collection] = items.filter((item: any) => item.id !== id)
-
-    // Atualizar localStorage
-    if (typeof window !== "undefined") {
-      localStorage.setItem("demo_mode", JSON.stringify(demoModeState))
-    }
-
-    return initialLength > demoModeState.demoData[collection].length
-  },
-
-  // Verificar restrições
-  canCreate: (): boolean => {
-    return demoModeState.enabled && demoModeState.restrictions.allowCreating
-  },
-
-  canEdit: (): boolean => {
-    return demoModeState.enabled && demoModeState.restrictions.allowEditing
-  },
-
-  canDelete: (): boolean => {
-    return demoModeState.enabled && demoModeState.restrictions.allowDeleting
-  },
-
-  canExport: (): boolean => {
-    return demoModeState.enabled && demoModeState.restrictions.allowExporting
-  },
-
-  // Inicializar modo de demonstração a partir do localStorage
-  initialize: (): void => {
-    if (typeof window === "undefined") {
-      return // Não executar durante SSR
-    }
-
-    try {
-      const savedState = localStorage.getItem("demo_mode")
-      if (savedState) {
-        demoModeState = JSON.parse(savedState)
-      }
-    } catch (error) {
-      console.error("Erro ao inicializar modo de demonstração:", error)
-    }
-  },
+// Obter dados de demonstração para uma entidade específica
+export function getDemoData<T>(entity: keyof typeof demoData): T[] {
+  const data = localStorage.getItem(`demo-data-${entity}`)
+  return data ? JSON.parse(data) : []
 }
 
 // Hook para usar o modo de demonstração em componentes
 export function useDemoMode() {
-  const [isEnabled, setIsEnabled] = useState(false)
+  const [demoMode, setDemoMode] = useState(false)
 
   useEffect(() => {
-    // Inicializar do localStorage
-    DemoMode.initialize()
-    setIsEnabled(DemoMode.isEnabled())
+    // Verificar o estado inicial
+    setDemoMode(isDemoMode())
 
-    // Criar um evento personalizado para mudanças no modo de demonstração
-    const handleDemoModeChange = () => {
-      setIsEnabled(DemoMode.isEnabled())
+    // Função para atualizar o estado quando o localStorage mudar
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === DEMO_MODE_KEY) {
+        setDemoMode(e.newValue === "true")
+      }
     }
 
-    window.addEventListener("demo_mode_change", handleDemoModeChange)
+    window.addEventListener("storage", handleStorageChange)
 
     return () => {
-      window.removeEventListener("demo_mode_change", handleDemoModeChange)
+      window.removeEventListener("storage", handleStorageChange)
     }
   }, [])
 
-  // Funções wrapper para atualizar o estado do React
-  const enable = useCallback((config?: Partial<DemoModeConfig>) => {
-    DemoMode.enable(config)
-    setIsEnabled(true)
-    window.dispatchEvent(new Event("demo_mode_change"))
-  }, [])
-
-  const disable = useCallback(() => {
-    DemoMode.disable()
-    setIsEnabled(false)
-    window.dispatchEvent(new Event("demo_mode_change"))
-  }, [])
-
-  return {
-    isEnabled,
-    enable,
-    disable,
-    getData: DemoMode.getData,
-    updateData: DemoMode.updateData,
-    removeData: DemoMode.removeData,
-    canCreate: DemoMode.canCreate,
-    canEdit: DemoMode.canEdit,
-    canDelete: DemoMode.canDelete,
-    canExport: DemoMode.canExport,
+  const toggleDemoMode = () => {
+    if (demoMode) {
+      disableDemoMode()
+    } else {
+      enableDemoMode()
+    }
+    setDemoMode(!demoMode)
   }
+
+  return { demoMode, toggleDemoMode, getDemoData }
 }

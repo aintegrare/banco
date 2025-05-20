@@ -2,8 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { useState, useRef } from "react"
 import {
   Dialog,
   DialogContent,
@@ -11,329 +10,373 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { getExportImport, type ExportMetadata } from "@/lib/export-import"
-import { Download, Upload, FileUp, Check, AlertCircle } from "lucide-react"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
+import { useToast } from "@/components/ui/use-toast"
+import { Download, Upload, FileText, CheckCircle, AlertCircle } from "lucide-react"
+import { exportData, importData, type ExportableEntity } from "@/lib/export-import"
 
 interface ExportImportDialogProps {
-  trigger?: React.ReactNode
-  defaultTab?: "export" | "import"
-  onExportComplete?: () => void
-  onImportComplete?: (metadata: ExportMetadata) => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
-export function ExportImportDialog({
-  trigger,
-  defaultTab = "export",
-  onExportComplete,
-  onImportComplete,
-}: ExportImportDialogProps) {
-  const [open, setOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<"export" | "import">(defaultTab)
-  const [selectedCollections, setSelectedCollections] = useState<string[]>([])
-  const [importMode, setImportMode] = useState<"merge" | "overwrite">("merge")
+export function ExportImportDialog({ open, onOpenChange }: ExportImportDialogProps) {
+  const [activeTab, setActiveTab] = useState("export")
+  const [selectedEntities, setSelectedEntities] = useState<ExportableEntity[]>(["tasks", "projects", "clients"])
+  const [exportFileName, setExportFileName] = useState(`integrare-export-${new Date().toISOString().split("T")[0]}`)
+  const [exportDescription, setExportDescription] = useState("")
+  const [exportedBy, setExportedBy] = useState("")
+
   const [importFile, setImportFile] = useState<File | null>(null)
+  const [importProgress, setImportProgress] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [result, setResult] = useState<{
-    success: boolean
-    message: string
-    details?: string
-    metadata?: ExportMetadata
-  } | null>(null)
+  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null)
 
-  const exportImport = getExportImport()
-  const collections = exportImport.getConfig().collections
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { toast } = useToast()
 
-  // Alternar seleção de coleção
-  const toggleCollection = (name: string) => {
-    setSelectedCollections((prev) => (prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]))
+  const handleEntityToggle = (entity: ExportableEntity) => {
+    if (selectedEntities.includes(entity)) {
+      setSelectedEntities(selectedEntities.filter((e) => e !== entity))
+    } else {
+      setSelectedEntities([...selectedEntities, entity])
+    }
   }
 
-  // Selecionar todas as coleções
-  const selectAllCollections = () => {
-    setSelectedCollections(collections.map((c) => c.name))
-  }
-
-  // Limpar seleção de coleções
-  const clearCollections = () => {
-    setSelectedCollections([])
-  }
-
-  // Manipular exportação
   const handleExport = async () => {
-    if (selectedCollections.length === 0) {
-      setResult({
-        success: false,
-        message: "Nenhuma coleção selecionada",
-        details: "Selecione pelo menos uma coleção para exportar.",
+    if (selectedEntities.length === 0) {
+      toast({
+        title: "Nenhuma entidade selecionada",
+        description: "Selecione pelo menos uma entidade para exportar",
+        variant: "destructive",
       })
       return
     }
 
+    setIsProcessing(true)
     try {
-      setIsProcessing(true)
-      setProgress(10)
-
-      // Simular progresso
-      const progressInterval = setInterval(() => {
-        setProgress((prev) => (prev < 90 ? prev + 10 : prev))
-      }, 200)
-
-      await exportImport.saveExportFile(selectedCollections)
-
-      clearInterval(progressInterval)
-      setProgress(100)
+      await exportData(selectedEntities, {
+        fileName: exportFileName,
+        description: exportDescription,
+        exportedBy: exportedBy,
+      })
 
       setResult({
         success: true,
-        message: "Exportação concluída com sucesso",
-        details: `${selectedCollections.length} coleções foram exportadas.`,
+        message: `Exportação concluída com sucesso. ${selectedEntities.length} entidades exportadas.`,
       })
 
-      if (onExportComplete) {
-        onExportComplete()
-      }
+      toast({
+        title: "Exportação concluída",
+        description: "Os dados foram exportados com sucesso.",
+      })
     } catch (error) {
+      console.error("Erro na exportação:", error)
       setResult({
         success: false,
-        message: "Erro ao exportar dados",
-        details: error instanceof Error ? error.message : "Erro desconhecido",
+        message: `Erro na exportação: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+      })
+
+      toast({
+        title: "Erro na exportação",
+        description: "Não foi possível exportar os dados. Tente novamente.",
+        variant: "destructive",
       })
     } finally {
       setIsProcessing(false)
     }
   }
 
-  // Manipular importação
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setImportFile(e.target.files[0])
+      setResult(null)
+    }
+  }
+
   const handleImport = async () => {
     if (!importFile) {
-      setResult({
-        success: false,
-        message: "Nenhum arquivo selecionado",
-        details: "Selecione um arquivo de exportação para importar.",
+      toast({
+        title: "Nenhum arquivo selecionado",
+        description: "Selecione um arquivo para importar",
+        variant: "destructive",
       })
       return
     }
 
+    setIsProcessing(true)
+    setImportProgress(0)
+
     try {
-      setIsProcessing(true)
-      setProgress(10)
-
-      // Simular progresso
-      const progressInterval = setInterval(() => {
-        setProgress((prev) => (prev < 90 ? prev + 10 : prev))
-      }, 200)
-
-      const metadata = await exportImport.importData(importFile, {
-        overwrite: importMode === "overwrite",
+      const result = await importData(importFile, {
+        entities: selectedEntities.length > 0 ? selectedEntities : undefined,
+        onProgress: setImportProgress,
       })
 
-      clearInterval(progressInterval)
-      setProgress(100)
+      setResult(result)
 
-      setResult({
-        success: true,
-        message: "Importação concluída com sucesso",
-        details: `${metadata.totalItems} itens foram importados de ${metadata.collections.length} coleções.`,
-        metadata,
+      toast({
+        title: result.success ? "Importação concluída" : "Erro na importação",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
       })
-
-      if (onImportComplete) {
-        onImportComplete(metadata)
-      }
     } catch (error) {
+      console.error("Erro na importação:", error)
       setResult({
         success: false,
-        message: "Erro ao importar dados",
-        details: error instanceof Error ? error.message : "Erro desconhecido",
+        message: `Erro na importação: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+      })
+
+      toast({
+        title: "Erro na importação",
+        description: "Não foi possível importar os dados. Tente novamente.",
+        variant: "destructive",
       })
     } finally {
       setIsProcessing(false)
     }
   }
 
-  // Manipular seleção de arquivo
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files && files.length > 0) {
-      setImportFile(files[0])
-    }
-  }
-
-  // Resetar estado
-  const resetState = () => {
-    setSelectedCollections([])
-    setImportFile(null)
-    setImportMode("merge")
-    setIsProcessing(false)
-    setProgress(0)
+  const resetForm = () => {
     setResult(null)
-  }
-
-  // Fechar diálogo
-  const handleClose = () => {
-    setOpen(false)
-    setTimeout(resetState, 300) // Resetar após animação de fechamento
+    setImportFile(null)
+    setImportProgress(0)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger || <Button>Exportar/Importar</Button>}</DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Exportar/Importar Dados</DialogTitle>
-          <DialogDescription>
-            Exporte seus dados para backup ou importe dados de um arquivo de exportação.
-          </DialogDescription>
+          <DialogTitle>Exportar / Importar Dados</DialogTitle>
+          <DialogDescription>Exporte seus dados para backup ou importe dados previamente exportados.</DialogDescription>
         </DialogHeader>
 
-        {/* Abas */}
-        <div className="flex border-b mb-4">
-          <button
-            className={`px-4 py-2 ${
-              activeTab === "export" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"
-            }`}
-            onClick={() => {
-              setActiveTab("export")
-              setResult(null)
-            }}
-          >
-            <Download className="h-4 w-4 inline mr-2" />
-            Exportar
-          </button>
-          <button
-            className={`px-4 py-2 ${
-              activeTab === "import" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"
-            }`}
-            onClick={() => {
-              setActiveTab("import")
-              setResult(null)
-            }}
-          >
-            <Upload className="h-4 w-4 inline mr-2" />
-            Importar
-          </button>
-        </div>
-
-        {/* Conteúdo da aba */}
-        <div className="py-2">
-          {activeTab === "export" ? (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium">Selecione as coleções para exportar:</h3>
-                <div className="space-x-2">
-                  <Button variant="outline" size="sm" onClick={selectAllCollections}>
-                    Selecionar todos
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={clearCollections}>
-                    Limpar
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-md p-2">
-                {collections.map((collection) => (
-                  <div key={collection.name} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`collection-${collection.name}`}
-                      checked={selectedCollections.includes(collection.name)}
-                      onCheckedChange={() => toggleCollection(collection.name)}
-                    />
-                    <Label htmlFor={`collection-${collection.name}`} className="text-sm cursor-pointer">
-                      {collection.label}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="import-file">Selecione o arquivo de exportação:</Label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => document.getElementById("import-file")?.click()}
-                    className="w-full justify-start"
-                  >
-                    <FileUp className="h-4 w-4 mr-2" />
-                    {importFile ? importFile.name : "Selecionar arquivo..."}
-                  </Button>
-                  <input type="file" id="import-file" accept=".zip" className="hidden" onChange={handleFileChange} />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Modo de importação:</Label>
-                <RadioGroup
-                  value={importMode}
-                  onValueChange={(value) => setImportMode(value as "merge" | "overwrite")}
-                  className="flex flex-col space-y-1"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="merge" id="merge" />
-                    <Label htmlFor="merge" className="cursor-pointer">
-                      Mesclar - Adicionar novos itens sem substituir existentes
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="overwrite" id="overwrite" />
-                    <Label htmlFor="overwrite" className="cursor-pointer">
-                      Substituir - Substituir todos os dados existentes
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-            </div>
-          )}
-
-          {/* Progresso */}
-          {isProcessing && (
-            <div className="mt-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Processando...</span>
-                <span>{progress}%</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-            </div>
-          )}
-
-          {/* Resultado */}
-          {result && (
-            <Alert className={`mt-4 ${result.success ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
-              <div className="flex items-center gap-2">
-                {result.success ? (
-                  <Check className="h-4 w-4 text-green-600" />
-                ) : (
-                  <AlertCircle className="h-4 w-4 text-red-600" />
-                )}
-                <AlertTitle className={result.success ? "text-green-700" : "text-red-700"}>{result.message}</AlertTitle>
-              </div>
-              <AlertDescription className="text-sm mt-1">{result.details}</AlertDescription>
-            </Alert>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
-            Fechar
-          </Button>
-          {activeTab === "export" ? (
-            <Button onClick={handleExport} disabled={isProcessing || selectedCollections.length === 0}>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="export" disabled={isProcessing}>
               <Download className="h-4 w-4 mr-2" />
               Exportar
+            </TabsTrigger>
+            <TabsTrigger value="import" disabled={isProcessing}>
+              <Upload className="h-4 w-4 mr-2" />
+              Importar
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="export" className="space-y-4 pt-4">
+            <div>
+              <h3 className="text-sm font-medium mb-2">Selecione os dados para exportar:</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="export-tasks"
+                    checked={selectedEntities.includes("tasks")}
+                    onCheckedChange={() => handleEntityToggle("tasks")}
+                  />
+                  <Label htmlFor="export-tasks">Tarefas</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="export-projects"
+                    checked={selectedEntities.includes("projects")}
+                    onCheckedChange={() => handleEntityToggle("projects")}
+                  />
+                  <Label htmlFor="export-projects">Projetos</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="export-clients"
+                    checked={selectedEntities.includes("clients")}
+                    onCheckedChange={() => handleEntityToggle("clients")}
+                  />
+                  <Label htmlFor="export-clients">Clientes</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="export-documents"
+                    checked={selectedEntities.includes("documents")}
+                    onCheckedChange={() => handleEntityToggle("documents")}
+                  />
+                  <Label htmlFor="export-documents">Documentos</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="export-posts"
+                    checked={selectedEntities.includes("posts")}
+                    onCheckedChange={() => handleEntityToggle("posts")}
+                  />
+                  <Label htmlFor="export-posts">Posts</Label>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="export-filename">Nome do arquivo</Label>
+              <Input
+                id="export-filename"
+                value={exportFileName}
+                onChange={(e) => setExportFileName(e.target.value)}
+                placeholder="Nome do arquivo de exportação"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="export-description">Descrição (opcional)</Label>
+              <Textarea
+                id="export-description"
+                value={exportDescription}
+                onChange={(e) => setExportDescription(e.target.value)}
+                placeholder="Descrição do conteúdo exportado"
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="exported-by">Exportado por (opcional)</Label>
+              <Input
+                id="exported-by"
+                value={exportedBy}
+                onChange={(e) => setExportedBy(e.target.value)}
+                placeholder="Seu nome ou identificação"
+              />
+            </div>
+
+            {result && (
+              <div
+                className={`p-3 rounded-md ${result.success ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}
+              >
+                <div className="flex items-start">
+                  {result.success ? (
+                    <CheckCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                  )}
+                  <p className="text-sm">{result.message}</p>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="import" className="space-y-4 pt-4">
+            <div>
+              <h3 className="text-sm font-medium mb-2">Selecione um arquivo para importar:</h3>
+              <div className="flex items-center gap-2">
+                <Input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="flex-1" />
+                {importFile && (
+                  <Button variant="outline" size="sm" onClick={resetForm}>
+                    Limpar
+                  </Button>
+                )}
+              </div>
+
+              {importFile && (
+                <div className="flex items-center mt-2 text-sm text-gray-500">
+                  <FileText className="h-4 w-4 mr-2" />
+                  <span>
+                    {importFile.name} ({Math.round(importFile.size / 1024)} KB)
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {isProcessing && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Progresso</span>
+                  <span>{importProgress}%</span>
+                </div>
+                <Progress value={importProgress} className="h-2" />
+              </div>
+            )}
+
+            {result && (
+              <div
+                className={`p-3 rounded-md ${result.success ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}
+              >
+                <div className="flex items-start">
+                  {result.success ? (
+                    <CheckCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                  )}
+                  <p className="text-sm">{result.message}</p>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <h3 className="text-sm font-medium mb-2">Filtrar entidades (opcional):</h3>
+              <p className="text-xs text-gray-500 mb-2">
+                Se desejar importar apenas tipos específicos de dados, selecione-os abaixo. Caso contrário, todos os
+                dados do arquivo serão importados.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="import-tasks"
+                    checked={selectedEntities.includes("tasks")}
+                    onCheckedChange={() => handleEntityToggle("tasks")}
+                  />
+                  <Label htmlFor="import-tasks">Tarefas</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="import-projects"
+                    checked={selectedEntities.includes("projects")}
+                    onCheckedChange={() => handleEntityToggle("projects")}
+                  />
+                  <Label htmlFor="import-projects">Projetos</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="import-clients"
+                    checked={selectedEntities.includes("clients")}
+                    onCheckedChange={() => handleEntityToggle("clients")}
+                  />
+                  <Label htmlFor="import-clients">Clientes</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="import-documents"
+                    checked={selectedEntities.includes("documents")}
+                    onCheckedChange={() => handleEntityToggle("documents")}
+                  />
+                  <Label htmlFor="import-documents">Documentos</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="import-posts"
+                    checked={selectedEntities.includes("posts")}
+                    onCheckedChange={() => handleEntityToggle("posts")}
+                  />
+                  <Label htmlFor="import-posts">Posts</Label>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
+            Cancelar
+          </Button>
+          {activeTab === "export" ? (
+            <Button onClick={handleExport} disabled={isProcessing || selectedEntities.length === 0}>
+              {isProcessing ? "Exportando..." : "Exportar Dados"}
             </Button>
           ) : (
             <Button onClick={handleImport} disabled={isProcessing || !importFile}>
-              <Upload className="h-4 w-4 mr-2" />
-              Importar
+              {isProcessing ? "Importando..." : "Importar Dados"}
             </Button>
           )}
         </DialogFooter>

@@ -1,10 +1,11 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { Calendar, MoreVertical } from "lucide-react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -103,6 +104,13 @@ export function TaskCard({ task, onEdit, onDelete, onStatusChange, showProject =
     onEdit(editedTask)
   }
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Impedir que o evento de clique se propague para elementos pai
+    e.stopPropagation()
+    // Abrir o diálogo de edição
+    setIsEditDialogOpen(true)
+  }
+
   const cardStyle = {
     borderLeft: task.color ? `4px solid ${task.color}` : `4px solid #4b7bb5`,
   }
@@ -112,20 +120,27 @@ export function TaskCard({ task, onEdit, onDelete, onStatusChange, showProject =
       <Card
         className="w-full shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer"
         style={cardStyle}
+        onClick={handleCardClick}
       >
         <CardContent className="p-4">
           <div className="flex justify-between items-start mb-3">
-            <Link
-              href={`/tarefas/${task.id}`}
+            <div
               className="text-lg font-medium text-[#4b7bb5] hover:text-[#3d649e] transition-colors duration-200 flex-1"
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsEditDialogOpen(true)
+              }}
             >
               {task.title}
-            </Link>
+            </div>
             <DropdownMenu>
-              <DropdownMenuTrigger className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-gray-100">
+              <DropdownMenuTrigger
+                className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-gray-100"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <MoreVertical className="h-4 w-4" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)}>Editar</DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setIsDeleteDialogOpen(true)}
@@ -204,9 +219,8 @@ export function TaskCard({ task, onEdit, onDelete, onStatusChange, showProject =
       <EditTaskDialog
         isOpen={isEditDialogOpen}
         onClose={() => setIsEditDialogOpen(false)}
-        task={task}
+        taskId={task.id}
         onSave={handleEditSave}
-        projects={PROJECTS}
       />
 
       <DeleteTaskConfirmation

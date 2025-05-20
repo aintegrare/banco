@@ -5,6 +5,7 @@ export function createClient() {
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!supabaseUrl || !supabaseKey) {
+    console.error("Variáveis de ambiente do Supabase não encontradas (servidor)")
     throw new Error("Supabase URL and key must be defined")
   }
 
@@ -16,4 +17,13 @@ export function createClient() {
   })
 }
 
-export const supabase = createClient()
+// Criar cliente apenas se as variáveis de ambiente estiverem disponíveis
+let supabase: ReturnType<typeof createSupabaseClient> | null = null
+
+try {
+  supabase = createClient()
+} catch (error) {
+  console.error("Erro ao criar cliente Supabase do servidor:", error)
+}
+
+export { supabase }

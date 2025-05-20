@@ -11,6 +11,26 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
   const [loginSuccess, setLoginSuccess] = useState(false)
+  const [envInfo, setEnvInfo] = useState<string | null>(null)
+
+  // Verificar variáveis de ambiente no carregamento
+  useEffect(() => {
+    const checkEnv = async () => {
+      try {
+        const response = await fetch("/api/check-env-vars")
+        const data = await response.json()
+        if (!data.supabaseConfigured) {
+          setEnvInfo(
+            "Aviso: Configuração do Supabase incompleta. Algumas funcionalidades podem não funcionar corretamente.",
+          )
+        }
+      } catch (error) {
+        console.error("Erro ao verificar variáveis de ambiente:", error)
+      }
+    }
+
+    checkEnv()
+  }, [])
 
   // Efeito para redirecionar após login bem-sucedido
   useEffect(() => {
@@ -109,6 +129,7 @@ export default function LoginPage() {
         <h1 className="text-2xl font-bold text-center text-[#4b7bb5] mb-6">Integrare Admin</h1>
 
         {message && <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-md">{message}</div>}
+        {envInfo && <div className="mb-4 p-3 bg-yellow-50 text-yellow-700 rounded-md text-sm">{envInfo}</div>}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>

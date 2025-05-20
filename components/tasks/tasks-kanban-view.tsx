@@ -27,26 +27,62 @@ interface TasksKanbanViewProps {
 }
 
 export function TasksKanbanView({
-  tasks,
-  onTaskEdit,
-  onTaskStatusChange,
-  onTaskUpdated,
-  projects,
+  tasks = [],
+  onTaskEdit = () => {},
+  onTaskStatusChange = () => {},
+  onTaskUpdated = () => {},
+  projects = [],
 }: TasksKanbanViewProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [priorityFilter, setPriorityFilter] = useState("all")
   const [projectFilter, setProjectFilter] = useState("all")
   const [showFilters, setShowFilters] = useState(false)
 
-  // Filtrar tarefas
-  const filteredTasks = tasks.filter((task) => {
-    // Filtro de texto
-    const matchesSearch =
-      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  // Função segura para obter o nome do projeto
+  const safeGetProjectName = (projectId: any): string => {
+    // Se projectId for null, undefined ou inválido
+    if (projectId == null) {
+      return "Sem projeto"
+    }
 
-    // Filtro de projeto
-    const matchesProject = projectFilter === "all" || (task.project_id && task.project_id.toString() === projectFilter)
+    try {
+      // Tenta encontrar o projeto pelo ID
+      const projectIdStr = String(projectId)
+      const project = projects.find((p) => p && p.id && String(p.id) === projectIdStr)
+
+      // Se encontrou o projeto e ele tem um nome, retorna o nome
+      if (project && project.name) {
+        return project.name
+      }
+
+      // Caso contrário, retorna um valor padrão
+      return "Projeto Desconhecido"
+    } catch (error) {
+      console.error("Erro ao obter nome do projeto:", error)
+      return "Erro ao obter projeto"
+    }
+  }
+
+  // Filtrar tarefas com verificações de segurança
+  const filteredTasks = tasks.filter((task) => {
+    if (!task) return false
+
+    // Filtro de texto
+    const title = task.title || ""
+    const description = task.description || ""
+    const matchesSearch =
+      title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      description.toLowerCase().includes(searchTerm.toLowerCase())
+
+    // Filtro de projeto com verificação de segurança
+    let matchesProject = projectFilter === "all"
+    if (projectFilter !== "all" && task.project_id != null) {
+      try {
+        matchesProject = String(task.project_id) === projectFilter
+      } catch (e) {
+        console.error("Erro ao comparar project_id:", e)
+      }
+    }
 
     // Filtro de prioridade
     const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter
@@ -54,26 +90,32 @@ export function TasksKanbanView({
     return matchesSearch && matchesProject && matchesPriority
   })
 
-  // Organizar tarefas por coluna
+  // Organizar tarefas por coluna com verificações de segurança
   const tasksByColumn = COLUMNS.reduce((acc: any, column) => {
-    acc[column.id] = filteredTasks.filter((task) => task.status === column.id)
+    acc[column.id] = filteredTasks.filter((task) => task && task.status === column.id)
     return acc
   }, {})
 
-  const handleEditTask = (editedTask: any) => {
-    onTaskUpdated(editedTask)
+  const handleEditTask = (taskId: number | string) => {
+    console.log("Editando tarefa no Kanban:", taskId)
+    if (taskId) {
+      onTaskEdit(taskId)
+    }
   }
 
   const handleDeleteTask = (taskId: number) => {
-    // Esta função seria implementada no componente pai
     console.log("Deletar tarefa:", taskId)
   }
 
   const handleStatusChange = (taskId: number, newStatus: string) => {
-    onTaskStatusChange(taskId, newStatus)
+    if (taskId && newStatus) {
+      onTaskStatusChange(taskId, newStatus)
+    }
   }
 
   const onDragEnd = (result: any) => {
+    if (!result) return
+
     const { destination, source, draggableId } = result
 
     // Se não houver destino ou se o destino for o mesmo que a origem, não fazer nada
@@ -82,12 +124,9 @@ export function TasksKanbanView({
     }
 
     // Atualizar o status da tarefa
-    onTaskStatusChange(draggableId, destination.droppableId)
-  }
-
-  const getProjectName = (projectId: string | number) => {
-    const project = projects.find((p) => p.id.toString() === projectId.toString())
-    return project ? project.name : "Projeto Desconhecido"
+    if (draggableId) {
+      onTaskStatusChange(draggableId, destination.droppableId)
+    }
   }
 
   return (
@@ -128,9 +167,9 @@ export function TasksKanbanView({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os projetos</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id.toString()}>
-                      {project.name}
+                  {projects.filter(Boolean).map((project) => (
+                    <SelectItem key={project.id} value={String(project.id)}>
+                      {project.name || "Projeto sem nome"}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -148,7 +187,7 @@ export function TasksKanbanView({
                 <div className="p-3 font-medium text-gray-700 border-b border-gray-200 bg-gray-200 rounded-t-lg flex justify-between items-center">
                   <span>{column.title}</span>
                   <Badge variant="secondary" className="bg-white text-gray-600">
-                    {tasksByColumn[column.id].length}
+                    {(tasksByColumn[column.id] || []).length}
                   </Badge>
                 </div>
 
@@ -160,29 +199,37 @@ export function TasksKanbanView({
                       className="flex-grow p-2 overflow-y-auto"
                       style={{ minHeight: "100px" }}
                     >
-                      {tasksByColumn[column.id].map((task: any, index: number) => (
-                        <Draggable key={task.id} draggableId={String(task.id)} index={index}>
-                          {(provided) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              className="mb-2 last:mb-0"
-                            >
-                              <TaskCard
-                                task={{
-                                  ...task,
-                                  projectName: getProjectName(task.project_id),
+                      {(tasksByColumn[column.id] || []).map((task: any, index: number) => {
+                        if (!task || !task.id) return null
+
+                        return (
+                          <Draggable key={task.id} draggableId={String(task.id)} index={index}>
+                            {(provided) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                className="mb-2 last:mb-0"
+                                onClick={(e) => {
+                                  // Impedir que o evento de clique se propague para o draggable
+                                  e.stopPropagation()
                                 }}
-                                onEdit={() => onTaskEdit(task.id)}
-                                onDelete={handleDeleteTask}
-                                onStatusChange={handleStatusChange}
-                                showProject={true}
-                              />
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
+                              >
+                                <TaskCard
+                                  task={{
+                                    ...task,
+                                    projectName: safeGetProjectName(task.project_id),
+                                  }}
+                                  onEdit={() => handleEditTask(task.id)}
+                                  onDelete={handleDeleteTask}
+                                  onStatusChange={handleStatusChange}
+                                  showProject={true}
+                                />
+                              </div>
+                            )}
+                          </Draggable>
+                        )
+                      })}
                       {provided.placeholder}
                     </div>
                   )}
