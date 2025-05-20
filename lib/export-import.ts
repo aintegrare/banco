@@ -1,4 +1,5 @@
-import { saveAs } from "file-saver"
+// Removendo a importação problemática do file-saver
+// import { saveAs } from "file-saver"
 import { offlineSync } from "./offline-sync"
 
 // Tipos de entidades que podem ser exportadas/importadas
@@ -16,6 +17,27 @@ export interface ExportFile {
     description?: string
     appVersion: string
   }
+}
+
+// Função para salvar blob como arquivo (substituindo a dependência file-saver)
+function saveBlob(blob: Blob, fileName: string): void {
+  // Criar URL para o blob
+  const url = URL.createObjectURL(blob)
+
+  // Criar elemento de link temporário
+  const a = document.createElement("a")
+  a.href = url
+  a.download = fileName
+
+  // Adicionar ao documento, clicar e remover
+  document.body.appendChild(a)
+  a.click()
+
+  // Limpar
+  setTimeout(() => {
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, 100)
 }
 
 // Função para exportar dados
@@ -68,7 +90,7 @@ export async function exportData(
   // Salvar arquivo se fileName for fornecido
   if (options?.fileName) {
     const fileName = options.fileName.endsWith(".json") ? options.fileName : `${options.fileName}.json`
-    saveAs(blob, fileName)
+    saveBlob(blob, fileName)
   }
 
   return blob
@@ -155,4 +177,40 @@ export async function importData(
       importedEntities: [],
     }
   }
+}
+
+// Função para obter a configuração de exportação/importação
+export function getExportImport() {
+  return {
+    getConfig: () => ({
+      collections: [
+        { name: "tasks", label: "Tarefas" },
+        { name: "projects", label: "Projetos" },
+        { name: "clients", label: "Clientes" },
+        { name: "documents", label: "Documentos" },
+        { name: "posts", label: "Posts" },
+      ],
+    }),
+    saveExportFile: async (collections: string[]) => {
+      const entities = collections as ExportableEntity[]
+      const fileName = `integrare-export-${new Date().toISOString().split("T")[0]}.json`
+      await exportData(entities, { fileName })
+      return true
+    },
+    importData: async (file: File, options: { overwrite?: boolean } = {}) => {
+      const result = await importData(file)
+      return {
+        success: result.success,
+        collections: result.importedEntities,
+        totalItems: result.importedEntities.length,
+      }
+    },
+  }
+}
+
+// Interface para metadados de exportação
+export interface ExportMetadata {
+  success: boolean
+  collections: string[]
+  totalItems: number
 }
