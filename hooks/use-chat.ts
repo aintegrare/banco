@@ -6,6 +6,7 @@ interface Message {
   role: "user" | "assistant"
   content: string
   timestamp: Date
+  provider?: string
 }
 
 export function useChat() {
@@ -13,6 +14,7 @@ export function useChat() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
+  const [currentProvider, setCurrentProvider] = useState<string | null>(null)
 
   // Carregar mensagens do localStorage ao iniciar
   useEffect(() => {
@@ -89,12 +91,18 @@ export function useChat() {
 
       const data = await response.json()
 
+      // Atualizar o provedor atual
+      if (data.provider) {
+        setCurrentProvider(data.provider)
+      }
+
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           content: data.response,
           timestamp: new Date(),
+          provider: data.provider,
         },
       ])
 
@@ -126,6 +134,7 @@ export function useChat() {
     localStorage.removeItem("chat-messages")
     setError(null)
     setRetryCount(0)
+    setCurrentProvider(null)
   }
 
   return {
@@ -134,5 +143,6 @@ export function useChat() {
     error,
     sendMessage,
     clearMessages,
+    currentProvider,
   }
 }

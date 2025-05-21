@@ -17,6 +17,7 @@ export default function ChatPage() {
   const { messages, isLoading, error, sendMessage, clearMessages } = useChat()
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
 
   // Agrupar mensagens por data
   const messagesByDate = messages.reduce<Record<string, typeof messages>>((acc, message) => {
@@ -54,29 +55,38 @@ export default function ChatPage() {
     setInput("")
   }
 
-  const handleExportChat = () => {
-    // Filtrar mensagens pela data selecionada, se houver
-    const messagesToExport = selectedDate ? messagesByDate[selectedDate] : messages
+  const handleExportChat = async () => {
+    if (isExporting) return
+    setIsExporting(true)
 
-    // Formatar mensagens para exportação
-    const exportContent = messagesToExport
-      .map((msg) => {
-        const time = format(msg.timestamp, "HH:mm")
-        const sender = msg.role === "user" ? "Você" : "Jaque"
-        return `[${time}] ${sender}: ${msg.content}`
-      })
-      .join("\n\n")
+    try {
+      // Filtrar mensagens pela data selecionada, se houver
+      const messagesToExport = selectedDate ? messagesByDate[selectedDate] : messages
 
-    // Criar blob e link para download
-    const blob = new Blob([exportContent], { type: "text/plain" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `chat-integrare-${selectedDate || format(new Date(), "yyyy-MM-dd")}.txt`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+      // Formatar mensagens para exportação
+      const exportContent = messagesToExport
+        .map((msg) => {
+          const time = format(msg.timestamp, "HH:mm")
+          const sender = msg.role === "user" ? "Você" : "Jaque"
+          return `[${time}] ${sender}: ${msg.content}`
+        })
+        .join("\n\n")
+
+      const filename = `chat-integrare-${selectedDate || format(new Date(), "yyyy-MM-dd")}.txt`
+
+      // Criar um link temporário para download usando data URI
+      const link = document.createElement("a")
+      link.setAttribute("href", `data:text/plain;charset=utf-8,${encodeURIComponent(exportContent)}`)
+      link.setAttribute("download", filename)
+      link.style.display = "none"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (error) {
+      console.error("Erro ao exportar chat:", error)
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   // Filtrar mensagens pela data selecionada ou mostrar todas
@@ -152,11 +162,11 @@ export default function ChatPage() {
             <button
               onClick={handleExportChat}
               className="flex items-center px-3 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700"
-              disabled={messages.length === 0}
+              disabled={messages.length === 0 || isExporting}
               title="Exportar conversa"
             >
               <Download size={16} className="mr-1" />
-              <span className="hidden sm:inline">Exportar</span>
+              <span className="hidden sm:inline">{isExporting ? "Exportando..." : "Exportar"}</span>
             </button>
             <button
               onClick={() => setShowClearConfirm(true)}

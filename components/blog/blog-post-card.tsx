@@ -1,12 +1,20 @@
 import Link from "next/link"
+import { Clock } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface BlogPostCardProps {
   post: any
+  className?: string
 }
 
-export function BlogPostCard({ post }: BlogPostCardProps) {
+export function BlogPostCard({ post, className }: BlogPostCardProps) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden h-full flex flex-col group">
+    <div
+      className={cn(
+        "bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden h-full flex flex-col group",
+        className,
+      )}
+    >
       <div className="relative h-48 overflow-hidden">
         <img
           src={post.featured_image || "/placeholder.svg?height=200&width=400&query=marketing digital"}
@@ -15,10 +23,11 @@ export function BlogPostCard({ post }: BlogPostCardProps) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
         <div className="absolute bottom-0 left-0 p-4 text-white">
-          <span className="text-xs font-medium bg-[#4b7bb5] px-2 py-1 rounded-full">
-            {post.category?.name || "Sem categoria"}
-          </span>
-          <p className="text-xs mt-2">{new Date(post.published_at).toLocaleDateString("pt-BR")}</p>
+          <Link href={`/blog/categoria/${post.category?.slug || ""}`}>
+            <span className="text-xs font-medium bg-[#4b7bb5] px-2 py-1 rounded-full hover:bg-[#3d649e] transition-colors">
+              {post.category?.name || "Sem categoria"}
+            </span>
+          </Link>
         </div>
       </div>
 
@@ -36,11 +45,14 @@ export function BlogPostCard({ post }: BlogPostCardProps) {
             <img
               src={post.author?.avatar_url || "/placeholder.svg?height=100&width=100&query=profile"}
               alt={post.author?.name || "Autor"}
-              className="w-8 h-8 rounded-full mr-2"
+              className="w-8 h-8 rounded-full mr-2 border-2 border-white shadow-sm"
             />
             <span className="text-sm text-gray-600 dark:text-gray-400">{post.author?.name || "Autor"}</span>
           </div>
-          <span className="text-xs text-gray-500 dark:text-gray-400">{post.read_time} de leitura</span>
+          <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+            <Clock className="h-3 w-3 mr-1" />
+            <span>{post.read_time}</span>
+          </div>
         </div>
       </div>
     </div>

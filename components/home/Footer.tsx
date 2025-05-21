@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button"
 import { Mail, Phone, MapPin, Instagram, Facebook, Linkedin, Youtube } from "lucide-react"
 
 export function Footer() {
@@ -121,9 +120,9 @@ export function Footer() {
               </li>
             </ul>
             <div className="mt-6">
-              <Button variant="outline" className="border-white text-white hover:bg-white/10 w-full">
+              <button className="w-full py-2 px-4 bg-white/10 hover:bg-white/20 transition-colors text-white border border-white/20 rounded-md">
                 Inscreva-se na Newsletter
-              </Button>
+              </button>
             </div>
           </div>
         </div>

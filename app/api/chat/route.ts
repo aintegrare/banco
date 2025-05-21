@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { OpenAI } from "openai"
 
 // Tipo para as mensagens
 interface Message {
@@ -10,14 +11,11 @@ interface Message {
 // Função para esperar um tempo específico (para retry com backoff)
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+// Inicializar cliente OpenAI como fallback
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null
+
 export async function POST(request: NextRequest) {
   try {
-    // Verificar se a chave da API está configurada
-    if (!process.env.ANTHROPIC_API_KEY) {
-      console.error("API Chat: Chave da API Anthropic não configurada")
-      return NextResponse.json({ error: "Configuração incompleta do servidor" }, { status: 500 })
-    }
-
     // Obter a mensagem do corpo da requisição
     const body = await request.json()
     const { message, history = [] } = body
@@ -81,22 +79,23 @@ DIRETRIZES DE RESPOSTA:
 
 Seu objetivo é representar perfeitamente a Integrare, demonstrando expertise em marketing digital e ajudando os usuários com informações valiosas e insights criativos.`
 
-    // Configuração para a API do Claude
-    const requestBody = {
-      model: "claude-3-5-sonnet-20240620", // Usando um modelo mais estável
-      max_tokens: 2000, // Reduzido para diminuir a carga
-      temperature: 0.7, // Reduzido para maior estabilidade
-      system: systemPrompt,
-      messages: messages,
-    }
+    // Tentar usar a API do Claude primeiro
+    let useOpenAIFallback = false
+    const claudeResponse = null
 
-    // Implementar retry com backoff exponencial
-    let retries = 0
-    const maxRetries = 3
-
-    while (retries <= maxRetries) {
+    // Verificar se a chave da API Anthropic está configurada
+    if (process.env.ANTHROPIC_API_KEY) {
       try {
-        console.log(`API Chat: Tentativa ${retries + 1} de ${maxRetries + 1}`)
+        console.log("API Chat: Tentando usar Claude API")
+
+        // Configuração para a API do Claude
+        const requestBody = {
+          model: "claude-3-5-sonnet-20240620",
+          max_tokens: 2000,
+          temperature: 0.7,
+          system: systemPrompt,
+          messages: messages,
+        }
 
         const response = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
@@ -114,65 +113,81 @@ Seu objetivo é representar perfeitamente a Integrare, demonstrando expertise em
           console.log("API Chat: Resposta recebida do Claude com sucesso")
           return NextResponse.json({
             response: data.content[0].text,
+            provider: "claude",
           })
         }
 
-        // Se a resposta não for bem-sucedida, verificar o tipo de erro
+        // Verificar o erro específico
         const errorData = await response.json().catch(() => ({}))
         console.error("API Chat: Erro na resposta da API Claude:", errorData)
 
-        // Se for um erro de sobrecarga, tentar novamente após um tempo
-        if (errorData?.error?.type === "overloaded_error") {
-          retries++
-
-          // Se atingiu o número máximo de tentativas, usar resposta de fallback
-          if (retries > maxRetries) {
-            console.log("API Chat: Número máximo de tentativas atingido, usando resposta de fallback")
-            return NextResponse.json({
-              response:
-                "Desculpe, estou com uma alta demanda no momento. Por favor, tente novamente em alguns instantes ou entre em contato com a equipe da Integrare pelo email contato@integrare.com.br para assistência imediata.",
-            })
-          }
-
-          // Esperar com backoff exponencial antes de tentar novamente
-          const waitTime = Math.pow(2, retries) * 1000
-          console.log(`API Chat: Aguardando ${waitTime}ms antes da próxima tentativa`)
-          await wait(waitTime)
-
-          // Reduzir ainda mais os parâmetros para aumentar chances de sucesso
-          requestBody.max_tokens = Math.max(1000, requestBody.max_tokens - 500)
-
-          // Continuar para a próxima tentativa
-          continue
+        // Se for erro de créditos insuficientes, usar OpenAI como fallback
+        if (
+          errorData?.error?.type === "invalid_request_error" &&
+          errorData?.error?.message?.includes("credit balance is too low")
+        ) {
+          console.log("API Chat: Créditos insuficientes no Claude, usando OpenAI como fallback")
+          useOpenAIFallback = true
+        } else {
+          // Para outros erros, lançar exceção
+          throw new Error(errorData.error?.message || `Erro na API Claude: ${response.status}`)
         }
+      } catch (claudeError) {
+        console.error("API Chat: Erro ao chamar API Claude:", claudeError)
+        useOpenAIFallback = true
+      }
+    } else {
+      console.log("API Chat: Chave da API Claude não configurada, usando OpenAI como fallback")
+      useOpenAIFallback = true
+    }
 
-        // Se for outro tipo de erro, lançar exceção
-        throw new Error(errorData.error?.message || `Erro na API Claude: ${response.status}`)
-      } catch (apiError) {
-        console.error("API Chat: Erro ao chamar API Claude:", apiError)
-        retries++
+    // Usar OpenAI como fallback se necessário
+    if (useOpenAIFallback) {
+      if (!openai) {
+        console.error("API Chat: Fallback para OpenAI falhou - chave da API não configurada")
+        return NextResponse.json({
+          response:
+            "Desculpe, estou temporariamente indisponível devido a problemas técnicos. Por favor, tente novamente mais tarde ou entre em contato com o suporte.",
+        })
+      }
 
-        // Se atingiu o número máximo de tentativas, retornar erro
-        if (retries > maxRetries) {
-          return NextResponse.json(
-            {
-              error: "Erro ao processar sua mensagem após múltiplas tentativas",
-              details: apiError instanceof Error ? apiError.message : String(apiError),
-            },
-            { status: 500 },
-          )
-        }
+      try {
+        console.log("API Chat: Usando OpenAI como fallback")
 
-        // Esperar com backoff exponencial antes de tentar novamente
-        const waitTime = Math.pow(2, retries) * 1000
-        console.log(`API Chat: Aguardando ${waitTime}ms antes da próxima tentativa`)
-        await wait(waitTime)
+        // Converter mensagens para o formato da OpenAI
+        const openAIMessages = [
+          { role: "system", content: systemPrompt },
+          ...messages.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+        ]
+
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: openAIMessages,
+          temperature: 0.7,
+          max_tokens: 2000,
+        })
+
+        console.log("API Chat: Resposta recebida da OpenAI com sucesso")
+        return NextResponse.json({
+          response: completion.choices[0].message.content,
+          provider: "openai",
+        })
+      } catch (openaiError) {
+        console.error("API Chat: Erro ao usar OpenAI como fallback:", openaiError)
+        return NextResponse.json({
+          response:
+            "Desculpe, não consegui processar sua mensagem no momento. Por favor, tente novamente mais tarde ou entre em contato com a equipe da Integrare pelo email contato@integrare.com.br para assistência imediata.",
+        })
       }
     }
 
-    // Fallback final se o loop terminar sem retornar
+    // Fallback final se nenhuma API estiver disponível
     return NextResponse.json({
-      response: "Desculpe, não consegui processar sua mensagem no momento. Por favor, tente novamente mais tarde.",
+      response:
+        "Desculpe, nossos serviços de IA estão temporariamente indisponíveis. Por favor, entre em contato com a equipe da Integrare pelo email contato@integrare.com.br para assistência imediata.",
     })
   } catch (error) {
     console.error("API Chat: Erro geral:", error)
