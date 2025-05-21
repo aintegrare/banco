@@ -139,7 +139,7 @@ importers:
         version: 0.4.6(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       openai:
         specifier: latest
-        version: 4.100.0(ws@8.18.2)(zod@3.25.13)
+        version: 4.100.0(ws@8.18.2)(zod@3.25.17)
       pdf-parse:
         specifier: latest
         version: 1.1.1
@@ -196,7 +196,7 @@ importers:
         version: 8.18.2
       zod:
         specifier: latest
-        version: 3.25.13
+        version: 3.25.17
     devDependencies:
       '@types/node':
         specifier: ^22
@@ -2533,8 +2533,8 @@ packages:
   zlibjs@0.3.1:
     resolution: {integrity: sha512-+J9RrgTKOmlxFSDHo0pI1xM6BLVUv+o0ZT9ANtCxGkjIVCCUdx9alUF8Gm+dGLKbkkkidWIHFDZHDMpfITt4+w==}
 
-  zod@3.25.13:
-    resolution: {integrity: sha512-Q8mvk2iWi7rTDfpQBsu4ziE7A6AxgzJ5hzRyRYQkoV3A3niYsXVwDaP1Kbz3nWav6S+VZ6k2OznFn8ZyDHvIrg==}
+  zod@3.25.17:
+    resolution: {integrity: sha512-8hQzQ/kMOIFbwOgPrm9Sf9rtFHpFUMy4HvN0yEB0spw14aYi0uT5xG5CE2DB9cd51GWNsz+DNO7se1kztHMKnw==}
 
   zustand@4.5.7:
     resolution: {integrity: sha512-CHOUy7mu3lbD6o6LJLfllpjkzhHXSBlX8B9+qPddUsIfeF5S/UZ5q0kmCsnRqT1UHFQZchNFDDzMbQsuesHWlw==}
@@ -4373,7 +4373,7 @@ snapshots:
 
   object-hash@3.0.0: {}
 
-  openai@4.100.0(ws@8.18.2)(zod@3.25.13):
+  openai@4.100.0(ws@8.18.2)(zod@3.25.17):
     dependencies:
       '@types/node': 18.19.103
       '@types/node-fetch': 2.6.12
@@ -4384,7 +4384,7 @@ snapshots:
       node-fetch: 2.7.0
     optionalDependencies:
       ws: 8.18.2
-      zod: 3.25.13
+      zod: 3.25.17
     transitivePeerDependencies:
       - encoding
 
@@ -4902,7 +4902,7 @@ snapshots:
 
   zlibjs@0.3.1: {}
 
-  zod@3.25.13: {}
+  zod@3.25.17: {}
 
   zustand@4.5.7(@types/react@19.0.0)(react@19.0.0):
     dependencies:
