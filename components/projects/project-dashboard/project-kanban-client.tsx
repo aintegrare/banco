@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { CreateTaskDialog } from "@/components/tasks/create-task-dialog"
 import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
 import { useToast } from "@/components/ui/use-toast"
+import { KanbanColumnHeader } from "@/components/tasks/task-status-badge"
 
 // Colunas do quadro Kanban
 const COLUMNS = [
@@ -232,61 +233,66 @@ export function ProjectKanbanClient({ tasks: initialTasks, projectId }: ProjectK
       ) : (
         <DragDropContext onDragEnd={onDragEnd}>
           <div className="flex overflow-x-auto pb-4 -mx-2">
-            {COLUMNS.map((column) => (
-              <div key={column.id} className="flex-shrink-0 w-64 mx-2 first:ml-0 last:mr-0">
-                <div className="bg-gray-100 rounded-lg h-full flex flex-col">
-                  <div className="p-2 font-medium text-sm text-gray-700 border-b border-gray-200 bg-gray-200 rounded-t-lg flex justify-between items-center">
-                    <span>{column.title}</span>
-                    <span className="bg-white text-gray-600 text-xs font-normal py-1 px-2 rounded-full">
-                      {tasksByColumn[column.id]?.length || 0}
-                    </span>
-                  </div>
+            {COLUMNS.map((column) => {
+              const columnTasks = tasksByColumn[column.id] || []
 
-                  <Droppable droppableId={column.id}>
-                    {(provided) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className="flex-grow p-2 overflow-y-auto"
-                        style={{ maxHeight: "300px", minHeight: "100px" }}
-                      >
-                        {tasksByColumn[column.id]?.map((task: Task, index: number) => (
-                          <Draggable key={task.id} draggableId={task.id.toString()} index={index}>
-                            {(provided) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                className="mb-2 last:mb-0"
-                                onClick={() => setEditTaskId(task.id)}
-                              >
-                                <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200 cursor-pointer">
-                                  <div className="flex items-start justify-between">
-                                    <h3 className="text-sm font-medium text-gray-800 line-clamp-2">{task.title}</h3>
-                                    <div
-                                      className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)} ml-2 flex-shrink-0`}
-                                    ></div>
-                                  </div>
-                                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-                                    <div className="flex items-center">
-                                      <div className="w-5 h-5 rounded-full bg-[#4b7bb5] flex items-center justify-center text-white text-xs">
-                                        {task.assignee ? task.assignee.charAt(0).toUpperCase() : "?"}
+              return (
+                <div key={column.id} className="flex-shrink-0 w-64 mx-2 first:ml-0 last:mr-0">
+                  <div className="bg-gray-100 rounded-lg h-full flex flex-col">
+                    <KanbanColumnHeader status={column.id} count={columnTasks.length} />
+
+                    <Droppable droppableId={column.id}>
+                      {(provided) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          className={`flex-grow p-2 overflow-y-auto ${columnTasks.length === 0 ? "flex items-center justify-center" : ""}`}
+                          style={{ maxHeight: "300px", minHeight: "100px" }}
+                        >
+                          {columnTasks.length > 0 ? (
+                            columnTasks.map((task: Task, index: number) => (
+                              <Draggable key={task.id} draggableId={task.id.toString()} index={index}>
+                                {(provided) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className="mb-2 last:mb-0"
+                                    onClick={() => setEditTaskId(task.id)}
+                                  >
+                                    <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200 cursor-pointer">
+                                      <div className="flex items-start justify-between">
+                                        <h3 className="text-sm font-medium text-gray-800 line-clamp-2">{task.title}</h3>
+                                        <div
+                                          className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)} ml-2 flex-shrink-0`}
+                                        ></div>
+                                      </div>
+                                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                                        <div className="flex items-center">
+                                          <div className="w-5 h-5 rounded-full bg-[#4b7bb5] flex items-center justify-center text-white text-xs">
+                                            {task.assignee ? task.assignee.charAt(0).toUpperCase() : "?"}
+                                          </div>
+                                        </div>
+                                        <div className="text-xs text-gray-500">{formatDate(task.due_date)}</div>
                                       </div>
                                     </div>
-                                    <div className="text-xs text-gray-500">{formatDate(task.due_date)}</div>
                                   </div>
-                                </div>
-                              </div>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
+                                )}
+                              </Draggable>
+                            ))
+                          ) : (
+                            <div className="text-center text-gray-500 text-sm p-2">
+                              Arraste tarefas para esta coluna
+                            </div>
+                          )}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </DragDropContext>
       )}

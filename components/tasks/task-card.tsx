@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { EditTaskDialog } from "./edit-task-dialog"
 import { DeleteTaskConfirmation } from "./delete-task-confirmation"
+import { TaskStatusBadge } from "./task-status-badge"
 
 // Lista de projetos disponíveis para simulação
 const PROJECTS = [
@@ -48,36 +49,6 @@ export function TaskCard({ task, onEdit, onDelete, onStatusChange, showProject =
         return "bg-green-100 text-green-800 hover:bg-green-200"
       default:
         return "bg-gray-100 text-gray-800 hover:bg-gray-200"
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "todo":
-        return "bg-gray-100 text-gray-800 hover:bg-gray-200"
-      case "in-progress":
-        return "bg-blue-100 text-blue-800 hover:bg-blue-200"
-      case "review":
-        return "bg-purple-100 text-purple-800 hover:bg-purple-200"
-      case "done":
-        return "bg-green-100 text-green-800 hover:bg-green-200"
-      default:
-        return "bg-gray-100 text-gray-800 hover:bg-gray-200"
-    }
-  }
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "todo":
-        return "A Fazer"
-      case "in-progress":
-        return "Em Progresso"
-      case "review":
-        return "Em Revisão"
-      case "done":
-        return "Concluído"
-      default:
-        return status
     }
   }
 
@@ -167,9 +138,7 @@ export function TaskCard({ task, onEdit, onDelete, onStatusChange, showProject =
           {task.description && <p className="text-sm text-gray-600 mb-3 line-clamp-2">{task.description}</p>}
 
           <div className="flex flex-wrap gap-2 mb-3">
-            <Badge variant="secondary" className={getStatusColor(task.status)}>
-              {getStatusLabel(task.status)}
-            </Badge>
+            <TaskStatusBadge status={task.status} size="sm" />
             <Badge variant="secondary" className={getPriorityColor(task.priority)}>
               {getPriorityLabel(task.priority)}
             </Badge>

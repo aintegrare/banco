@@ -815,16 +815,8 @@ export function getBunnyPublicUrl(filePath: string): string {
   // Normalizar o caminho do arquivo
   const normalizedPath = filePath.replace(/\/+/g, "/").replace(/^\//, "")
 
-  // CORREÇÃO CRÍTICA: Garantir que o caminho inclua "documents/clientes"
-  if (normalizedPath.includes("documents/") && !normalizedPath.includes("documents/clientes/")) {
-    // Se contém "documents" mas não "documents/clientes", inserir "clientes" após "documents"
-    const pathParts = normalizedPath.split("documents/")
-    if (pathParts.length > 1) {
-      const newPath = `documents/clientes/${pathParts[1]}`
-      console.log(`Bunny URL: Corrigindo caminho de ${normalizedPath} para ${newPath}`)
-      return `${BUNNY_PULLZONE_URL}/${newPath}`
-    }
-  }
+  // CORREÇÃO: Não forçar mais o caminho "documents/clientes"
+  // Apenas verificar se o caminho está correto e normalizar
 
   // Remover qualquer prefixo "zona-de-guardar/" se existir
   const cleanPath = normalizedPath.replace(/^zona-de-guardar\//, "")

@@ -2,12 +2,13 @@
 
 import { useState } from "react"
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd"
-import { Filter, Search } from "lucide-react"
+import { Filter, Search, HelpCircle } from "lucide-react"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
+import { KanbanColumnHeader, STATUS_CONFIG } from "./task-status-badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 // Colunas do quadro Kanban
 const COLUMNS = [
@@ -113,7 +114,6 @@ export function TasksKanbanView({
     }
   }
 
-  // Atualizar a função onDragEnd para usar o método PATCH
   const onDragEnd = (result: any) => {
     if (!result) return
 
@@ -178,67 +178,91 @@ export function TasksKanbanView({
               </Select>
             </div>
           </div>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-gray-500">
+                  <HelpCircle size={16} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-sm">
+                <div className="space-y-2 p-1">
+                  <p className="font-medium">Como usar o Kanban:</p>
+                  <ul className="text-sm space-y-1">
+                    <li>• Arraste e solte tarefas entre colunas para mudar seu status</li>
+                    <li>• Clique em uma tarefa para editar seus detalhes</li>
+                    <li>• Use os filtros para encontrar tarefas específicas</li>
+                  </ul>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
 
       <DragDropContext onDragEnd={onDragEnd}>
         <div className="flex overflow-x-auto pb-4 p-4 h-full" style={{ minHeight: "calc(100vh - 300px)" }}>
-          {COLUMNS.map((column) => (
-            <div key={column.id} className="flex-shrink-0 w-80 mx-2 first:ml-0 last:mr-0">
-              <div className="bg-gray-100 rounded-lg shadow-sm h-full flex flex-col">
-                <div className="p-3 font-medium text-gray-700 border-b border-gray-200 bg-gray-200 rounded-t-lg flex justify-between items-center">
-                  <span>{column.title}</span>
-                  <Badge variant="secondary" className="bg-white text-gray-600">
-                    {(tasksByColumn[column.id] || []).length}
-                  </Badge>
+          {COLUMNS.map((column) => {
+            const columnTasks = tasksByColumn[column.id] || []
+            const config = STATUS_CONFIG[column.id]
+
+            return (
+              <div key={column.id} className="flex-shrink-0 w-80 mx-2 first:ml-0 last:mr-0">
+                <div className="bg-gray-100 rounded-lg shadow-sm h-full flex flex-col">
+                  <KanbanColumnHeader status={column.id} count={columnTasks.length} />
+
+                  <Droppable droppableId={column.id}>
+                    {(provided) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`flex-grow p-2 overflow-y-auto ${columnTasks.length === 0 ? "flex items-center justify-center" : ""}`}
+                        style={{ minHeight: "100px" }}
+                      >
+                        {columnTasks.length > 0 ? (
+                          columnTasks.map((task: any, index: number) => {
+                            if (!task || !task.id) return null
+
+                            return (
+                              <Draggable key={task.id} draggableId={String(task.id)} index={index}>
+                                {(provided) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className="mb-2 last:mb-0"
+                                    onClick={(e) => {
+                                      // Impedir que o evento de clique se propague para o draggable
+                                      e.stopPropagation()
+                                    }}
+                                  >
+                                    <TaskCard
+                                      task={{
+                                        ...task,
+                                        projectName: safeGetProjectName(task.project_id),
+                                      }}
+                                      onEdit={() => handleEditTask(task.id)}
+                                      onDelete={handleDeleteTask}
+                                      onStatusChange={handleStatusChange}
+                                      showProject={true}
+                                    />
+                                  </div>
+                                )}
+                              </Draggable>
+                            )
+                          })
+                        ) : (
+                          <div className="text-center text-gray-500 text-sm p-4">Arraste tarefas para esta coluna</div>
+                        )}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
                 </div>
-
-                <Droppable droppableId={column.id}>
-                  {(provided) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className="flex-grow p-2 overflow-y-auto"
-                      style={{ minHeight: "100px" }}
-                    >
-                      {(tasksByColumn[column.id] || []).map((task: any, index: number) => {
-                        if (!task || !task.id) return null
-
-                        return (
-                          <Draggable key={task.id} draggableId={String(task.id)} index={index}>
-                            {(provided) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                className="mb-2 last:mb-0"
-                                onClick={(e) => {
-                                  // Impedir que o evento de clique se propague para o draggable
-                                  e.stopPropagation()
-                                }}
-                              >
-                                <TaskCard
-                                  task={{
-                                    ...task,
-                                    projectName: safeGetProjectName(task.project_id),
-                                  }}
-                                  onEdit={() => handleEditTask(task.id)}
-                                  onDelete={handleDeleteTask}
-                                  onStatusChange={handleStatusChange}
-                                  showProject={true}
-                                />
-                              </div>
-                            )}
-                          </Draggable>
-                        )
-                      })}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </DragDropContext>
     </div>

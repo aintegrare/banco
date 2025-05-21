@@ -233,7 +233,9 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   }
 }
 
-// Modificar a função updateTask para lidar corretamente com o campo updated_at
+/**
+ * Atualiza uma tarefa existente
+ */
 export async function updateTask(id: number, input: UpdateTaskInput): Promise<Task> {
   try {
     const supabase = createClient()
@@ -290,7 +292,10 @@ export async function deleteTask(id: number): Promise<void> {
   }
 }
 
-// Adicionar uma função específica para atualizar apenas o status da tarefa
+/**
+ * Atualiza o status de uma tarefa
+ * Versão corrigida para evitar o erro "record 'new' has no field 'updated_at'"
+ */
 export async function updateTaskStatus(id: number, status: string): Promise<Task> {
   try {
     // Converter status do frontend para o formato do banco
@@ -299,13 +304,25 @@ export async function updateTaskStatus(id: number, status: string): Promise<Task
 
     const supabase = createClient()
 
-    // Usar um objeto simples com apenas os campos necessários
+    // Primeiro, verificar se a tarefa existe
+    const { data: existingTask, error: fetchError } = await supabase.from("tasks").select("*").eq("id", id).single()
+
+    if (fetchError) {
+      console.error(`Erro ao buscar tarefa ${id} para atualização de status:`, fetchError)
+      throw new Error(fetchError.message)
+    }
+
+    if (!existingTask) {
+      throw new Error(`Tarefa com ID ${id} não encontrada para atualização de status`)
+    }
+
+    // Criar um objeto de atualização simples e explícito
     const updateData = {
       status: dbStatus,
       updated_at: new Date().toISOString(),
     }
 
-    // Modificado para não usar .single() e tratar o resultado manualmente
+    // Atualizar a tarefa com o novo status
     const { data, error } = await supabase.from("tasks").update(updateData).eq("id", id).select()
 
     if (error) {
@@ -314,7 +331,7 @@ export async function updateTaskStatus(id: number, status: string): Promise<Task
     }
 
     if (!data || data.length === 0) {
-      throw new Error(`Tarefa com ID ${id} não encontrada para atualização de status`)
+      throw new Error(`Tarefa com ID ${id} não encontrada após atualização de status`)
     }
 
     // Usar o primeiro resultado encontrado
