@@ -1,104 +1,176 @@
 "use client"
 
 import { useState } from "react"
-import { Copy, Check, X, Link, Share2 } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Copy, Check, Link2 } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 
 interface ShareLinkDialogProps {
   isOpen: boolean
   onClose: () => void
-  fileUrl: string
-  fileName: string
+  item: {
+    name: string
+    path: string
+    type: "folder" | "file"
+    url?: string
+  } | null
 }
 
-export function ShareLinkDialog({ isOpen, onClose, fileUrl, fileName }: ShareLinkDialogProps) {
+export default function ShareLinkDialog({ isOpen, onClose, item }: ShareLinkDialogProps) {
   const [copied, setCopied] = useState(false)
+  const [shareLink, setShareLink] = useState("")
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false)
+  const [expiryDays, setExpiryDays] = useState(7)
+  const [isPasswordProtected, setIsPasswordProtected] = useState(false)
+  const [password, setPassword] = useState("")
+  const [isPublic, setIsPublic] = useState(true)
 
-  if (!isOpen) return null
+  // Gerar link de compartilhamento
+  const generateShareLink = async () => {
+    if (!item) return
 
-  const handleCopy = async () => {
+    setIsGeneratingLink(true)
+
     try {
-      await navigator.clipboard.writeText(fileUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error("Falha ao copiar texto: ", err)
+      // Para arquivos, podemos usar a URL direta
+      if (item.type === "file" && item.url) {
+        setShareLink(item.url)
+      }
+      // Para pastas, precisamos criar um link especial
+      else if (item.type === "folder") {
+        // Aqui você pode implementar a lógica para gerar um token único
+        // e armazenar no banco de dados com as informações da pasta
+        const response = await fetch("/api/files/share", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            path: item.path,
+            type: item.type,
+            expiryDays,
+            isPasswordProtected,
+            password: isPasswordProtected ? password : undefined,
+            isPublic,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error("Falha ao gerar link de compartilhamento")
+        }
+
+        const data = await response.json()
+
+        // Para pastas, criamos um link para nossa página de visualização de pasta compartilhada
+        if (item.type === "folder") {
+          const baseUrl = window.location.origin
+          setShareLink(`${baseUrl}/shared-folder/${data.token}?path=${encodeURIComponent(item.path)}`)
+        } else {
+          setShareLink(data.url)
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao gerar link de compartilhamento:", error)
+      alert("Erro ao gerar link de compartilhamento. Tente novamente.")
+    } finally {
+      setIsGeneratingLink(false)
     }
   }
 
+  // Copiar link para a área de transferência
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(shareLink)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
-    <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <div
-        className="bg-white rounded-lg max-w-md w-full overflow-hidden shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="p-4 border-b flex justify-between items-center">
-          <h3 className="font-medium flex items-center">
-            <Share2 className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-            Compartilhar arquivo
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="p-4">
-          <p className="text-sm text-gray-600 mb-3">
-            Compartilhe <span className="font-medium">{fileName}</span> usando o link abaixo:
-          </p>
-          <div className="flex items-center">
-            <div className="flex-1 relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Link className="h-4 w-4 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                value={fileUrl}
-                readOnly
-                className="block w-full pl-10 pr-12 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-[#4b7bb5] focus:border-[#4b7bb5] bg-gray-50 text-sm"
-              />
-              <button
-                onClick={handleCopy}
-                className={`absolute inset-y-0 right-0 pr-3 flex items-center ${
-                  copied ? "text-green-500" : "text-gray-400 hover:text-[#4b7bb5]"
-                }`}
-                title={copied ? "Copiado!" : "Copiar link"}
-              >
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              </button>
-            </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Compartilhar {item?.type === "folder" ? "Pasta" : "Arquivo"}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Nome</Label>
+            <div className="text-sm text-gray-700">{item?.name}</div>
           </div>
+
+          <div className="space-y-2">
+            <Label>Tipo</Label>
+            <div className="text-sm text-gray-700 capitalize">{item?.type}</div>
+          </div>
+
+          {item?.type === "folder" && (
+            <>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="expiry">Expirar após (dias)</Label>
+                <Input
+                  id="expiry"
+                  type="number"
+                  min="1"
+                  max="30"
+                  value={expiryDays}
+                  onChange={(e) => setExpiryDays(Number.parseInt(e.target.value))}
+                  className="w-20"
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label htmlFor="public-switch">Link público</Label>
+                <Switch id="public-switch" checked={isPublic} onCheckedChange={setIsPublic} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password-switch">Proteger com senha</Label>
+                <Switch id="password-switch" checked={isPasswordProtected} onCheckedChange={setIsPasswordProtected} />
+              </div>
+
+              {isPasswordProtected && (
+                <div className="space-y-2">
+                  <Label htmlFor="password">Senha</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Digite uma senha"
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          {!shareLink && (
+            <Button onClick={generateShareLink} className="w-full" disabled={isGeneratingLink}>
+              <Link2 className="mr-2 h-4 w-4" />
+              {isGeneratingLink ? "Gerando..." : "Gerar Link de Compartilhamento"}
+            </Button>
+          )}
+
+          {shareLink && (
+            <div className="space-y-2">
+              <Label>Link de compartilhamento</Label>
+              <div className="flex">
+                <Input value={shareLink} readOnly className="flex-1" />
+                <Button type="button" size="icon" variant="outline" onClick={copyToClipboard} className="ml-2">
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
-        <div className="p-4 bg-gray-50 flex justify-between items-center">
-          <p className="text-xs text-gray-500">O link é público e pode ser acessado por qualquer pessoa.</p>
-          <button
-            onClick={handleCopy}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              copied
-                ? "bg-green-100 text-green-800 border border-green-200"
-                : "bg-[#4b7bb5] text-white hover:bg-[#3d649e]"
-            }`}
-          >
-            {copied ? (
-              <>
-                <Check className="h-4 w-4 mr-1.5 inline" />
-                Copiado!
-              </>
-            ) : (
-              <>
-                <Copy className="h-4 w-4 mr-1.5 inline" />
-                Copiar link
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
+
+        <DialogFooter className="sm:justify-end">
+          <Button variant="outline" onClick={onClose}>
+            Fechar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
