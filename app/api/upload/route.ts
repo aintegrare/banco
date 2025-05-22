@@ -37,13 +37,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Nenhum arquivo enviado" }, { status: 400 })
     }
 
-    // Verificar tamanho do arquivo (500MB para vídeos, 100MB para outros)
-    const maxSize = isVideo || file.type.startsWith("video/") ? 500 * 1024 * 1024 : 100 * 1024 * 1024
+    // Verificar tamanho do arquivo (100MB para todos os tipos de arquivo)
+    const maxSize = 100 * 1024 * 1024 // 100MB para todos os tipos de arquivo
     if (file.size > maxSize) {
       console.error(`API Upload: Arquivo muito grande - ${file.size} bytes`)
       return NextResponse.json(
         {
-          error: `O arquivo excede o tamanho máximo de ${isVideo ? "500MB" : "100MB"}.`,
+          error: `O arquivo excede o tamanho máximo de 100MB.`,
         },
         { status: 400 },
       )
