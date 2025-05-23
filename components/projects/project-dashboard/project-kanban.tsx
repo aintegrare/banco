@@ -1,294 +1,314 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { DragDropContext } from "react-beautiful-dnd"
-import Link from "next/link"
-import { ArrowRight, Plus, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { CreateTaskDialog } from "@/components/tasks/create-task-dialog"
-import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
-import { useToast } from "@/components/ui/use-toast"
-
-// Colunas do quadro Kanban
-const COLUMNS = [
-  { id: "backlog", title: "Backlog" },
-  { id: "todo", title: "A Fazer" },
-  { id: "in-progress", title: "Em Progresso" },
-  { id: "review", title: "Em Revisão" },
-  { id: "done", title: "Concluído" },
-]
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd"
 
 interface Task {
-  id: string | number
+  id: number
   title: string
+  description?: string | null
   status: string
-  assignee?: string
-  priority: string
-  due_date?: string
-  project_id: string | number
+  priority?: string
+  project_id?: number | null
+  due_date?: string | null
 }
 
 interface ProjectKanbanProps {
-  tasks: Task[]
-  projectId: string | number
+  projectId: number
+  className?: string
 }
 
-export function ProjectKanban({ tasks: initialTasks, projectId }: ProjectKanbanProps) {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks || [])
+const COLUMNS = [
+  { id: "backlog", title: "Backlog", color: "bg-gray-100" },
+  { id: "todo", title: "A Fazer", color: "bg-blue-100" },
+  { id: "in_progress", title: "Em Progresso", color: "bg-yellow-100" },
+  { id: "review", title: "Em Revisão", color: "bg-purple-100" },
+  { id: "done", title: "Concluído", color: "bg-green-100" },
+]
+
+export function ProjectKanban({ projectId, className = "" }: ProjectKanbanProps) {
+  const [tasks, setTasks] = useState<Task[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [isUpdating, setIsUpdating] = useState(false)
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [editTaskId, setEditTaskId] = useState<string | number | null>(null)
-  const { toast } = useToast()
+  const [error, setError] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
-  // Buscar tarefas do projeto
-  useEffect(() => {
-    const fetchTasks = async () => {
-      if (!projectId) return
+  // Função para buscar tarefas do projeto - COM VALIDAÇÃO ROBUSTA
+  const fetchTasks = async () => {
+    setIsLoading(true)
+    setError(null)
 
-      setIsLoading(true)
-      try {
-        // Corrigido: Usar project_id em vez de projectId no parâmetro da URL
-        const response = await fetch(`/api/tasks?project_id=${projectId}`)
-        if (!response.ok) {
-          throw new Error("Falha ao buscar tarefas")
-        }
-        const data = await response.json()
-        console.log("Tarefas carregadas para o projeto", projectId, ":", data.length, "tarefas")
+    try {
+      console.log(`🔄 [PROJECT-KANBAN] Carregando tarefas do projeto ${projectId}`)
 
-        // Filtrar explicitamente para garantir que apenas tarefas deste projeto sejam exibidas
-        const filteredTasks = data.filter(
-          (task: Task) => task.project_id && task.project_id.toString() === projectId.toString(),
-        )
-        console.log("Tarefas filtradas:", filteredTasks.length, "tarefas")
+      const response = await fetch(`/api/tasks?project_id=${projectId}`)
+      const result = await response.json()
 
-        setTasks(filteredTasks)
-      } catch (error: any) {
-        console.error("Erro ao buscar tarefas:", error)
-        toast({
-          title: "Erro",
-          description: "Não foi possível carregar as tarefas do projeto",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
+      console.log(`📋 [PROJECT-KANBAN] Resposta da API:`, result)
+
+      if (!response.ok) {
+        throw new Error(`Erro HTTP ${response.status}: ${result.error || "Erro desconhecido"}`)
       }
+
+      if (!result.success) {
+        throw new Error(result.error || "Erro ao buscar tarefas")
+      }
+
+      // VALIDAÇÃO ROBUSTA: Garantir que sempre temos um array
+      let tasksData = []
+
+      if (result.data) {
+        if (Array.isArray(result.data)) {
+          tasksData = result.data
+        } else if (typeof result.data === "object" && result.data.tasks && Array.isArray(result.data.tasks)) {
+          tasksData = result.data.tasks
+        } else if (typeof result.data === "object") {
+          // Se for um objeto, tenta extrair o primeiro array encontrado
+          const arrayValues = Object.values(result.data).filter(Array.isArray)
+          if (arrayValues.length > 0) {
+            tasksData = arrayValues[0] as Task[]
+          }
+        }
+      }
+
+      // Filtrar apenas tarefas válidas
+      const validTasks = tasksData
+        .filter((task) => task && typeof task === "object" && task.id)
+        .map((task) => ({
+          ...task,
+          id: Number.parseInt(task.id.toString(), 10),
+          status: task.status || "todo",
+          project_id: Number.parseInt(task.project_id?.toString() || "0", 10) || null,
+        }))
+        .filter((task) => !isNaN(task.id) && task.id > 0)
+
+      console.log(`✅ [PROJECT-KANBAN] ${validTasks.length} tarefas válidas carregadas`)
+      setTasks(validTasks)
+    } catch (err: any) {
+      console.error(`❌ [PROJECT-KANBAN] Erro ao buscar tarefas:`, err)
+      setError(err.message)
+      setTasks([]) // Garantir que sempre é um array
+    } finally {
+      setIsLoading(false)
     }
-
-    fetchTasks()
-  }, [projectId, toast])
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "Sem data"
-    const date = new Date(dateString)
-    return date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-    })
   }
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return "bg-red-500"
-      case "medium":
-        return "bg-orange-500"
-      case "low":
-        return "bg-green-500"
-      default:
-        return "bg-gray-500"
+  // Atualizar status da tarefa
+  const updateTaskStatus = async (taskId: number, newStatus: string) => {
+    try {
+      console.log(`🔄 [PROJECT-KANBAN] Atualizando tarefa ${taskId} para ${newStatus}`)
+
+      // Atualização otimista
+      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)))
+
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || "Erro ao atualizar status")
+      }
+
+      // Confirmar atualização
+      setTasks((prev) => prev.map((task) => (task.id === taskId ? result.data : task)))
+
+      console.log(`✅ [PROJECT-KANBAN] Status atualizado`)
+    } catch (err: any) {
+      console.error(`❌ [PROJECT-KANBAN] Erro ao atualizar status:`, err)
+      // Reverter mudança otimista
+      await fetchTasks()
+      throw err
     }
   }
 
-  const onDragEnd = async (result: any) => {
+  // Handle drag end
+  const handleDragEnd = async (result: DropResult) => {
+    setIsDragging(false)
+
     const { destination, source, draggableId } = result
 
-    // Se não houver destino ou se o destino for o mesmo que a origem, não fazer nada
     if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) {
       return
     }
 
     try {
-      // Encontrar a tarefa que está sendo movida
-      const taskToUpdate = tasks.find((task) => task.id.toString() === draggableId)
+      const taskId = Number.parseInt(draggableId, 10)
+      if (isNaN(taskId)) throw new Error(`ID inválido: ${draggableId}`)
 
-      if (!taskToUpdate) {
-        console.error("Tarefa não encontrada:", draggableId)
-        toast({
-          title: "Erro",
-          description: "Tarefa não encontrada",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Atualizar o status da tarefa localmente
-      const updatedTasks = tasks.map((task) => {
-        if (task.id.toString() === draggableId) {
-          return { ...task, status: destination.droppableId }
-        }
-        return task
-      })
-
-      // Atualizar o estado local imediatamente para feedback visual
-      setTasks(updatedTasks)
-      setIsUpdating(true)
-
-      // Atualizar o status da tarefa no servidor
-      const response = await fetch(`/api/tasks/${draggableId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...taskToUpdate,
-          status: destination.droppableId,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Falha ao atualizar status da tarefa")
-      }
-
-      toast({
-        title: "Status atualizado",
-        description: "O status da tarefa foi atualizado com sucesso",
-      })
+      const newStatus = destination.droppableId
+      await updateTaskStatus(taskId, newStatus)
     } catch (error: any) {
-      console.error("Erro ao atualizar status da tarefa:", error)
-
-      // Reverter a alteração local em caso de erro
-      setTasks(tasks)
-
-      toast({
-        title: "Erro",
-        description: error.message || "Não foi possível atualizar o status da tarefa",
-        variant: "destructive",
-      })
-    } finally {
-      setIsUpdating(false)
+      console.error("❌ [PROJECT-KANBAN] Erro no drag and drop:", error)
+      setError(error.message)
     }
   }
 
-  const handleTaskCreated = (newTask: Task) => {
-    // Verificar se a tarefa pertence a este projeto antes de adicioná-la
-    if (newTask.project_id && newTask.project_id.toString() === projectId.toString()) {
-      setTasks((prevTasks) => [newTask, ...prevTasks])
-      toast({
-        title: "Tarefa criada",
-        description: "A tarefa foi criada com sucesso!",
-      })
+  // Organizar tarefas por status
+  const tasksByStatus = tasks.reduce(
+    (acc, task) => {
+      const status = task.status || "todo"
+      if (!acc[status]) acc[status] = []
+      acc[status].push(task)
+      return acc
+    },
+    {} as Record<string, Task[]>,
+  )
+
+  // Carregar tarefas quando componente monta ou projectId muda
+  useEffect(() => {
+    if (projectId) {
+      fetchTasks()
     }
+  }, [projectId])
+
+  if (isLoading) {
+    return (
+      <div className={`flex items-center justify-center p-8 ${className}`}>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        <span className="ml-2">Carregando tarefas do projeto...</span>
+      </div>
+    )
   }
 
-  const handleTaskUpdated = (updatedTask: Task) => {
-    // Verificar se a tarefa pertence a este projeto
-    if (updatedTask.project_id && updatedTask.project_id.toString() === projectId.toString()) {
-      setTasks((prevTasks) => prevTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task)))
-      toast({
-        title: "Tarefa atualizada",
-        description: "A tarefa foi atualizada com sucesso!",
-      })
-    } else {
-      // Se a tarefa foi movida para outro projeto, removê-la da lista
-      setTasks((prevTasks) => prevTasks.filter((task) => task.id !== updatedTask.id))
-      toast({
-        title: "Tarefa movida",
-        description: "A tarefa foi movida para outro projeto!",
-      })
-    }
+  if (error) {
+    return (
+      <div className={`p-4 bg-red-50 border border-red-200 rounded-lg ${className}`}>
+        <p className="text-red-600 font-medium">❌ {error}</p>
+        <button onClick={fetchTasks} className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+          🔄 Tentar Novamente
+        </button>
+      </div>
+    )
   }
-
-  // Organizar tarefas por coluna
-  const tasksByColumn = COLUMNS.reduce((acc: any, column) => {
-    acc[column.id] = tasks.filter((task) => task.status === column.id)
-    return acc
-  }, {})
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-medium text-gray-800">Quadro Kanban</h2>
-        <div className="flex items-center space-x-2">
-          <Link
-            href={`/tarefas?projeto=${projectId}`}
-            className="inline-flex items-center text-sm text-[#4b7bb5] hover:underline mr-2"
-          >
-            Ver quadro completo
-            <ArrowRight size={16} className="ml-1" />
-          </Link>
-
-          <Button size="sm" onClick={() => setIsCreateDialogOpen(true)} className="bg-[#4b7bb5] hover:bg-[#3d649e]">
-            <Plus size={16} className="mr-1" />
-            Nova
-          </Button>
+    <div className={`w-full ${className}`}>
+      {/* Header */}
+      <div className="mb-4 p-3 bg-green-50 rounded-lg">
+        <div className="flex items-center justify-between">
+          <h3 className="font-medium text-green-800">📋 Kanban do Projeto #{projectId}</h3>
+          <div className="text-sm text-green-600">
+            {tasks.length} tarefa{tasks.length !== 1 ? "s" : ""}
+          </div>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center items-center py-12">
-          <Loader2 size={30} className="text-[#4b7bb5] animate-spin" />
-        </div>
-      ) : (
-        <DragDropContext onDragEnd={onDragEnd}>
-          <div className="flex overflow-x-auto pb-4 -mx-2">
-            {COLUMNS.map((column) => (
-              <div key={column.id} className="flex-shrink-0 w-64 mx-2 first:ml-0 last:mr-0">
-                <div className="bg-gray-100 rounded-lg h-full flex flex-col">
-                  <div className="p-2 font-medium text-sm text-gray-700 border-b border-gray-200 bg-gray-200 rounded-t-lg flex justify-between items-center">
-                    <span>{column.title}</span>
-                    <span className="bg-white text-gray-600 text-xs font-normal py-1 px-2 rounded-full">
-                      {tasksByColumn[column.id]?.length || 0}
+      <DragDropContext onDragStart={() => setIsDragging(true)} onDragEnd={handleDragEnd}>
+        <div className="flex gap-4 overflow-x-auto min-h-96 pb-4">
+          {COLUMNS.map((column) => {
+            const columnTasks = tasksByStatus[column.id] || []
+
+            return (
+              <div key={column.id} className="flex-shrink-0 w-80">
+                {/* Header da coluna */}
+                <div className={`${column.color} p-3 rounded-t-lg border-b`}>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-gray-800">{column.title}</h4>
+                    <span className="bg-white px-2 py-1 rounded-full text-xs font-medium text-gray-600">
+                      {columnTasks.length}
                     </span>
                   </div>
-
-                  <div className="flex-grow p-2 overflow-y-auto" style={{ maxHeight: "300px", minHeight: "100px" }}>
-                    {tasksByColumn[column.id]?.map((task: Task, index: number) => (
-                      <div key={task.id} className="mb-2 last:mb-0" onClick={() => setEditTaskId(task.id)}>
-                        <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200 cursor-pointer">
-                          <div className="flex items-start justify-between">
-                            <h3 className="text-sm font-medium text-gray-800 line-clamp-2">{task.title}</h3>
-                            <div
-                              className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)} ml-2 flex-shrink-0`}
-                            ></div>
-                          </div>
-                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-                            <div className="flex items-center">
-                              <div className="w-5 h-5 rounded-full bg-[#4b7bb5] flex items-center justify-center text-white text-xs">
-                                {task.assignee ? task.assignee.charAt(0).toUpperCase() : "?"}
-                              </div>
-                            </div>
-                            <div className="text-xs text-gray-500">{formatDate(task.due_date)}</div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
+
+                {/* Lista de tarefas */}
+                <Droppable droppableId={column.id}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={`
+                        min-h-96 p-3 bg-gray-50 rounded-b-lg border border-t-0
+                        ${snapshot.isDraggedOver ? "bg-blue-50" : ""}
+                        ${isDragging ? "border-blue-300" : "border-gray-200"}
+                      `}
+                    >
+                      {columnTasks.map((task, index) => (
+                        <Draggable key={task.id} draggableId={task.id.toString()} index={index}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              className={`
+                                bg-white rounded-lg p-3 mb-3 border shadow-sm
+                                hover:shadow-md transition-shadow cursor-pointer
+                                ${snapshot.isDragging ? "shadow-lg rotate-2" : ""}
+                              `}
+                            >
+                              <ProjectTaskCard task={task} />
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+
+                      {/* Empty state */}
+                      {columnTasks.length === 0 && (
+                        <div className="text-center py-8 text-gray-400">
+                          <p className="text-sm">Nenhuma tarefa</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Droppable>
               </div>
-            ))}
-          </div>
-        </DragDropContext>
-      )}
-
-      {/* Diálogo de criação de tarefa */}
-      <CreateTaskDialog
-        isOpen={isCreateDialogOpen}
-        onClose={() => setIsCreateDialogOpen(false)}
-        initialProject={projectId}
-        onTaskCreated={handleTaskCreated}
-      />
-
-      {/* Diálogo de edição de tarefa */}
-      {editTaskId && (
-        <EditTaskDialog
-          isOpen={!!editTaskId}
-          onClose={() => setEditTaskId(null)}
-          taskId={editTaskId}
-          onSave={handleTaskUpdated}
-        />
-      )}
+            )
+          })}
+        </div>
+      </DragDropContext>
     </div>
   )
 }
+
+// Componente de card para tarefa do projeto
+function ProjectTaskCard({ task }: { task: Task }) {
+  const priorityColors = {
+    low: "bg-green-100 text-green-800",
+    medium: "bg-yellow-100 text-yellow-800",
+    high: "bg-orange-100 text-orange-800",
+    urgent: "bg-red-100 text-red-800",
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Header com ID */}
+      <div className="flex items-center justify-between text-xs text-gray-400">
+        <span>#{task.id}</span>
+        <span className="font-mono">{task.status}</span>
+      </div>
+
+      {/* Título */}
+      <h5 className="font-medium text-gray-900 line-clamp-2">{task.title}</h5>
+
+      {/* Descrição */}
+      {task.description && <p className="text-sm text-gray-600 line-clamp-2">{task.description}</p>}
+
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-2">
+        {/* Prioridade */}
+        {task.priority && (
+          <span
+            className={`
+            px-2 py-1 rounded-full text-xs font-medium
+            ${priorityColors[task.priority as keyof typeof priorityColors] || "bg-gray-100 text-gray-800"}
+          `}
+          >
+            {task.priority}
+          </span>
+        )}
+
+        {/* Data de vencimento */}
+        {task.due_date && (
+          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+            📅 {new Date(task.due_date).toLocaleDateString("pt-BR")}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default ProjectKanban
