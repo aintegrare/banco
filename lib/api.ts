@@ -391,6 +391,144 @@ export function splitTextIntoChunks(text: string, chunkSize: number) {
   return chunks
 }
 
+// Função para criar diretório
+export async function createDirectory(parentDirectory: string, directoryName: string) {
+  try {
+    console.log(`API: Criando diretório: ${directoryName} em ${parentDirectory}`)
+
+    const response = await fetch("/api/create-directory", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        directory: parentDirectory ? `${parentDirectory}/${directoryName}` : directoryName,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Erro ao criar diretório: ${response.status}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Erro ao criar diretório:", error)
+    throw error
+  }
+}
+
+// Função para obter lista de arquivos
+export async function getFiles(directory: string) {
+  try {
+    const response = await fetch(`/api/files?directory=${encodeURIComponent(directory)}`)
+
+    if (!response.ok) {
+      throw new Error(`Erro ao buscar arquivos: ${response.status}`)
+    }
+
+    const data = await response.json()
+    return data.files || []
+  } catch (error) {
+    console.error("Erro ao buscar arquivos:", error)
+    throw error
+  }
+}
+
+// Função para fazer upload de arquivo
+export async function uploadFile(directory: string, file: File) {
+  try {
+    console.log(`API: Fazendo upload do arquivo: ${file.name} para ${directory}`)
+
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("directory", directory)
+
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    })
+
+    if (!response.ok) {
+      throw new Error(`Erro ao fazer upload: ${response.status}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Erro ao fazer upload:", error)
+    throw error
+  }
+}
+
+// Função para excluir um arquivo
+export async function deleteFile(directory: string, fileName: string) {
+  try {
+    const path = directory ? `${directory}/${fileName}` : fileName
+
+    const response = await fetch(`/api/files/${encodeURIComponent(path)}`, {
+      method: "DELETE",
+    })
+
+    if (!response.ok) {
+      throw new Error(`Erro ao excluir arquivo: ${response.status}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Erro ao excluir arquivo:", error)
+    throw error
+  }
+}
+
+// Função para renomear um arquivo ou diretório
+export async function renameFile(oldPath: string, newName: string) {
+  try {
+    const response = await fetch("/api/files/rename", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        oldPath,
+        newName,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Erro ao renomear: ${response.status}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Erro ao renomear:", error)
+    throw error
+  }
+}
+
+// Função para mover um arquivo para outro diretório
+export async function moveFile(sourcePath: string, destinationPath: string) {
+  try {
+    const response = await fetch("/api/files/move", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sourcePath,
+        destinationPath,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Erro ao mover arquivo: ${response.status}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Erro ao mover arquivo:", error)
+    throw error
+  }
+}
+
 // Atualizar a função processDocument para usar o novo extrator de PDF e metadados
 export async function processDocument(documentId: number, chunkSize = 1000) {
   try {

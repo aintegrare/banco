@@ -1,217 +1,294 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
+import { motion } from "framer-motion"
+import { ChevronDown, BarChart2, Mail, Cloud, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ChevronRight } from "lucide-react"
+import { useTheme } from "@/components/theme-provider"
 
 export function HeroSection() {
   const [isVisible, setIsVisible] = useState(false)
-  const sectionRef = useRef<HTMLElement>(null)
+  const { theme } = useTheme()
+  const isDarkMode = theme === "dark"
 
   useEffect(() => {
-    setIsVisible(true) // Ativa animações imediatamente para o hero
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true)
-        }
-      },
-      { threshold: 0.1 },
-    )
-
-    if (sectionRef.current) {
-      observer.observe(sectionRef.current)
-    }
-
-    return () => {
-      if (sectionRef.current) {
-        observer.unobserve(sectionRef.current)
-      }
-    }
+    setIsVisible(true)
   }, [])
 
-  const scrollToSection = (id: string) => {
-    const element = document.getElementById(id)
-    if (element) {
-      const offsetTop = element.getBoundingClientRect().top + window.pageYOffset
-      window.scrollTo({
-        top: offsetTop - 80,
-        behavior: "smooth",
-      })
+  const scrollToNextSection = () => {
+    const nextSection = document.getElementById("sobre")
+    if (nextSection) {
+      nextSection.scrollIntoView({ behavior: "smooth" })
     }
   }
 
+  // Variantes de animação
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.2,
+      },
+    },
+  }
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: { duration: 0.6, ease: "easeOut" },
+    },
+  }
+
+  const floatingVariants = {
+    initial: { y: 0 },
+    float: {
+      y: [0, -10, 0],
+      transition: {
+        duration: 3,
+        repeat: Number.POSITIVE_INFINITY,
+        repeatType: "reverse",
+        ease: "easeInOut",
+      },
+    },
+  }
+
+  const circleVariants = {
+    initial: { scale: 0.95, opacity: 0.9 },
+    pulse: {
+      scale: 1,
+      opacity: 1,
+      transition: {
+        duration: 2.5,
+        repeat: Number.POSITIVE_INFINITY,
+        repeatType: "reverse",
+        ease: "easeInOut",
+      },
+    },
+  }
+
+  const iconVariants = {
+    initial: { opacity: 0, scale: 0 },
+    animate: (i: number) => ({
+      opacity: 1,
+      scale: 1,
+      transition: {
+        delay: 0.3 + i * 0.2,
+        duration: 0.5,
+        ease: "easeOut",
+      },
+    }),
+  }
+
   return (
-    <section
-      ref={sectionRef}
-      className="relative min-h-[90vh] flex items-center overflow-hidden bg-gradient-to-br from-[#3d649e] to-[#4b7bb5] text-white"
-    >
-      {/* Elementos minimalistas de fundo */}
+    <section className="relative overflow-hidden bg-gradient-to-b from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 pt-20 pb-16 md:pt-28 md:pb-24">
+      {/* Elementos decorativos de fundo */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full bg-white/5"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-white/5"></div>
-
-        {/* Linhas geométricas minimalistas */}
-        <div className="absolute top-0 left-0 w-full h-full">
-          <svg className="w-full h-full opacity-10" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <line x1="0" y1="0" x2="100" y2="100" stroke="white" strokeWidth="0.2" />
-            <line x1="100" y1="0" x2="0" y2="100" stroke="white" strokeWidth="0.2" />
-            <line x1="50" y1="0" x2="50" y2="100" stroke="white" strokeWidth="0.2" />
-            <line x1="0" y1="50" x2="100" y2="50" stroke="white" strokeWidth="0.2" />
-          </svg>
-        </div>
-
-        {/* Círculos flutuantes sutis */}
-        <div className="absolute top-1/3 right-1/5 w-4 h-4 rounded-full bg-white/20 animate-pulse"></div>
-        <div className="absolute bottom-1/3 left-1/5 w-6 h-6 rounded-full bg-white/20 animate-pulse delay-300"></div>
-        <div className="absolute top-2/3 right-1/3 w-8 h-8 rounded-full bg-white/20 animate-pulse delay-700"></div>
+        {/* Linhas geométricas */}
+        <div className="absolute top-1/4 left-0 w-full h-px bg-gradient-to-r from-transparent via-blue-200 dark:via-blue-700 to-transparent opacity-30"></div>
+        <div className="absolute top-2/3 left-0 w-full h-px bg-gradient-to-r from-transparent via-blue-200 dark:via-blue-700 to-transparent opacity-30"></div>
+        <div className="absolute top-0 left-1/4 w-px h-full bg-gradient-to-b from-transparent via-blue-200 dark:via-blue-700 to-transparent opacity-30"></div>
+        <div className="absolute top-0 left-3/4 w-px h-full bg-gradient-to-b from-transparent via-blue-200 dark:via-blue-700 to-transparent opacity-30"></div>
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-12 items-center">
-          {/* Conteúdo de texto - ocupa 3/5 em desktop */}
-          <div
-            className={`lg:col-span-3 transition-all duration-1000 delay-300 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
-            }`}
-          >
-            <div className="space-y-6">
-              <div className="inline-flex items-center px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm text-sm font-medium">
-                <span className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></span>
+        <motion.div
+          className="flex flex-col lg:flex-row items-center justify-between gap-12"
+          variants={containerVariants}
+          initial="hidden"
+          animate={isVisible ? "visible" : "hidden"}
+        >
+          {/* Conteúdo de texto */}
+          <motion.div className="w-full lg:w-3/5" variants={itemVariants}>
+            <motion.div
+              className="inline-block px-4 py-1 mb-6 rounded-full bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800"
+              variants={itemVariants}
+            >
+              <span className="text-sm font-medium text-[#4072b0] dark:text-[#6b91c1]">
                 Agência de Marketing Digital
-              </div>
+              </span>
+            </motion.div>
 
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-tight">
-                Transformamos <span className="text-[#f2f1ef]">ideias</span> em resultados{" "}
-                <span className="text-[#f2f1ef]">mensuráveis</span>
-              </h1>
+            <motion.h1
+              className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight text-gray-900 dark:text-white"
+              variants={itemVariants}
+            >
+              Transformamos sua
+              <span className="relative inline-block mx-2">
+                <span className="relative z-10 text-[#4b7bb5] dark:text-[#6b91c1]">presença</span>
+                <span className="absolute bottom-2 left-0 w-full h-3 bg-blue-100 dark:bg-blue-900/40 rounded-lg -z-0"></span>
+              </span>
+              digital em
+              <span className="relative inline-block mx-2">
+                <span className="relative z-10 text-[#4b7bb5] dark:text-[#6b91c1]">resultados</span>
+                <span className="absolute bottom-2 left-0 w-full h-3 bg-blue-100 dark:bg-blue-900/40 rounded-lg -z-0"></span>
+              </span>
+            </motion.h1>
 
-              <p className="text-lg md:text-xl text-white/80 max-w-xl leading-relaxed">
-                Estratégias de marketing baseadas em dados que impulsionam o crescimento do seu negócio em Maringá,
-                Curitiba e São Paulo.
-              </p>
+            <motion.p
+              className="text-lg md:text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl"
+              variants={itemVariants}
+            >
+              Estratégias personalizadas de marketing digital que impulsionam seu negócio com criatividade, dados e
+              resultados mensuráveis.
+            </motion.p>
 
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Button
-                  size="lg"
-                  className="bg-white text-[#3d649e] hover:bg-white/90 shadow-lg hover:shadow-xl transition-all"
-                  onClick={() => scrollToSection("sobre")}
-                >
-                  Conheça Nossa Abordagem
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="border-white text-white hover:bg-white/10 shadow-lg transition-all"
-                  onClick={() => scrollToSection("contato")}
-                >
-                  Fale Conosco
-                  <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
+            <motion.div className="flex flex-col sm:flex-row gap-4 mb-8" variants={itemVariants}>
+              <Button
+                size="lg"
+                className="bg-[#4072b0] hover:bg-[#3d649e] text-white dark:bg-[#4b7bb5] dark:hover:bg-[#6b91c1] rounded-lg px-8"
+                onClick={() => scrollToNextSection()}
+              >
+                Conheça Nossos Serviços
+              </Button>
 
-          {/* Elemento visual - ocupa 2/5 em desktop */}
-          <div
-            className={`hidden lg:block lg:col-span-2 transition-all duration-1000 delay-500 ${
-              isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-10"
-            }`}
-          >
-            <div className="relative">
-              {/* Círculo decorativo */}
-              <div className="absolute -inset-4 rounded-full bg-gradient-to-r from-white/10 to-white/5 blur-xl"></div>
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-[#4b7bb5] text-[#4b7bb5] hover:bg-[#4b7bb5]/10 dark:border-[#6b91c1] dark:text-[#6b91c1] dark:hover:bg-[#6b91c1]/10 rounded-lg px-8"
+                onClick={() => {
+                  const contactSection = document.getElementById("contato")
+                  if (contactSection) {
+                    contactSection.scrollIntoView({ behavior: "smooth" })
+                  }
+                }}
+              >
+                Fale Conosco
+              </Button>
+            </motion.div>
 
-              {/* Elemento visual abstrato */}
-              <div className="relative aspect-square rounded-full overflow-hidden border border-white/20 backdrop-blur-sm">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-3/4 h-3/4 rounded-full bg-gradient-to-br from-[#6b91c1]/40 to-[#4072b0]/40 animate-pulse"></div>
-                </div>
+            <motion.div
+              className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+              variants={itemVariants}
+            >
+              <span>Descubra mais</span>
+              <motion.div
+                animate={{
+                  y: [0, 5, 0],
+                  transition: { repeat: Number.POSITIVE_INFINITY, duration: 1.5 },
+                }}
+              >
+                <ChevronDown size={16} />
+              </motion.div>
+            </motion.div>
+          </motion.div>
 
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-1/2 h-1/2 rounded-full bg-gradient-to-br from-white/20 to-white/5 animate-ping animation-delay-700"></div>
-                </div>
+          {/* Elemento visual abstrato */}
+          <motion.div className="w-full lg:w-2/5 relative h-[400px] md:h-[500px]" variants={itemVariants}>
+            {/* Círculos concêntricos */}
+            <motion.div
+              className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 md:w-80 md:h-80 rounded-full border-2 border-[#4b7bb5]/20 dark:border-[#6b91c1]/20"
+              initial="initial"
+              animate="pulse"
+              variants={circleVariants}
+            ></motion.div>
 
-                {/* Ícones de marketing flutuantes */}
-                <div className="absolute top-1/4 left-1/4 transform -translate-x-1/2 -translate-y-1/2 animate-float">
-                  <div className="bg-white/90 text-[#3d649e] w-12 h-12 rounded-lg flex items-center justify-center shadow-lg">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-6 w-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                      />
-                    </svg>
-                  </div>
-                </div>
+            <motion.div
+              className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 h-48 md:w-64 md:h-64 rounded-full border-2 border-[#4b7bb5]/30 dark:border-[#6b91c1]/30"
+              initial="initial"
+              animate="pulse"
+              variants={circleVariants}
+              custom={1.2}
+            ></motion.div>
 
-                <div className="absolute bottom-1/4 right-1/4 transform translate-x-1/2 translate-y-1/2 animate-float-delayed">
-                  <div className="bg-white/90 text-[#3d649e] w-12 h-12 rounded-lg flex items-center justify-center shadow-lg">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-6 w-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                      />
-                    </svg>
-                  </div>
-                </div>
+            <motion.div
+              className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 md:w-48 md:h-48 rounded-full border-2 border-[#4b7bb5]/40 dark:border-[#6b91c1]/40"
+              initial="initial"
+              animate="pulse"
+              variants={circleVariants}
+              custom={1.4}
+            ></motion.div>
 
-                <div className="absolute top-1/2 right-1/6 transform translate-x-1/2 -translate-y-1/2 animate-float-slow">
-                  <div className="bg-white/90 text-[#3d649e] w-12 h-12 rounded-lg flex items-center justify-center shadow-lg">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-6 w-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
+            <motion.div
+              className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-[#4b7bb5] to-[#3d649e] dark:from-[#6b91c1] dark:to-[#4b7bb5] opacity-90"
+              initial="initial"
+              animate="pulse"
+              variants={circleVariants}
+              custom={1.6}
+            ></motion.div>
 
-              {/* Estatística flutuante */}
-              <div className="absolute -bottom-6 -right-6 bg-white rounded-lg shadow-xl p-4 transform rotate-3 animate-float">
+            {/* Ícones flutuantes */}
+            <motion.div
+              className="absolute top-[15%] left-[25%] p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg"
+              initial="initial"
+              animate="float"
+              variants={floatingVariants}
+              custom={0}
+            >
+              <motion.div initial="initial" animate="animate" variants={iconVariants} custom={0}>
+                <BarChart2 className="w-6 h-6 text-[#4b7bb5] dark:text-[#6b91c1]" />
+              </motion.div>
+            </motion.div>
+
+            <motion.div
+              className="absolute top-[70%] left-[20%] p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg"
+              initial="initial"
+              animate="float"
+              variants={floatingVariants}
+              custom={1}
+            >
+              <motion.div initial="initial" animate="animate" variants={iconVariants} custom={1}>
+                <Mail className="w-6 h-6 text-[#4b7bb5] dark:text-[#6b91c1]" />
+              </motion.div>
+            </motion.div>
+
+            <motion.div
+              className="absolute top-[25%] right-[20%] p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg"
+              initial="initial"
+              animate="float"
+              variants={floatingVariants}
+              custom={2}
+            >
+              <motion.div initial="initial" animate="animate" variants={iconVariants} custom={2}>
+                <Cloud className="w-6 h-6 text-[#4b7bb5] dark:text-[#6b91c1]" />
+              </motion.div>
+            </motion.div>
+
+            <motion.div
+              className="absolute top-[60%] right-[25%] p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg"
+              initial="initial"
+              animate="float"
+              variants={floatingVariants}
+              custom={3}
+            >
+              <motion.div initial="initial" animate="animate" variants={iconVariants} custom={3}>
+                <TrendingUp className="w-6 h-6 text-[#4b7bb5] dark:text-[#6b91c1]" />
+              </motion.div>
+            </motion.div>
+
+            {/* Estatística flutuante */}
+            <motion.div
+              className="absolute top-[40%] right-[30%] p-4 rounded-lg bg-white dark:bg-gray-800 shadow-lg"
+              initial="initial"
+              animate="float"
+              variants={floatingVariants}
+              custom={4}
+            >
+              <motion.div initial="initial" animate="animate" variants={iconVariants} custom={4}>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-[#3d649e]">250%</div>
-                  <div className="text-xs text-[#4b7bb5]">ROI médio</div>
+                  <div className="text-2xl font-bold text-[#4072b0] dark:text-[#6b91c1]">+300%</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">ROI Médio</div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        </motion.div>
       </div>
 
       {/* Divisor de onda minimalista */}
-      <div className="absolute bottom-0 left-0 right-0">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100" className="w-full h-auto">
+      <div className="absolute bottom-0 left-0 w-full overflow-hidden">
+        <svg
+          className="relative block w-full h-[30px] md:h-[50px]"
+          viewBox="0 0 1200 120"
+          preserveAspectRatio="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <path
-            fill="currentColor"
-            fillOpacity="1"
-            className="text-white dark:text-gray-900"
-            d="M0,32L80,42.7C160,53,320,75,480,74.7C640,75,800,53,960,42.7C1120,32,1280,32,1360,32L1440,32L1440,100L1360,100C1280,100,1120,100,960,100C800,100,640,100,480,100C320,100,160,100,80,100L0,100Z"
+            d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V0C0,0,0,0,0,0Z"
+            className="fill-white dark:fill-gray-900"
           ></path>
         </svg>
       </div>

@@ -1,8 +1,9 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 export default function LoginPage() {
   const [email] = useState("estrategia@designmarketing.com.br")
@@ -12,6 +13,7 @@ export default function LoginPage() {
   const [message, setMessage] = useState("")
   const [loginSuccess, setLoginSuccess] = useState(false)
   const [envInfo, setEnvInfo] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   // Verificar variáveis de ambiente no carregamento
   useEffect(() => {
@@ -21,11 +23,18 @@ export default function LoginPage() {
         const data = await response.json()
         if (!data.supabaseConfigured) {
           setEnvInfo(
-            "Aviso: Configuração do Supabase incompleta. Algumas funcionalidades podem não funcionar corretamente.",
+            "Configuração do Supabase não encontrada. O sistema funcionará em modo de demonstração com funcionalidades limitadas.",
           )
+          setIsDemoMode(true)
+          // Preencher a senha de demonstração automaticamente
+          setPassword("Jivago14#")
         }
       } catch (error) {
         console.error("Erro ao verificar variáveis de ambiente:", error)
+        setEnvInfo("Não foi possível verificar a configuração. O sistema tentará funcionar em modo de demonstração.")
+        setIsDemoMode(true)
+        // Preencher a senha de demonstração automaticamente
+        setPassword("Jivago14#")
       }
     }
 
@@ -38,10 +47,13 @@ export default function LoginPage() {
       console.log("Login bem-sucedido, redirecionando...")
       // Armazenar no localStorage como fallback
       localStorage.setItem("isAuthenticated", "true")
+      if (isDemoMode) {
+        localStorage.setItem("demoMode", "true")
+      }
       // Redirecionar para a página admin
       window.location.href = "/admin"
     }
-  }, [loginSuccess])
+  }, [loginSuccess, isDemoMode])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -74,6 +86,12 @@ export default function LoginPage() {
         } else {
           throw new Error(data.error || "Falha ao fazer login")
         }
+      }
+
+      // Verificar se está em modo de demonstração
+      if (data.demoMode) {
+        setIsDemoMode(true)
+        setMessage("Login em modo de demonstração. Algumas funcionalidades podem estar limitadas.")
       }
 
       // Marcar login como bem-sucedido para acionar o redirecionamento
@@ -128,8 +146,30 @@ export default function LoginPage() {
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
         <h1 className="text-2xl font-bold text-center text-[#4b7bb5] mb-6">Integrare Admin</h1>
 
-        {message && <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-md">{message}</div>}
-        {envInfo && <div className="mb-4 p-3 bg-yellow-50 text-yellow-700 rounded-md text-sm">{envInfo}</div>}
+        {message && (
+          <Alert className="mb-4 bg-green-50 border-green-200">
+            <AlertDescription className="text-green-700">{message}</AlertDescription>
+          </Alert>
+        )}
+
+        {envInfo && (
+          <Alert className="mb-4 bg-yellow-50 border-yellow-200">
+            <AlertCircle className="h-4 w-4 text-yellow-700 mr-2" />
+            <AlertDescription className="text-yellow-700 text-sm">{envInfo}</AlertDescription>
+          </Alert>
+        )}
+
+        {isDemoMode && (
+          <Alert className="mb-4 bg-blue-50 border-blue-200">
+            <AlertDescription className="text-blue-700 text-sm">
+              <strong>Modo de Demonstração Ativo</strong>
+              <br />
+              Email: estrategia@designmarketing.com.br
+              <br />
+              Senha: Jivago14#
+            </AlertDescription>
+          </Alert>
+        )}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
@@ -153,7 +193,12 @@ export default function LoginPage() {
             />
           </div>
 
-          {error && <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm">{error}</div>}
+          {error && (
+            <Alert className="p-3 bg-red-50 border-red-200">
+              <AlertCircle className="h-4 w-4 text-red-700 mr-2" />
+              <AlertDescription className="text-red-700 text-sm">{error}</AlertDescription>
+            </Alert>
+          )}
 
           <button
             type="submit"
@@ -164,24 +209,26 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
+        {!isDemoMode && (
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Primeiro acesso?</span>
+              </div>
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Primeiro acesso?</span>
-            </div>
-          </div>
 
-          <button
-            onClick={handleCreateAdmin}
-            disabled={loading}
-            className="mt-4 w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-          >
-            {loading ? "Processando..." : "Criar Usuário Administrador"}
-          </button>
-        </div>
+            <button
+              onClick={handleCreateAdmin}
+              disabled={loading}
+              className="mt-4 w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+            >
+              {loading ? "Processando..." : "Criar Usuário Administrador"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

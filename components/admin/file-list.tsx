@@ -1,2482 +1,385 @@
 "use client"
 
-import React from "react"
-
-import { useState, useEffect, useCallback, useRef } from "react"
+import type React from "react"
+import { forwardRef, useImperativeHandle, useState, useEffect, useCallback } from "react"
+import { useDropzone } from "react-dropzone"
 import {
-  File,
-  FileText,
-  ImageIcon,
-  Film,
-  Music,
-  Archive,
-  Trash2,
-  RefreshCw,
-  Loader2,
-  ExternalLink,
-  AlertCircle,
-  FolderPlus,
-  Search,
-  Info,
-  X,
-  CheckCircle,
-  FolderOpen,
-  Pencil,
-  MoveIcon,
-  ChevronLeft,
-  ChevronRight,
-  Home,
-  CheckSquare,
-  Square,
-  ClipboardList,
-  Palette,
-  FileImage,
-  BookOpen,
-  Folder,
-  Upload,
-  Star,
-  Clock,
-  Share2,
-  Filter,
-  SortAsc,
-  SortDesc,
-  LayoutGrid,
-  LayoutList,
-  HardDrive,
-} from "lucide-react"
-import { getBunnyPublicUrl } from "@/lib/bunny"
-import { FolderTaskBadge } from "./folder-task-badge"
-import { fetchFolderTaskCounts } from "@/lib/folder-tasks-manager"
-import { FolderTasksPanel } from "./folder-tasks-panel"
-// Primeiro, vamos adicionar a importação do novo componente no topo do arquivo
-import { FolderSelector } from "./folder-selector"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  IconButton,
+  Typography,
+  Breadcrumbs,
+  Link,
+  TextField,
+  InputAdornment,
+  CircularProgress,
+  Box,
+  Alert,
+  Snackbar,
+} from "@mui/material"
+import FolderIcon from "@mui/icons-material/Folder"
+import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile"
+import DeleteIcon from "@mui/icons-material/Delete"
+import UploadIcon from "@mui/icons-material/Upload"
+import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder"
+import SearchIcon from "@mui/icons-material/Search"
+import { styled } from "@mui/material/styles"
+import { deleteFile, getFiles, uploadFile, createDirectory } from "@/lib/api"
+import { formatDistanceToNow } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { getSupabaseClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
 
-interface BunnyFile {
-  ObjectName: string
-  Length: number
-  LastChanged: string
-  IsDirectory: boolean
-  StorageZoneName: string
-  Path: string
-  ObjectType: number
-  Guid: string
-  ServerId: number
-  UserId: string
-  DateCreated: string
-  StorageZoneId: number
-  PublicUrl?: string
+interface File {
+  name: string
+  type: "directory" | "file"
+  modified: string
+  size: number
 }
 
 interface FileListProps {
   initialDirectory?: string
 }
 
-export function FileList({ initialDirectory = "documents" }: FileListProps) {
-  const [files, setFiles] = useState<BunnyFile[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [deletingFile, setDeletingFile] = useState<string | null>(null)
-  const [isCreatingDirectory, setIsCreatingDirectory] = useState(false)
-  const [directoryCreated, setDirectoryCreated] = useState(false)
-  const [directoryInfo, setDirectoryInfo] = useState<any | null>(null)
-  const [isCheckingDirectory, setIsCheckingDirectory] = useState(false)
-  const [debugInfo, setDebugInfo] = useState<string | null>(null)
-  const [selectedDirectory, setSelectedDirectory] = useState<string>(initialDirectory)
-  const [previewFile, setPreviewFile] = useState<BunnyFile | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
+// Adicionar interface para o ref
+interface FileListRef {
+  fetchFiles: () => void
+  refresh: () => void
+}
+
+const Item = styled(Paper)(({ theme }) => ({
+  backgroundColor: theme.palette.mode === "dark" ? "#1A2027" : "#fff",
+  ...theme.typography.body2,
+  padding: theme.spacing(1),
+  textAlign: "left",
+  color: theme.palette.text.secondary,
+}))
+
+// Modificar a exportação para usar forwardRef
+export const FileList = forwardRef<FileListRef, FileListProps>(({ initialDirectory = "documents" }, ref) => {
+  const [files, setFiles] = useState<File[]>([])
   const [currentPath, setCurrentPath] = useState<string[]>([initialDirectory])
-  const [pathHistory, setPathHistory] = useState<string[][]>([])
-  const [forwardHistory, setForwardHistory] = useState<string[][]>([])
-  const [showRenameModal, setShowRenameModal] = useState(false)
-  const [fileToRename, setFileToRename] = useState<BunnyFile | null>(null)
-  const [newFileName, setNewFileName] = useState("")
-  const [isRenaming, setIsRenaming] = useState(false)
-  const [renameError, setRenameError] = useState<string | null>(null)
-  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false)
-  const [newFolderName, setNewFolderName] = useState("")
-  const [isCreatingFolder, setIsCreatingFolder] = useState(false)
-  const [createFolderError, setCreateFolderError] = useState<string | null>(null)
-  const [showMoveFileModal, setShowMoveFileModal] = useState(false)
-  const [fileToMove, setFileToMove] = useState<BunnyFile | null>(null)
-  const [destinationPath, setDestinationPath] = useState<string>("")
-  const [availableFolders, setAvailableFolders] = useState<string[]>([])
-  const [isMovingFile, setIsMovingFile] = useState(false)
-  const [moveFileError, setMoveFileError] = useState<string | null>(null)
-  const [selectedFiles, setSelectedFiles] = useState<BunnyFile[]>([])
-  const [isSelectionMode, setIsSelectionMode] = useState(false)
-  const [isMovingMultiple, setIsMovingMultiple] = useState(false)
-  const [multiMoveDestination, setMultiMoveDestination] = useState<string>("")
-  const [showMultiMoveModal, setShowMultiMoveModal] = useState(false)
-  const [multiMoveError, setMultiMoveError] = useState<string | null>(null)
-  const [multiMoveProgress, setMultiMoveProgress] = useState<{
-    current: number
-    total: number
-    currentFile: string
-  } | null>(null)
-  const [isLoadingTaskCounts, setIsLoadingTaskCounts] = useState(false)
-  const [showTasksPanel, setShowTasksPanel] = useState<boolean>(false)
-  const [showFolderTasks, setShowFolderTasks] = useState(false)
-  const [selectedFolderForTasks, setSelectedFolderForTasks] = useState<string>("")
-  const [folderTaskCounts, setFolderTaskCounts] = useState<Record<string, number>>({})
-  const [viewMode, setViewMode] = useState<"list" | "grid">("grid")
-  const [draggedFile, setDraggedFile] = useState<BunnyFile | null>(null)
-  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null)
-  const [isDraggingOver, setIsDraggingOver] = useState(false)
-  const [dragFeedback, setDragFeedback] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null)
-  const fileListRef = useRef<HTMLDivElement>(null)
-  const [activeFilter, setActiveFilter] = useState<"all" | "recent" | "favorites" | "shared">("all")
-  const [favorites, setFavorites] = useState<string[]>([])
-  const [recentFiles, setRecentFiles] = useState<BunnyFile[]>([])
-  const [sortBy, setSortBy] = useState<"name" | "date" | "size">("name")
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
-  const [viewType, setViewType] = useState<"files" | "tasks">("files")
-  const [storageUsage, setStorageUsage] = useState({ used: 0, total: 1024 * 1024 * 1024 * 10 }) // 10GB default
+  const [searchQuery, setSearchQuery] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [creatingDirectory, setCreatingDirectory] = useState(false)
+  const [newDirectoryName, setNewDirectoryName] = useState("")
+  const [snackbarOpen, setSnackbarOpen] = useState(false)
+  const [snackbarMessage, setSnackbarMessage] = useState("")
+  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">("success")
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const router = useRouter()
 
-  // Função para carregar automaticamente as contagens de tarefas das pastas
-  const loadFolderTaskCounts = useCallback(async (folders: BunnyFile[]) => {
-    if (!folders || folders.length === 0) return
+  const getCurrentPathString = () => currentPath.join("/")
 
-    setIsLoadingTaskCounts(true)
+  const fetchFiles = useCallback(async (path: string) => {
+    setLoading(true)
     try {
-      // Filtrar apenas as pastas e obter seus caminhos
-      const folderPaths = folders.filter((file) => file.IsDirectory).map((folder) => folder.Path)
-
-      if (folderPaths.length > 0) {
-        // Buscar contagens de tarefas para todas as pastas
-        const counts = await fetchFolderTaskCounts(folderPaths)
-        setFolderTaskCounts(counts)
+      const filesData = await getFiles(path)
+      // Garantir que filesData é um array válido
+      if (Array.isArray(filesData)) {
+        setFiles(filesData)
+      } else {
+        setFiles([])
+        console.warn("Dados de arquivos inválidos recebidos:", filesData)
       }
-    } catch (error) {
-      console.error("Erro ao carregar contagens de tarefas:", error)
+    } catch (error: any) {
+      console.error("Error fetching files:", error)
+      setSnackbarMessage(`Error fetching files: ${error.message}`)
+      setSnackbarSeverity("error")
+      setSnackbarOpen(true)
+      setFiles([]) // Definir array vazio em caso de erro
     } finally {
-      setIsLoadingTaskCounts(false)
+      setLoading(false)
     }
   }, [])
 
-  const fetchFiles = async (directory = selectedDirectory) => {
-    setIsLoading(true)
-    setError(null)
-    setDebugInfo(null)
+  // Verificar autenticação com Supabase
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const supabase = getSupabaseClient()
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
 
-    try {
-      console.log(`Iniciando busca de arquivos no diretório: ${directory}...`)
-      console.log(`Caminho atual: ${currentPath.join("/")}`)
-      const response = await fetch(`/api/files?directory=${directory}`)
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || errorData.error || `Erro ao listar arquivos: ${response.status}`)
-      }
-
-      const data = await response.json()
-      console.log(`Arquivos recebidos: ${data.files?.length || 0}`)
-
-      setDebugInfo(null)
-
-      const filesWithPublicUrls = (data.files || []).map((file: BunnyFile) => {
-        if (!file.PublicUrl) {
-          return {
-            ...file,
-            PublicUrl: getBunnyPublicUrl(file.Path),
-          }
+        if (!session) {
+          router.push("/admin/login")
+          return
         }
-        return file
-      })
 
-      setFiles(filesWithPublicUrls)
-
-      // Atualizar arquivos recentes
-      const newRecentFiles = filesWithPublicUrls
-        .filter((file) => file.type !== "folder")
-        .sort((a, b) => new Date(b.LastChanged).getTime() - new Date(a.LastChanged).getTime())
-        .slice(0, 5)
-
-      setRecentFiles(newRecentFiles)
-
-      // Simular cálculo de uso de armazenamento
-      const totalSize = filesWithPublicUrls.reduce((acc, file) => acc + (file.Length || 0), 0)
-      setStorageUsage((prev) => ({ ...prev, used: totalSize }))
-
-      // Carregar contagens de tarefas para as pastas automaticamente
-      loadFolderTaskCounts(filesWithPublicUrls)
-
-      const folders = filesWithPublicUrls.filter((file) => file.IsDirectory).map((folder) => folder.Path)
-
-      setAvailableFolders(folders)
-    } catch (err) {
-      console.error("Erro ao buscar arquivos:", err)
-      setError(err instanceof Error ? err.message : "Erro desconhecido ao buscar arquivos")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchFiles(getCurrentPathString())
-    setSelectedFiles([])
-    setIsSelectionMode(false)
-  }, [currentPath])
-
-  // Carregar favoritos do localStorage
-  useEffect(() => {
-    const savedFavorites = localStorage.getItem("fileFavorites")
-    if (savedFavorites) {
-      setFavorites(JSON.parse(savedFavorites))
-    }
-  }, [])
-
-  const getCurrentPathString = () => {
-    return currentPath.join("/")
-  }
-
-  const navigateToFolder = (folderPath: string) => {
-    setSelectedFiles([])
-    setIsSelectionMode(false)
-
-    setPathHistory((prev) => [...prev, currentPath])
-    setForwardHistory([])
-
-    const pathSegments = folderPath.split("/").filter((segment) => segment.length > 0)
-    setCurrentPath(pathSegments)
-    setSelectedDirectory(pathSegments[0] || initialDirectory)
-  }
-
-  const navigateBack = () => {
-    if (pathHistory.length > 0) {
-      setSelectedFiles([])
-      setIsSelectionMode(false)
-
-      const previousPath = pathHistory[pathHistory.length - 1]
-
-      setForwardHistory((prev) => [...prev, currentPath])
-
-      setPathHistory((prev) => prev.slice(0, prev.length - 1))
-
-      setCurrentPath(previousPath)
-      setSelectedDirectory(previousPath[0] || initialDirectory)
-    }
-  }
-
-  const navigateForward = () => {
-    if (forwardHistory.length > 0) {
-      setSelectedFiles([])
-      setIsSelectionMode(false)
-
-      const nextPath = forwardHistory[forwardHistory.length - 1]
-
-      setPathHistory((prev) => [...prev, currentPath])
-
-      setForwardHistory((prev) => prev.slice(0, prev.length - 1))
-
-      setCurrentPath(nextPath)
-      setSelectedDirectory(nextPath[0] || initialDirectory)
-    }
-  }
-
-  const navigateHome = () => {
-    setSelectedFiles([])
-    setIsSelectionMode(false)
-
-    setPathHistory((prev) => [...prev, currentPath])
-    setForwardHistory([])
-
-    setCurrentPath([initialDirectory])
-    setSelectedDirectory(initialDirectory)
-  }
-
-  const handleDelete = async (path: string) => {
-    if (!confirm("Tem certeza que deseja excluir este arquivo? Esta ação não pode ser desfeita.")) {
-      return
+        setIsAuthenticated(true)
+        fetchFiles(getCurrentPathString())
+      } catch (error) {
+        console.error("Erro ao verificar autenticação:", error)
+        router.push("/admin/login")
+      }
     }
 
-    setDeletingFile(path)
+    checkAuth()
+  }, [fetchFiles, router])
 
+  const handlePathClick = (index: number) => {
+    const newPath = currentPath.slice(0, index + 1)
+    setCurrentPath(newPath)
+    fetchFiles(newPath.join("/"))
+  }
+
+  const handleDirectoryClick = (directoryName: string) => {
+    const newPath = [...currentPath, directoryName]
+    setCurrentPath(newPath)
+    fetchFiles(newPath.join("/"))
+  }
+
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(event.target.value || "")
+  }
+
+  // Adicionar verificações de segurança no filtro
+  const filteredFiles = files.filter((file) => {
+    if (!file || !file.name) return false
+    const fileName = file.name.toLowerCase()
+    const query = (searchQuery || "").toLowerCase()
+    return fileName.includes(query)
+  })
+
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      setUploading(true)
+      try {
+        await Promise.all(
+          acceptedFiles.map(async (file: any) => {
+            await uploadFile(getCurrentPathString(), file)
+          }),
+        )
+        setSnackbarMessage("Files uploaded successfully!")
+        setSnackbarSeverity("success")
+        setSnackbarOpen(true)
+        fetchFiles(getCurrentPathString()) // Refresh file list
+      } catch (error: any) {
+        console.error("Error uploading files:", error)
+        setSnackbarMessage(`Error uploading files: ${error.message}`)
+        setSnackbarSeverity("error")
+        setSnackbarOpen(true)
+      } finally {
+        setUploading(false)
+      }
+    },
+    [fetchFiles],
+  )
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop })
+
+  const handleDeleteFile = async (fileName: string) => {
     try {
-      console.log(`FileList: Iniciando exclusão do arquivo: ${path}`)
-
-      let cleanPath = path
-
-      if (path.startsWith("http")) {
-        const url = new URL(path)
-        cleanPath = url.pathname.replace(/^\//, "")
-      }
-
-      console.log(`FileList: Caminho limpo para API: ${cleanPath}`)
-
-      const response = await fetch(`/api/files/${encodeURIComponent(cleanPath)}`, {
-        method: "DELETE",
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || `Erro ao excluir arquivo: ${response.status}`)
-      }
-
-      setFiles((prev) => prev.filter((file) => file.Path !== path))
-      console.log(`FileList: Arquivo excluído com sucesso: ${path}`)
-    } catch (err) {
-      console.error("Erro ao excluir arquivo:", err)
-      alert(err instanceof Error ? err.message : "Erro ao excluir arquivo")
-    } finally {
-      setDeletingFile(null)
+      await deleteFile(getCurrentPathString(), fileName)
+      setSnackbarMessage("File deleted successfully!")
+      setSnackbarSeverity("success")
+      setSnackbarOpen(true)
+      fetchFiles(getCurrentPathString()) // Refresh file list
+    } catch (error: any) {
+      console.error("Error deleting file:", error)
+      setSnackbarMessage(`Error deleting file: ${error.message}`)
+      setSnackbarSeverity("error")
+      setSnackbarOpen(true)
     }
   }
 
   const handleCreateDirectory = async () => {
-    console.log("Abrindo modal para criar pasta no caminho:", getCurrentPathString())
-    setShowCreateFolderModal(true)
-  }
-
-  const submitCreateFolder = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!newFolderName || newFolderName.trim() === "") {
-      setCreateFolderError("O nome da pasta não pode estar vazio")
+    if (!newDirectoryName.trim()) {
+      setSnackbarMessage("Please enter a directory name")
+      setSnackbarSeverity("error")
+      setSnackbarOpen(true)
       return
     }
 
-    if (/[\\/:*?"<>|]/.test(newFolderName)) {
-      setCreateFolderError("O nome da pasta contém caracteres inválidos")
-      return
-    }
-
-    setIsCreatingFolder(true)
-    setCreateFolderError(null)
-
+    setCreatingDirectory(true)
     try {
-      const currentPathString = getCurrentPathString()
-      const newFolderPath = currentPathString ? `${currentPathString}/${newFolderName}` : newFolderName
-
-      console.log(`Criando pasta: ${newFolderPath}`)
-
-      const response = await fetch("/api/create-directory", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ directory: newFolderPath }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || `Erro ao criar pasta: ${response.status}`)
-      }
-
-      console.log("Resposta da API:", data)
-
-      setShowCreateFolderModal(false)
-      setNewFolderName("")
-      setDirectoryCreated(true)
-
-      const newFolder = {
-        ObjectName: newFolderName,
-        Length: 0,
-        LastChanged: new Date().toISOString(),
-        IsDirectory: true,
-        StorageZoneName: "",
-        Path: `${currentPathString}/${newFolderName}/`.replace(/\/+/g, "/"),
-        ObjectType: 1,
-        Guid: `temp-${Date.now()}`,
-        ServerId: 0,
-        UserId: "",
-        DateCreated: new Date().toISOString(),
-        StorageZoneId: 0,
-        PublicUrl: `${process.env.NEXT_PUBLIC_BUNNY_PULLZONE_URL}/${currentPathString}/${newFolderName}/`.replace(
-          /\/+/g,
-          "/",
-        ),
-      }
-
-      setFiles((prev) => [...prev, newFolder])
-
-      setTimeout(() => {
-        fetchFiles(getCurrentPathString())
-      }, 1000)
-    } catch (error) {
-      console.error("Erro ao criar pasta:", error)
-      setCreateFolderError(error instanceof Error ? error.message : "Erro ao criar pasta")
+      await createDirectory(getCurrentPathString(), newDirectoryName)
+      setSnackbarMessage("Directory created successfully!")
+      setSnackbarSeverity("success")
+      setSnackbarOpen(true)
+      fetchFiles(getCurrentPathString()) // Refresh file list
+      setNewDirectoryName("")
+    } catch (error: any) {
+      console.error("Error creating directory:", error)
+      setSnackbarMessage(`Error creating directory: ${error.message}`)
+      setSnackbarSeverity("error")
+      setSnackbarOpen(true)
     } finally {
-      setIsCreatingFolder(false)
+      setCreatingDirectory(false)
     }
   }
 
-  const checkFolderExists = async (path: string) => {
-    try {
-      const response = await fetch(`/api/check-folder?path=${encodeURIComponent(path)}`)
-      const data = await response.json()
-
-      console.log("Verificação de pasta:", data)
-
-      if (response.ok) {
-        alert(
-          `Pasta ${path}: ${data.exists ? "Existe" : "Não existe"}\n` +
-            `Arquivos: ${data.fileCount || 0}\n` +
-            `Caminho: ${data.path}`,
-        )
-      } else {
-        alert(`Erro ao verificar pasta: ${data.error || data.message || "Erro desconhecido"}`)
-      }
-    } catch (error) {
-      console.error("Erro ao verificar pasta:", error)
-      alert(`Erro ao verificar pasta: ${error instanceof Error ? error.message : "Erro desconhecido"}`)
-    }
-  }
-
-  const handleCheckDirectory = async () => {
-    setIsCheckingDirectory(true)
-    setDirectoryInfo(null)
-    setError(null)
-
-    try {
-      const response = await fetch(`/api/check-directory?directory=${getCurrentPathString()}`)
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || errorData.error || `Erro ao verificar diretório: ${response.status}`)
-      }
-
-      const data = await response.json()
-      setDirectoryInfo(data)
-
-      if (data.exists && data.files && data.files.length > 0) {
-        const filesWithUrls = data.files.map((file: BunnyFile) => ({
-          ...file,
-          PublicUrl: file.PublicUrl || getBunnyPublicUrl(file.Path),
-        }))
-
-        setFiles(filesWithUrls)
-
-        // Carregar contagens de tarefas para as pastas automaticamente
-        loadFolderTaskCounts(filesWithUrls)
-      }
-    } catch (err) {
-      console.error("Erro ao verificar diretório:", err)
-      setError(err instanceof Error ? err.message : "Erro ao verificar diretório")
-    } finally {
-      setIsCheckingDirectory(false)
-    }
-  }
-
-  const getFileIcon = (fileName: string) => {
-    const extension = fileName.split(".").pop()?.toLowerCase()
-
-    switch (extension) {
-      case "pdf":
-        return <FileText className="h-5 w-5 text-red-500" />
-      case "jpg":
-      case "jpeg":
-      case "png":
-      case "gif":
-      case "webp":
-        return <ImageIcon className="h-5 w-5 text-blue-500" />
-      case "mp4":
-      case "webm":
-      case "avi":
-        return <Film className="h-5 w-5 text-purple-500" />
-      case "mp3":
-      case "wav":
-      case "ogg":
-        return <Music className="h-5 w-5 text-green-500" />
-      case "zip":
-      case "rar":
-      case "7z":
-        return <Archive className="h-5 w-5 text-yellow-500" />
-      case "psd":
-      case "psb":
-        return <Palette className="h-5 w-5 text-purple-600" />
-      case "ai":
-        return <FileImage className="h-5 w-5 text-orange-500" />
-      case "indd":
-      case "idml":
-        return <BookOpen className="h-5 w-5 text-pink-500" />
-      default:
-        return <File className="h-5 w-5 text-gray-500" />
-    }
-  }
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes"
-    const k = 1024
-    const sizes = ["Bytes", "KB", "MB", "GB", "TB"]
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
-  }
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  const isImage = (fileName: string) => {
-    const extension = fileName.split(".").pop()?.toLowerCase()
-    return ["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")
-  }
-
-  const handlePreviewFile = (file: BunnyFile) => {
-    if (isSelectionMode) {
-      toggleFileSelection(file)
+  const handleCloseSnackbar = (event?: React.SyntheticEvent | Event, reason?: string) => {
+    if (reason === "clickaway") {
       return
     }
-
-    if (file.IsDirectory) {
-      navigateToFolder(file.Path)
-    } else if (isImage(file.ObjectName)) {
-      setPreviewFile(file)
-    } else {
-      const url = file.PublicUrl || getBunnyPublicUrl(file.Path)
-      console.log(`Preview: Abrindo arquivo ${file.ObjectName} com URL: ${url}`)
-      window.open(url, "_blank")
-    }
+    setSnackbarOpen(false)
   }
 
-  const closePreview = () => {
-    setPreviewFile(null)
-  }
-
-  const switchDirectory = (directory: string) => {
-    setSelectedFiles([])
-    setIsSelectionMode(false)
-
-    setPathHistory((prev) => [...prev, currentPath])
-    setForwardHistory([])
-
-    setCurrentPath([directory])
-    setSelectedDirectory(directory)
-  }
-
-  // Filtrar arquivos com base na pesquisa e no filtro ativo
-  const getFilteredFiles = () => {
-    let filtered = files
-
-    // Filtrar por pesquisa
-    if (searchQuery) {
-      filtered = filtered.filter((file) => file.ObjectName.toLowerCase().includes(searchQuery.toLowerCase()))
-    }
-
-    // Filtrar por aba ativa
-    if (activeFilter === "favorites") {
-      filtered = filtered.filter((file) => favorites.includes(file.Path))
-    } else if (activeFilter === "recent") {
-      // Mostrar apenas os 20 arquivos mais recentes
-      const recentOnly = filtered
-        .filter((file) => !file.IsDirectory)
-        .sort((a, b) => new Date(b.LastChanged).getTime() - new Date(a.LastChanged).getTime())
-        .slice(0, 20)
-
-      filtered = recentOnly
-    } else if (activeFilter === "shared") {
-      // Implementação futura para arquivos compartilhados
-      filtered = filtered.filter((file) => false) // Por enquanto, não mostra nada
-    }
-
-    return filtered
-  }
-
-  const filteredFiles = getFilteredFiles()
-
-  // Ordenar arquivos
-  const sortedFiles = [...filteredFiles].sort((a, b) => {
-    // Sempre mostrar pastas primeiro
-    if (a.IsDirectory && b.IsDirectory) {
-      // Se ambos são pastas, ordenar pelo critério selecionado
-      if (sortBy === "name") {
-        return sortDirection === "asc"
-          ? a.ObjectName.localeCompare(b.ObjectName)
-          : b.ObjectName.localeCompare(a.ObjectName)
-      } else if (sortBy === "date") {
-        return sortDirection === "asc"
-          ? new Date(a.LastChanged).getTime() - new Date(b.LastChanged).getTime()
-          : new Date(b.LastChanged).getTime() - new Date(a.LastChanged).getTime()
-      } else if (sortBy === "size") {
-        return sortDirection === "asc" ? a.Length - b.Length : b.Length - a.Length
-      }
-    } else if (a.IsDirectory && !b.IsDirectory) {
-      return -1 // Pastas vêm primeiro
-    } else if (!a.IsDirectory && b.IsDirectory) {
-      return 1 // Arquivos vêm depois
-    }
-
-    // Se ambos são arquivos, ordenar pelo critério selecionado
-    if (sortBy === "name") {
-      return sortDirection === "asc"
-        ? a.ObjectName.localeCompare(b.ObjectName)
-        : b.ObjectName.localeCompare(a.ObjectName)
-    } else if (sortBy === "date") {
-      return sortDirection === "asc"
-        ? new Date(a.LastChanged).getTime() - new Date(b.LastChanged).getTime()
-        : new Date(b.LastChanged).getTime() - new Date(a.LastChanged).getTime()
-    } else if (sortBy === "size") {
-      return sortDirection === "asc" ? a.Length - b.Length : b.Length - a.Length
-    }
-
-    return 0
-  })
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-  }
-
-  const openRenameModal = (file: BunnyFile) => {
-    setFileToRename(file)
-    setNewFileName(file.ObjectName)
-    setRenameError(null)
-    setShowRenameModal(true)
-  }
-
-  const handleRename = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!fileToRename || !newFileName || newFileName.trim() === "") {
-      setRenameError("O nome do arquivo não pode estar vazio")
-      return
-    }
-
-    if (newFileName === fileToRename.ObjectName) {
-      setShowRenameModal(false)
-      return
-    }
-
-    if (/[\\/:*?"<>|]/.test(newFileName)) {
-      setRenameError("O nome do arquivo contém caracteres inválidos")
-      return
-    }
-
-    setIsRenaming(true)
-    setRenameError(null)
-
-    try {
-      console.log(`Renomeando arquivo: ${fileToRename.Path} para ${newFileName}`)
-
-      const response = await fetch("/api/files/rename", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          oldPath: fileToRename.Path,
-          newName: newFileName,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || "Erro ao renomear arquivo")
-      }
-
-      console.log("Resposta da API:", data)
-
-      const lastSlashIndex = fileToRename.Path.lastIndexOf("/")
-      const directory = lastSlashIndex >= 0 ? fileToRename.Path.substring(0, lastSlashIndex + 1) : ""
-      const newPath = directory + newFileName
-
-      setFiles((prevFiles) =>
-        prevFiles.map((file) => {
-          if (file.Path === fileToRename.Path) {
-            return {
-              ...file,
-              ObjectName: newFileName,
-              Path: newPath,
-              PublicUrl: data.newUrl || `${process.env.NEXT_PUBLIC_BUNNY_PULLZONE_URL}/${newPath}`,
-            }
-          }
-          return file
-        }),
-      )
-
-      setShowRenameModal(false)
-
-      setTimeout(() => {
-        fetchFiles(getCurrentPathString())
-      }, 1000)
-    } catch (error) {
-      console.error("Erro ao renomear arquivo:", error)
-      setRenameError(error instanceof Error ? error.message : "Erro ao renomear arquivo")
-    } finally {
-      setIsRenaming(false)
-    }
-  }
-
-  const openMoveFileModal = (file: BunnyFile) => {
-    setFileToMove(file)
-    setDestinationPath("")
-    setMoveFileError(null)
-    setShowMoveFileModal(true)
-  }
-
-  const handleMoveFile = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!fileToMove || !destinationPath) {
-      setMoveFileError("Selecione um destino para mover o arquivo")
-      return
-    }
-
-    setIsMovingFile(true)
-    setMoveFileError(null)
-
-    try {
-      const fileName = fileToMove.ObjectName
-      const newPath = `${destinationPath}${destinationPath.endsWith("/") ? "" : "/"}${fileName}`
-
-      console.log(`Movendo arquivo: ${fileToMove.Path} para ${newPath}`)
-
-      const response = await fetch("/api/files/move", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          sourcePath: fileToMove.Path,
-          destinationPath: newPath,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || "Erro ao mover arquivo")
-      }
-
-      console.log("Resposta da API:", data)
-
-      setFiles((prevFiles) => prevFiles.filter((file) => file.Path !== fileToMove.Path))
-
-      setShowMoveFileModal(false)
-
-      await fetchFiles(getCurrentPathString())
-    } catch (error) {
-      console.error("Erro ao mover arquivo:", error)
-      setMoveFileError(error instanceof Error ? error.message : "Erro ao mover arquivo")
-    } finally {
-      setIsMovingFile(false)
-    }
-  }
-
-  const renderBreadcrumb = () => {
-    return (
-      <div className="flex items-center text-sm text-gray-600 mb-4 overflow-x-auto">
-        <button onClick={navigateHome} className="p-1 hover:bg-gray-100 rounded-md flex items-center" title="Início">
-          <Home size={16} className="text-[#4b7bb5]" />
-        </button>
-        <span className="mx-1">/</span>
-
-        {currentPath.map((segment, index) => (
-          <React.Fragment key={index}>
-            <button
-              onClick={() => {
-                if (index < currentPath.length - 1) {
-                  navigateToFolder(currentPath.slice(0, index + 1).join("/"))
-                }
-              }}
-              className={`hover:underline ${index === currentPath.length - 1 ? "font-medium text-[#4b7bb5]" : ""}`}
-              disabled={index === currentPath.length - 1}
-            >
-              {segment}
-            </button>
-            {index < currentPath.length - 1 && <span className="mx-1">/</span>}
-          </React.Fragment>
-        ))}
-      </div>
-    )
-  }
-
-  const openFolderTasks = (folderPath: string) => {
-    console.log("Abrindo tarefas para a pasta:", folderPath)
-    setSelectedFolderForTasks(folderPath)
-    setShowFolderTasks(true)
-  }
-
-  const updateFolderTaskCount = useCallback((folderPath: string, count: number) => {
-    setFolderTaskCounts((prev) => ({
-      ...prev,
-      [folderPath]: count,
-    }))
-  }, [])
-
-  const toggleSelectionMode = () => {
-    setIsSelectionMode(!isSelectionMode)
-    if (!isSelectionMode) {
-      setSelectedFiles([])
-    }
-  }
-
-  const toggleFileSelection = (file: BunnyFile) => {
-    if (selectedFiles.some((f) => f.Path === file.Path)) {
-      setSelectedFiles(selectedFiles.filter((f) => f.Path !== file.Path))
-    } else {
-      setSelectedFiles([...selectedFiles, file])
-    }
-  }
-
-  const isFileSelected = (file: BunnyFile) => {
-    return selectedFiles.some((f) => f.Path === file.Path)
-  }
-
-  const selectAll = () => {
-    setSelectedFiles([...filteredFiles])
-  }
-
-  const deselectAll = () => {
-    setSelectedFiles([])
-  }
-
-  const openMultiMoveModal = () => {
-    if (selectedFiles.length === 0) {
-      setDragFeedback({
-        message: "Selecione pelo menos um arquivo para mover",
-        type: "error",
-      })
-
-      setTimeout(() => {
-        setDragFeedback(null)
-      }, 3000)
-      return
-    }
-
-    setMultiMoveDestination("")
-    setMultiMoveError(null)
-    setShowMultiMoveModal(true)
-  }
-
-  // Atualizar a função de mover múltiplos arquivos
-  const handleMoveMultipleFiles = async (e) => {
-    if (typeof e.preventDefault === "function") e.preventDefault()
-
-    if (selectedFiles.length === 0) {
-      setMultiMoveError("Nenhum arquivo selecionado para mover")
-      return
-    }
-
-    setIsMovingMultiple(true)
-    setMultiMoveError(null)
-    setMultiMoveProgress({
-      current: 0,
-      total: selectedFiles.length,
-      currentFile: selectedFiles[0].ObjectName,
-    })
-
-    try {
-      const sourcePaths = selectedFiles.map((file) => file.Path)
-      const destinationFolder = multiMoveDestination || getCurrentPathString()
-
-      console.log(`Movendo ${sourcePaths.length} arquivos para ${destinationFolder}`)
-
-      // Usar a API de mover múltiplos arquivos
-      const response = await fetch("/api/files/move-multiple", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          sourcePaths,
-          destinationFolder,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || "Erro ao mover arquivos")
-      }
-
-      console.log("Resposta da API:", data)
-
-      // Remover os arquivos movidos da lista
-      setFiles((prevFiles) => prevFiles.filter((file) => !selectedFiles.some((f) => f.Path === file.Path)))
-
-      setShowMultiMoveModal(false)
-      setSelectedFiles([])
-      setIsSelectionMode(false)
-
-      await fetchFiles(getCurrentPathString())
-
-      // Mostrar toast de sucesso
-      const successMessage = data.success
-        ? `${selectedFiles.length} arquivo(s) movido(s) com sucesso!`
-        : `Operação concluída com ${data.errors?.length || 0} erro(s)`
-
-      alert(successMessage)
-    } catch (error) {
-      console.error("Erro ao mover arquivos:", error)
-      setMultiMoveError(error instanceof Error ? error.message : "Erro ao mover arquivos")
-    } finally {
-      setIsMovingMultiple(false)
-      setMultiMoveProgress(null)
-    }
-  }
-
-  const handleDeleteMultipleFiles = async () => {
-    if (selectedFiles.length === 0) {
-      alert("Selecione pelo menos um arquivo para excluir")
-      return
-    }
-
-    if (
-      !confirm(`Tem certeza que deseja excluir ${selectedFiles.length} arquivo(s)? Esta ação não pode ser desfeita.`)
-    ) {
-      return
-    }
-
-    try {
-      for (const file of selectedFiles) {
-        console.log(`Excluindo arquivo: ${file.Path}`)
-
-        let cleanPath = file.Path
-
-        if (file.Path.startsWith("http")) {
-          const url = new URL(file.Path)
-          cleanPath = url.pathname.replace(/^\//, "")
-        }
-
-        const response = await fetch(`/api/files/${encodeURIComponent(cleanPath)}`, {
-          method: "DELETE",
-        })
-
-        if (!response.ok) {
-          const data = await response.json()
-          throw new Error(
-            `Erro ao excluir arquivo ${file.ObjectName}: ${data.message || data.error || "Erro desconhecido"}`,
-          )
-        }
-      }
-
-      setFiles((prevFiles) => prevFiles.filter((file) => !selectedFiles.some((f) => f.Path === file.Path)))
-
-      setSelectedFiles([])
-      setIsSelectionMode(false)
-
-      alert(`${selectedFiles.length} arquivo(s) excluído(s) com sucesso!`)
-    } catch (error) {
-      console.error("Erro ao excluir arquivos:", error)
-      alert(error instanceof Error ? error.message : "Erro ao excluir arquivos")
-    }
-  }
-
-  const openTasksPanel = (folderPath: string) => {
-    setSelectedFolderForTasks(folderPath)
-    setShowTasksPanel(true)
-  }
-
-  const closeTasksPanel = () => {
-    setShowTasksPanel(false)
-    setSelectedFolderForTasks("")
-  }
-
-  const truncateFileName = (name: string, maxLength = 25) => {
-    if (name.length <= maxLength) return name
-
-    const extension = name.split(".").pop() || ""
-    const nameWithoutExt = name.substring(0, name.length - extension.length - 1)
-
-    if (nameWithoutExt.length <= maxLength - 3) return name
-
-    return `${nameWithoutExt.substring(0, maxLength - 3)}...${extension ? "." + extension : ""}`
-  }
-
-  const getRelativeTime = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-
-    const diffSecs = Math.floor(diffMs / 1000)
-    const diffMins = Math.floor(diffSecs / 60)
-    const diffHours = Math.floor(diffMins / 60)
-    const diffDays = Math.floor(diffHours / 24)
-
-    if (diffDays > 0) {
-      return `há ${diffDays} ${diffDays === 1 ? "dia" : "dias"}`
-    } else if (diffHours > 0) {
-      return `há ${diffHours} ${diffHours === 1 ? "hora" : "horas"}`
-    } else if (diffMins > 0) {
-      return `há ${diffMins} ${diffMins === 1 ? "minuto" : "minutos"}`
-    } else {
-      return "agora mesmo"
-    }
-  }
-
-  // Funções para drag and drop
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, file: BunnyFile) => {
-    e.dataTransfer.setData("application/json", JSON.stringify(file))
-    e.dataTransfer.effectAllowed = "move"
-    setDraggedFile(file)
-
-    // Criar uma imagem de preview para o drag
-    const dragPreview = document.createElement("div")
-    dragPreview.className = "bg-white p-2 rounded shadow-md border border-[#4b7bb5] flex items-center"
-    dragPreview.innerHTML = `
-      <div class="mr-2">${
-        file.IsDirectory
-          ? '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4b7bb5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>'
-          : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>'
-      }</div>
-      <span class="text-sm font-medium">${file.ObjectName.length > 15 ? file.ObjectName.substring(0, 15) + "..." : file.ObjectName}</span>
-    `
-    document.body.appendChild(dragPreview)
-
-    // Definir a imagem de preview para o drag
-    try {
-      e.dataTransfer.setDragImage(dragPreview, 20, 20)
-      setTimeout(() => {
-        document.body.removeChild(dragPreview)
-      }, 0)
-    } catch (err) {
-      console.error("Erro ao definir imagem de drag:", err)
-      if (document.body.contains(dragPreview)) {
-        document.body.removeChild(dragPreview)
-      }
-    }
-  }
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, folder?: BunnyFile) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    if (!draggedFile) return
-
-    // Não permitir arrastar para a mesma pasta ou para um arquivo
-    if (folder) {
-      if (!folder.IsDirectory) return
-      if (draggedFile.Path === folder.Path) return
-      if (draggedFile.IsDirectory && folder.Path.startsWith(draggedFile.Path)) return
-
-      e.dataTransfer.dropEffect = "move"
-      setDragOverFolder(folder.Path)
-    } else {
-      // Estamos sobre a área de drop geral
-      e.dataTransfer.dropEffect = "move"
-      setIsDraggingOver(true)
-    }
-  }
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOverFolder(null)
-    setIsDraggingOver(false)
-  }
-
-  const handleDrop = async (e: React.DragEvent<HTMLDivElement>, folder?: BunnyFile) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    setDragOverFolder(null)
-    setIsDraggingOver(false)
-
-    if (!draggedFile) return
-
-    try {
-      let destinationPath: string
-
-      if (folder) {
-        // Drop em uma pasta específica
-        if (!folder.IsDirectory) return
-        if (draggedFile.Path === folder.Path) return
-        if (draggedFile.IsDirectory && folder.Path.startsWith(draggedFile.Path)) {
-          setDragFeedback({
-            message: "Não é possível mover uma pasta para dentro dela mesma",
-            type: "error",
-          })
-          return
-        }
-
-        destinationPath = folder.Path
-      } else {
-        // Drop na área geral (pasta atual)
-        destinationPath = getCurrentPathString()
-
-        // Verificar se já estamos na pasta atual
-        const currentDir = getCurrentPathString()
-        const fileDir = draggedFile.Path.substring(0, draggedFile.Path.lastIndexOf("/"))
-
-        if (fileDir === currentDir) {
-          setDragFeedback({
-            message: "O arquivo já está nesta pasta",
-            type: "info",
-          })
-          return
-        }
-      }
-
-      // Construir o novo caminho
-      const fileName = draggedFile.ObjectName
-      const newPath = `${destinationPath}${destinationPath.endsWith("/") ? "" : "/"}${fileName}`
-
-      console.log(`Movendo arquivo via drag & drop: ${draggedFile.Path} para ${newPath}`)
-
-      setDragFeedback({
-        message: `Movendo ${draggedFile.ObjectName}...`,
-        type: "info",
-      })
-
-      const response = await fetch("/api/files/move", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          sourcePath: draggedFile.Path,
-          destinationPath: newPath,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || "Erro ao mover arquivo")
-      }
-
-      // Atualizar a UI
-      setFiles((prevFiles) => prevFiles.filter((file) => file.Path !== draggedFile.Path))
-
-      setDragFeedback({
-        message: `${draggedFile.ObjectName} movido com sucesso!`,
-        type: "success",
-      })
-
-      // Limpar o feedback após alguns segundos
-      setTimeout(() => {
-        setDragFeedback(null)
-      }, 3000)
-
-      // Recarregar os arquivos
-      await fetchFiles(getCurrentPathString())
-    } catch (error) {
-      console.error("Erro ao mover arquivo via drag & drop:", error)
-      setDragFeedback({
-        message: error instanceof Error ? error.message : "Erro ao mover arquivo",
-        type: "error",
-      })
-
-      // Limpar o feedback após alguns segundos
-      setTimeout(() => {
-        setDragFeedback(null)
-      }, 5000)
-    } finally {
-      setDraggedFile(null)
-    }
-  }
-
-  // Função para lidar com o upload de arquivos via drag and drop
-  const handleFileUploadDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    setIsDraggingOver(false)
-
-    // Verificar se temos arquivos
-    if (!e.dataTransfer.files || e.dataTransfer.files.length === 0) return
-
-    const files = Array.from(e.dataTransfer.files)
-
-    // Verificar se são arquivos válidos
-    if (files.some((file) => file.size > 100 * 1024 * 1024)) {
-      setDragFeedback({
-        message: "Alguns arquivos excedem o tamanho máximo de 100MB",
-        type: "error",
-      })
-      return
-    }
-
-    setDragFeedback({
-      message: `Iniciando upload de ${files.length} arquivo(s)...`,
-      type: "info",
-    })
-
-    // Fazer upload de cada arquivo
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-
-        setDragFeedback({
-          message: `Enviando ${i + 1}/${files.length}: ${file.name}...`,
-          type: "info",
-        })
-
-        const formData = new FormData()
-        formData.append("file", file)
-        formData.append("folder", getCurrentPathString())
-
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || errorData.error || `Erro ao fazer upload: ${response.status}`)
-        }
-      }
-
-      setDragFeedback({
-        message: `${files.length} arquivo(s) enviado(s) com sucesso!`,
-        type: "success",
-      })
-
-      // Limpar o feedback após alguns segundos
-      setTimeout(() => {
-        setDragFeedback(null)
-      }, 3000)
-
-      // Recarregar os arquivos
-      await fetchFiles(getCurrentPathString())
-    } catch (error) {
-      console.error("Erro ao fazer upload de arquivos:", error)
-      setDragFeedback({
-        message: error instanceof Error ? error.message : "Erro ao fazer upload de arquivos",
-        type: "error",
-      })
-
-      // Limpar o feedback após alguns segundos
-      setTimeout(() => {
-        setDragFeedback(null)
-      }, 5000)
-    }
-  }
-
-  // Alternar favorito
-  const toggleFavorite = (file: BunnyFile) => {
-    const newFavorites = favorites.includes(file.Path)
-      ? favorites.filter((path) => path !== file.Path)
-      : [...favorites, file.Path]
-
-    setFavorites(newFavorites)
-    localStorage.setItem("fileFavorites", JSON.stringify(newFavorites))
-
-    // Mostrar feedback
-    setDragFeedback({
-      message: favorites.includes(file.Path) ? "Removido dos favoritos" : "Adicionado aos favoritos",
-      type: "success",
-    })
-
-    // Esconder o feedback após alguns segundos
-    setTimeout(() => {
-      setDragFeedback(null)
-    }, 3000)
-  }
-
-  // Renderizar estatísticas de armazenamento
-  const renderStorageStats = () => {
-    const usedPercentage = (storageUsage.used / storageUsage.total) * 100
-
-    return (
-      <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm mb-4">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-sm font-medium text-gray-700 flex items-center">
-            <HardDrive className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-            Armazenamento
-          </h3>
-          <span className="text-xs text-gray-500">
-            {formatFileSize(storageUsage.used)} de {formatFileSize(storageUsage.total)}
-          </span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div
-            className={`h-2 rounded-full ${
-              usedPercentage < 70 ? "bg-[#4b7bb5]" : usedPercentage < 90 ? "bg-yellow-500" : "bg-red-500"
-            }`}
-            style={{ width: `${usedPercentage}%` }}
-          ></div>
-        </div>
-        <p className="mt-2 text-xs text-gray-500">
-          {usedPercentage < 70
-            ? "Espaço suficiente disponível"
-            : usedPercentage < 90
-              ? "Espaço limitado disponível"
-              : "Pouco espaço disponível"}
-        </p>
-      </div>
-    )
+  // Adicionar useImperativeHandle para expor métodos
+  useImperativeHandle(ref, () => ({
+    fetchFiles: () => fetchFiles(getCurrentPathString()),
+    refresh: () => fetchFiles(getCurrentPathString()),
+  }))
+
+  // Se não estiver autenticado, não renderizar nada
+  if (!isAuthenticated) {
+    return null
   }
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Área principal de arquivos */}
-        <div className="md:col-span-3">
-          <div
-            className="bg-white rounded-xl shadow-md p-6 border border-gray-100"
-            ref={fileListRef}
-            onDragOver={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              if (!draggedFile) {
-                setIsDraggingOver(true)
-              }
-            }}
-            onDragLeave={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              if (!draggedFile) {
-                setIsDraggingOver(false)
-              }
-            }}
-            onDrop={(e) => {
-              if (draggedFile) {
-                handleDrop(e)
-              } else {
-                handleFileUploadDrop(e)
-              }
-            }}
-          >
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <h2 className="text-xl font-bold text-[#4072b0] flex items-center">
-                <FolderOpen className="mr-2 h-6 w-6 text-[#4b7bb5]" />
-                Arquivos Armazenados
-              </h2>
-
-              <div className="flex flex-wrap gap-3 w-full md:w-auto">
-                <div className="flex gap-2 bg-gray-50 p-1 rounded-lg border border-gray-200">
-                  <button
-                    onClick={() => switchDirectory("documents")}
-                    className={`px-3 py-1.5 text-sm rounded-md transition-all ${
-                      selectedDirectory === "documents"
-                        ? "bg-[#4b7bb5] text-white shadow-sm"
-                        : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    Documentos
-                  </button>
-                  <button
-                    onClick={() => switchDirectory("images")}
-                    className={`px-3 py-1.5 text-sm rounded-md transition-all ${
-                      selectedDirectory === "images"
-                        ? "bg-[#4b7bb5] text-white shadow-sm"
-                        : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    Imagens
-                  </button>
-                </div>
-
-                <form onSubmit={handleSearch} className="relative flex-grow max-w-xs">
-                  <input
-                    type="text"
-                    placeholder="Buscar arquivos..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5] transition-all"
-                  />
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                </form>
-              </div>
-            </div>
-
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              <div className="flex items-center space-x-2 mr-4">
-                <button
-                  onClick={navigateBack}
-                  disabled={pathHistory.length === 0}
-                  className="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-transparent"
-                  title="Voltar"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <button
-                  onClick={navigateForward}
-                  disabled={forwardHistory.length === 0}
-                  className="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-transparent"
-                  title="Avançar"
-                >
-                  <ChevronRight size={18} />
-                </button>
-                <button
-                  onClick={navigateHome}
-                  className="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                  title="Início"
-                >
-                  <Home size={18} />
-                </button>
-              </div>
-
-              {renderBreadcrumb()}
-            </div>
-
-            <div className="flex flex-wrap gap-2 mb-6">
-              <button
-                onClick={toggleSelectionMode}
-                className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all ${
-                  isSelectionMode
-                    ? "bg-[#4b7bb5] text-white shadow-sm"
-                    : "bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
-                }`}
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+        <Breadcrumbs aria-label="breadcrumb">
+          <Link underline="hover" color="inherit" href="#" onClick={() => handlePathClick(0)}>
+            Home
+          </Link>
+          {currentPath.slice(1).map((path, index) => {
+            const pathIndex = index + 1
+            return (
+              <Link
+                key={pathIndex}
+                underline="hover"
+                color="inherit"
+                href="#"
+                onClick={() => handlePathClick(pathIndex)}
               >
-                {isSelectionMode ? (
-                  <>
-                    <X className="h-4 w-4 mr-1.5" />
-                    Cancelar Seleção
-                  </>
-                ) : (
-                  <>
-                    <CheckSquare className="h-4 w-4 mr-1.5" />
-                    Selecionar Múltiplos
-                  </>
-                )}
-              </button>
+                {path}
+              </Link>
+            )
+          })}
+        </Breadcrumbs>
 
-              {isSelectionMode && (
-                <>
-                  <button
-                    onClick={selectAll}
-                    className="flex items-center text-sm px-3 py-1.5 rounded-md transition-all bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
-                    disabled={filteredFiles.length === 0}
-                  >
-                    <CheckSquare className="h-4 w-4 mr-1.5" />
-                    Selecionar Todos
-                  </button>
+        <TextField
+          size="small"
+          placeholder="Search files"
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+          value={searchQuery}
+          onChange={handleSearchChange}
+        />
+      </Box>
 
-                  <button
-                    onClick={deselectAll}
-                    className="flex items-center text-sm px-3 py-1.5 rounded-md transition-all bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
-                    disabled={selectedFiles.length === 0}
-                  >
-                    <Square className="h-4 w-4 mr-1.5" />
-                    Limpar Seleção
-                  </button>
-
-                  <button
-                    onClick={openMultiMoveModal}
-                    className="flex items-center text-sm px-3 py-1.5 rounded-md transition-all bg-[#4b7bb5] text-white hover:bg-[#3d649e] shadow-sm"
-                    disabled={selectedFiles.length === 0}
-                  >
-                    <MoveIcon className="h-4 w-4 mr-1.5" />
-                    Mover Selecionados ({selectedFiles.length})
-                  </button>
-
-                  <button
-                    onClick={handleDeleteMultipleFiles}
-                    className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all 
-                  ${
-                    selectedFiles.length > 0
-                      ? "bg-white text-red-600 border border-red-600 hover:bg-red-50"
-                      : "bg-white text-gray-400 border border-gray-300 cursor-not-allowed"
-                  }`}
-                    disabled={selectedFiles.length === 0}
-                  >
-                    <Trash2 className="h-4 w-4 mr-1.5" />
-                    Excluir Selecionados ({selectedFiles.length})
-                  </button>
-                </>
-              )}
-
-              {!isSelectionMode && (
-                <>
-                  <button
-                    onClick={handleCreateDirectory}
-                    className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all ${
-                      isCreatingDirectory
-                        ? "bg-gray-100 text-gray-500"
-                        : "bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
-                    }`}
-                    disabled={isCreatingDirectory}
-                  >
-                    {isCreatingDirectory ? (
-                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                    ) : (
-                      <FolderPlus className="h-4 w-4 mr-1.5" />
-                    )}
-                    Criar Pasta
-                  </button>
-
-                  <button
-                    onClick={() => fetchFiles(getCurrentPathString())}
-                    className={`flex items-center text-sm px-3 py-1.5 rounded-md transition-all ${
-                      isLoading
-                        ? "bg-gray-100 text-gray-500"
-                        : "bg-white text-[#4b7bb5] border border-[#4b7bb5] hover:bg-[#f0f4f9]"
-                    }`}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4 mr-1.5" />
-                    )}
-                    Atualizar
-                  </button>
-
-                  <div className="flex items-center gap-1 ml-auto">
-                    <button
-                      onClick={() => setViewMode("grid")}
-                      className={`p-2 rounded-md ${
-                        viewMode === "grid" ? "bg-[#4b7bb5] text-white" : "text-gray-500 hover:bg-gray-100"
-                      }`}
-                      title="Visualização em grade"
-                    >
-                      <LayoutGrid size={16} />
-                    </button>
-                    <button
-                      onClick={() => setViewMode("list")}
-                      className={`p-2 rounded-md ${
-                        viewMode === "list" ? "bg-[#4b7bb5] text-white" : "text-gray-500 hover:bg-gray-100"
-                      }`}
-                      title="Visualização em lista"
-                    >
-                      <LayoutList size={16} />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => {
-                        setSortBy("name")
-                        setSortDirection(sortBy === "name" && sortDirection === "asc" ? "desc" : "asc")
-                      }}
-                      className={`p-2 rounded-md ${
-                        sortBy === "name" ? "bg-[#4b7bb5] text-white" : "text-gray-500 hover:bg-gray-100"
-                      }`}
-                      title={`Ordenar por nome (${sortDirection === "asc" ? "A-Z" : "Z-A"})`}
-                    >
-                      {sortBy === "name" && sortDirection === "asc" ? <SortAsc size={16} /> : <SortDesc size={16} />}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {isSelectionMode && selectedFiles.length > 0 && (
-              <div className="bg-blue-50 p-3 rounded-lg mb-4 border border-blue-100 flex items-center justify-between">
-                <div className="flex items-center">
-                  <CheckSquare className="h-5 w-5 mr-2 text-[#4b7bb5]" />
-                  <span className="font-medium text-[#4b7bb5]">{selectedFiles.length} arquivo(s) selecionado(s)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={openMultiMoveModal}
-                    className="bg-[#4b7bb5] text-white text-sm py-1 px-2 rounded hover:bg-[#3d649e] flex items-center"
-                  >
-                    <MoveIcon className="h-3 w-3 mr-1" />
-                    Mover
-                  </button>
-                  <button
-                    onClick={handleDeleteMultipleFiles}
-                    className="bg-red-500 text-white text-sm py-1 px-2 rounded hover:bg-red-600 flex items-center"
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" />
-                    Excluir
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {directoryCreated && (
-              <div className="bg-green-50 p-4 rounded-lg mb-6 border-l-4 border-green-500 flex items-start animate-fadeIn">
-                <CheckCircle className="h-5 w-5 mr-2 text-green-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-green-700">Diretório criado com sucesso!</p>
-                  <p className="mt-1 text-green-600">
-                    O diretório "{selectedDirectory}" foi criado e está pronto para receber arquivos.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {directoryInfo && (
-              <div className="bg-blue-50 p-4 rounded-lg mb-6 border-l-4 border-blue-500">
-                <h3 className="font-medium text-blue-700 mb-2 flex items-center">
-                  <Info className="h-4 w-4 mr-2" />
-                  Informações do Diretório
-                </h3>
-                <div className="bg-white p-3 rounded-md border border-blue-100">
-                  <p className="mb-1">
-                    Status: <span className="font-medium">{directoryInfo.exists ? "Existe" : "Não existe"}</span>
-                  </p>
-                  {directoryInfo.exists && (
-                    <p>
-                      Quantidade de arquivos: <span className="font-medium">{directoryInfo.fileCount}</span>
-                    </p>
-                  )}
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-blue-600 hover:text-blue-800 text-sm">
-                      Detalhes técnicos
-                    </summary>
-                    <pre className="mt-2 p-2 bg-blue-50 rounded text-xs overflow-auto max-h-40 border border-blue-100">
-                      {JSON.stringify(directoryInfo, null, 2)}
-                    </pre>
-                  </details>
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-red-50 p-4 rounded-lg mb-6 border-l-4 border-red-500 flex items-start">
-                <AlertCircle className="h-5 w-5 mr-2 text-red-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-red-700 mb-2">Erro ao carregar arquivos:</p>
-                  <p className="mb-3 text-red-600">{error}</p>
-                  <div className="bg-white p-3 rounded-md border border-red-100 text-sm space-y-2">
-                    <p>
-                      Verifique se as variáveis de ambiente{" "}
-                      <code className="bg-red-50 px-1 py-0.5 rounded">BUNNY_API_KEY</code> e{" "}
-                      <code className="bg-red-50 px-1 py-0.5 rounded">BUNNY_STORAGE_ZONE</code> estão configuradas
-                      corretamente.
-                    </p>
-                    <p>
-                      <strong>Importante:</strong> Certifique-se de que você configurou uma Pull Zone no painel do
-                      Bunny.net conectada à sua Storage Zone para acessar os arquivos publicamente.
-                    </p>
-                    <div className="mt-3">
-                      <button
-                        onClick={() => handleCreateDirectory()}
-                        className="text-red-600 hover:text-red-800 underline font-medium"
-                        disabled={isCreatingDirectory}
-                      >
-                        Tentar criar uma nova pasta
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Área de drop para upload de arquivos */}
-            {isDraggingOver && !draggedFile && (
-              <div className="absolute inset-0 bg-[#4b7bb5] bg-opacity-10 border-2 border-dashed border-[#4b7bb5] rounded-xl flex items-center justify-center z-10">
-                <div className="bg-white p-6 rounded-lg shadow-lg text-center">
-                  <Upload className="h-12 w-12 text-[#4b7bb5] mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-[#4b7bb5] mb-2">Solte os arquivos aqui</h3>
-                  <p className="text-gray-600">Solte para fazer upload para a pasta atual</p>
-                </div>
-              </div>
-            )}
-
-            {isLoading && filteredFiles.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="animate-spin h-10 w-10 border-3 border-[#4b7bb5] border-t-transparent rounded-full mx-auto mb-4"></div>
-                <p className="text-gray-600 font-medium">Carregando arquivos...</p>
-                <p className="text-gray-500 text-sm mt-1">Aguarde enquanto buscamos os arquivos do diretório</p>
-              </div>
-            ) : filteredFiles.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                <FolderOpen size={48} className="text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-700 mb-1">Pasta vazia</h3>
-                <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                  {searchQuery
-                    ? `Nenhum arquivo encontrado para "${searchQuery}". Tente outra busca.`
-                    : `Esta pasta não contém nenhum arquivo ou subpasta. Faça upload de arquivos ou crie uma nova pasta.`}
-                </p>
-                <div className="flex flex-wrap justify-center gap-3">
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className={`flex items-center px-4 py-2 rounded-md transition-all ${
-                      searchQuery ? "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50" : "hidden"
-                    }`}
-                  >
-                    <X className="h-4 w-4 mr-1.5" />
-                    Limpar busca
-                  </button>
-
-                  <button
-                    onClick={handleCreateDirectory}
-                    className="flex items-center px-4 py-2 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] transition-colors shadow-sm"
-                    disabled={isCreatingDirectory}
-                  >
-                    {isCreatingDirectory ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                        <span>Criando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FolderPlus className="h-4 w-4 mr-1.5" />
-                        <span>Criar pasta</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            ) : viewMode === "grid" ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {sortedFiles.map((file) => (
-                  <div
-                    key={file.Guid || file.ObjectName}
-                    className={`bg-gray-100 rounded-lg border ${
-                      dragOverFolder === file.Path
-                        ? "border-[#4b7bb5] border-2 shadow-md"
-                        : isSelectionMode && selectedFiles.some((f) => f.Path === file.Path)
-                          ? "border-[#4b7bb5] shadow-md bg-blue-50"
-                          : "border-gray-200"
-                    } overflow-hidden hover:shadow-md transition-all cursor-pointer relative group`}
-                    onClick={() => (isSelectionMode ? toggleFileSelection(file) : handlePreviewFile(file))}
-                    draggable={!isSelectionMode}
-                    onDragStart={(e) => handleDragStart(e, file)}
-                    onDragOver={(e) => handleDragOver(e, file)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, file)}
-                  >
-                    <div className="flex flex-col">
-                      {/* Área de thumbnail */}
-                      <div className="w-full h-40 overflow-hidden bg-white flex items-center justify-center">
-                        {isImage(file.ObjectName) && file.PublicUrl ? (
-                          <img
-                            src={file.PublicUrl || "/placeholder.svg"}
-                            alt={file.ObjectName}
-                            className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none"
-                              const iconContainer = e.currentTarget.parentElement
-                              if (iconContainer) {
-                                const icon = document.createElement("div")
-                                icon.className = "flex items-center justify-center h-full"
-                                icon.innerHTML =
-                                  '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="text-green-500"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>'
-                                iconContainer.appendChild(icon)
-                              }
-                            }}
-                          />
-                        ) : file.ObjectName.toLowerCase().endsWith(".pdf") ? (
-                          <div className="flex flex-col items-center justify-center">
-                            <div className="w-10 h-10 bg-red-500 rounded-md flex items-center justify-center mb-2">
-                              <FileText className="h-6 w-6 text-white" />
-                            </div>
-                          </div>
-                        ) : file.IsDirectory ? (
-                          <div className="flex flex-col items-center justify-center">
-                            <Folder className="h-16 w-16 text-[#4b7bb5]" />
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center">
-                            {getFileIcon(file.ObjectName)}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Área de informações */}
-                      <div className="p-3 bg-gray-200">
-                        {/* Ícone de tipo de arquivo */}
-                        <div className="flex items-center mb-1">
-                          {file.ObjectName.toLowerCase().endsWith(".pdf") && (
-                            <div className="w-6 h-6 bg-red-500 rounded-sm flex items-center justify-center mr-2">
-                              <FileText className="h-4 w-4 text-white" />
-                            </div>
-                          )}
-                          <h3 className="text-sm font-medium text-gray-700 truncate">
-                            {truncateFileName(file.ObjectName, 25)}
-                          </h3>
-                        </div>
-                        <div className="flex items-center text-xs text-gray-500">
-                          <span>
-                            {file.IsDirectory
-                              ? "Pasta"
-                              : file.ObjectName.toLowerCase().endsWith(".pdf")
-                                ? "PDF"
-                                : file.ObjectName.split(".").pop()?.toUpperCase() || "Arquivo"}
-                          </span>
-                          <span className="mx-1">•</span>
-                          <span>{getRelativeTime(file.LastChanged)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Indicador de seleção */}
-                    {isSelectionMode && (
-                      <div className="absolute top-2 left-2 z-10">
-                        <div
-                          className={`w-6 h-6 rounded-md flex items-center justify-center transition-all ${
-                            isFileSelected(file)
-                              ? "bg-[#4b7bb5] text-white shadow-md scale-110"
-                              : "bg-white/80 border border-gray-300"
-                          }`}
-                        >
-                          {isFileSelected(file) && <CheckSquare className="h-4 w-4" />}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-lg border border-gray-200">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        {isSelectionMode && <th className="py-3 px-2 font-medium text-gray-600 w-10"></th>}
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Arquivo</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Tamanho</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Data</th>
-                        <th className="text-right py-3 px-4 font-medium text-gray-600">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {sortedFiles.map((file) => (
-                        <tr
-                          key={file.Guid || file.ObjectName}
-                          className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                            isFileSelected(file) ? "bg-blue-50" : ""
-                          } ${dragOverFolder === file.Path ? "bg-blue-100" : ""}`}
-                          draggable={!isSelectionMode}
-                          onDragStart={(e) => handleDragStart(e, file)}
-                          onDragOver={(e) => handleDragOver(e, file)}
-                          onDragLeave={handleDragLeave}
-                          onDrop={(e) => handleDrop(e, file)}
-                        >
-                          {isSelectionMode && (
-                            <td className="py-3 px-2 text-center">
-                              <button
-                                onClick={() => toggleFileSelection(file)}
-                                className="p-1 rounded hover:bg-gray-100"
-                              >
-                                {isFileSelected(file) ? (
-                                  <CheckSquare className="h-5 w-5 text-[#4b7bb5]" />
-                                ) : (
-                                  <Square className="h-5 w-5 text-gray-400" />
-                                )}
-                              </button>
-                            </td>
-                          )}
-
-                          <td className="py-3 px-4">
-                            <div className="flex items-center">
-                              <div className="p-1.5 bg-gray-100 rounded-md mr-3">
-                                {file.IsDirectory ? (
-                                  <FolderOpen className="h-5 w-5 text-[#4b7bb5]" />
-                                ) : (
-                                  getFileIcon(file.ObjectName)
-                                )}
-                              </div>
-                              <div className="flex flex-col">
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className="cursor-pointer hover:text-[#4b7bb5] font-medium transition-colors"
-                                    onClick={() => handlePreviewFile(file)}
-                                  >
-                                    {file.ObjectName}
-                                  </span>
-                                  {file.IsDirectory && folderTaskCounts[file.Path] > 0 && (
-                                    <FolderTaskBadge
-                                      count={folderTaskCounts[file.Path]}
-                                      onClick={(e) => {
-                                        openFolderTasks(file.Path)
-                                      }}
-                                    />
-                                  )}
-                                  {favorites.includes(file.Path) && (
-                                    <Star size={14} className="fill-amber-500 text-amber-500" />
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-gray-500">
-                            {file.IsDirectory ? "-" : formatFileSize(file.Length)}
-                          </td>
-                          <td className="py-3 px-4 text-gray-500">{formatDate(file.LastChanged)}</td>
-
-                          <td className="py-3 px-4 text-right">
-                            <div className="flex justify-end space-x-2">
-                              {file.IsDirectory && (
-                                <button
-                                  className="p-1.5 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-md transition-colors"
-                                  title="Tarefas da pasta"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    openFolderTasks(file.Path)
-                                  }}
-                                >
-                                  <ClipboardList className="h-4 w-4" />
-                                </button>
-                              )}
-                              {!file.IsDirectory && (
-                                <a
-                                  href={file.PublicUrl || getBunnyPublicUrl(file.Path)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
-                                  title="Abrir arquivo"
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                </a>
-                              )}
-                              <button
-                                className="p-1.5 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-md transition-colors"
-                                title={
-                                  favorites.includes(file.Path) ? "Remover dos favoritos" : "Adicionar aos favoritos"
-                                }
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  toggleFavorite(file)
-                                }}
-                              >
-                                <Star
-                                  className={`h-4 w-4 ${
-                                    favorites.includes(file.Path) ? "fill-amber-500 text-amber-500" : ""
-                                  }`}
-                                />
-                              </button>
-                              <button
-                                className="p-1.5 text-orange-500 hover:text-orange-700 hover:bg-orange-50 rounded-md transition-colors"
-                                title="Renomear"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  openRenameModal(file)
-                                }}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </button>
-                              {!file.IsDirectory && (
-                                <button
-                                  className="p-1.5 text-purple-500 hover:text-purple-700 hover:bg-purple-50 rounded-md transition-colors"
-                                  title="Mover arquivo"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    openMoveFileModal(file)
-                                  }}
-                                >
-                                  <MoveIcon className="h-4 w-4" />
-                                </button>
-                              )}
-                              <button
-                                className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
-                                title="Excluir"
-                                onClick={() => handleDelete(file.Path)}
-                                disabled={deletingFile === file.Path}
-                              >
-                                {deletingFile === file.Path ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Feedback de drag and drop */}
-            {dragFeedback && (
-              <div
-                className={`fixed bottom-4 right-4 p-4 rounded-lg shadow-lg max-w-md z-50 transition-all duration-300 ${
-                  dragFeedback.type === "success"
-                    ? "bg-green-100 border-l-4 border-green-500 text-green-700"
-                    : dragFeedback.type === "error"
-                      ? "bg-red-100 border-l-4 border-red-500 text-red-700"
-                      : "bg-blue-100 border-l-4 border-blue-500 text-blue-700"
-                }`}
-              >
-                <div className="flex items-start">
-                  {dragFeedback.type === "success" && <CheckCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />}
-                  {dragFeedback.type === "error" && <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />}
-                  {dragFeedback.type === "info" && <Info className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />}
-                  <p>{dragFeedback.message}</p>
-                </div>
-              </div>
-            )}
-          </div>
-          {/* Botão flutuante para mover arquivos quando há seleção */}
-          {isSelectionMode && selectedFiles.length > 0 && (
-            <div className="fixed bottom-6 right-6 z-10">
-              <button
-                onClick={openMultiMoveModal}
-                className="flex items-center justify-center gap-2 bg-[#4b7bb5] text-white p-4 rounded-full shadow-lg hover:bg-[#3d649e] transition-all"
-              >
-                <MoveIcon className="h-5 w-5" />
-                <span className="font-medium">{selectedFiles.length}</span>
-              </button>
-            </div>
+      <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+        <div
+          {...getRootProps()}
+          style={{ border: "1px dashed gray", padding: "20px", textAlign: "center", cursor: "pointer" }}
+        >
+          <input {...getInputProps()} />
+          {uploading ? (
+            <CircularProgress size={24} />
+          ) : isDragActive ? (
+            <Typography>Drop the files here ...</Typography>
+          ) : (
+            <Typography>
+              Drag 'n' drop some files here, or click to select files <UploadIcon />
+            </Typography>
           )}
         </div>
 
-        {/* Sidebar direita */}
-        <div className="space-y-4">
-          {/* Filtros */}
-          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-            <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-              <Filter className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-              Filtrar Arquivos
-            </h3>
-            <div className="space-y-2">
-              <button
-                onClick={() => setActiveFilter("all")}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm ${
-                  activeFilter === "all" ? "bg-[#4b7bb5] text-white" : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                Todos os Arquivos
-              </button>
-              <button
-                onClick={() => setActiveFilter("recent")}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center ${
-                  activeFilter === "recent" ? "bg-[#4b7bb5] text-white" : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                <Clock className="h-4 w-4 mr-2" />
-                Arquivos Recentes
-              </button>
-              <button
-                onClick={() => setActiveFilter("favorites")}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center ${
-                  activeFilter === "favorites"
-                    ? "bg-[#4b7bb5] text-white"
-                    : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                <Star className="h-4 w-4 mr-2" />
-                Favoritos
-              </button>
-              <button
-                onClick={() => setActiveFilter("shared")}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center ${
-                  activeFilter === "shared" ? "bg-[#4b7bb5] text-white" : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                <Share2 className="h-4 w-4 mr-2" />
-                Compartilhados
-              </button>
-            </div>
-          </div>
+        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+          <TextField
+            size="small"
+            label="New directory name"
+            value={newDirectoryName}
+            onChange={(e) => setNewDirectoryName(e.target.value)}
+            disabled={creatingDirectory}
+          />
+          <IconButton onClick={handleCreateDirectory} disabled={creatingDirectory || !newDirectoryName.trim()}>
+            {creatingDirectory ? <CircularProgress size={24} /> : <CreateNewFolderIcon />}
+          </IconButton>
+        </Box>
+      </Box>
 
-          {/* Estatísticas de armazenamento */}
-          {renderStorageStats()}
-
-          {/* Arquivos recentes */}
-          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-            <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-              <Clock className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-              Arquivos Recentes
-            </h3>
-            {recentFiles.length === 0 ? (
-              <p className="text-xs text-gray-500 text-center py-2">Nenhum arquivo recente</p>
+      <TableContainer component={Paper}>
+        <Table sx={{ minWidth: 650 }} aria-label="simple table">
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>Modified</TableCell>
+              <TableCell>Size</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={4} align="center">
+                  <CircularProgress />
+                </TableCell>
+              </TableRow>
+            ) : filteredFiles.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} align="center">
+                  No files found.
+                </TableCell>
+              </TableRow>
             ) : (
-              <ul className="space-y-2">
-                {recentFiles.slice(0, 5).map((file) => (
-                  <li key={file.Guid || file.ObjectName} className="text-sm">
-                    <button
-                      onClick={() => window.open(file.PublicUrl, "_blank")}
-                      className="flex items-center hover:bg-gray-50 p-1.5 rounded-md w-full text-left"
-                    >
-                      {file.ObjectName.toLowerCase().endsWith(".pdf") ? (
-                        <FileText className="h-4 w-4 mr-2 text-red-500" />
-                      ) : isImage(file.ObjectName) ? (
-                        <ImageIcon className="h-4 w-4 mr-2 text-green-500" />
-                      ) : (
-                        getFileIcon(file.ObjectName)
-                      )}
-                      <span className="truncate flex-1">{file.ObjectName}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <button
-              onClick={() => setActiveFilter("recent")}
-              className="mt-3 text-xs text-[#4b7bb5] hover:text-[#3d649e] hover:underline w-full text-center"
-            >
-              Ver todos os arquivos recentes
-            </button>
-          </div>
-
-          {/* Favoritos */}
-          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-            <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-              <Star className="h-4 w-4 mr-2 text-amber-500" />
-              Favoritos
-            </h3>
-            {favorites.length === 0 ? (
-              <p className="text-xs text-gray-500 text-center py-2">Nenhum favorito</p>
-            ) : (
-              <ul className="space-y-2">
-                {files
-                  .filter((file) => favorites.includes(file.Path))
-                  .slice(0, 5)
-                  .map((file) => (
-                    <li key={file.Guid || file.ObjectName} className="text-sm">
-                      <button
-                        onClick={() =>
-                          file.IsDirectory ? navigateToFolder(file.Path) : window.open(file.PublicUrl, "_blank")
-                        }
-                        className="flex items-center hover:bg-gray-50 p-1.5 rounded-md w-full text-left"
+              filteredFiles.map((file) => (
+                <TableRow key={file.name} sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
+                  <TableCell component="th" scope="row">
+                    {file.type === "directory" ? (
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer" }}
+                        onClick={() => handleDirectoryClick(file.name)}
                       >
-                        {file.IsDirectory ? (
-                          <Folder className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-                        ) : (
-                          getFileIcon(file.ObjectName)
-                        )}
-                        <span className="truncate flex-1">{file.ObjectName}</span>
-                      </button>
-                    </li>
-                  ))}
-              </ul>
+                        <FolderIcon color="primary" />
+                        {file.name || "Unnamed"}
+                      </Box>
+                    ) : (
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <InsertDriveFileIcon />
+                        {file.name || "Unnamed"}
+                      </Box>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {file.modified
+                      ? formatDistanceToNow(new Date(file.modified), { addSuffix: true, locale: ptBR })
+                      : "Unknown"}
+                  </TableCell>
+                  <TableCell>{file.size ? `${file.size} KB` : "Unknown"}</TableCell>
+                  <TableCell align="right">
+                    {file.type === "file" && (
+                      <IconButton aria-label="delete" onClick={() => handleDeleteFile(file.name)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
             )}
-            <button
-              onClick={() => setActiveFilter("favorites")}
-              className="mt-3 text-xs text-[#4b7bb5] hover:text-[#3d649e] hover:underline w-full text-center"
-            >
-              Ver todos os favoritos
-            </button>
-          </div>
-        </div>
-      </div>
+          </TableBody>
+        </Table>
+      </TableContainer>
 
-      {/* Modais */}
-      {showRenameModal && fileToRename && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="font-medium flex items-center">
-                {fileToRename.IsDirectory ? (
-                  <FolderOpen className="h-5 w-5 mr-2 text-[#4b7bb5]" />
-                ) : (
-                  getFileIcon(fileToRename.ObjectName)
-                )}
-                <span className="ml-2">Renomear {fileToRename.IsDirectory ? "pasta" : "arquivo"}</span>
-              </h3>
-              <button
-                onClick={() => setShowRenameModal(false)}
-                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <form onSubmit={handleRename}>
-              <div className="p-6">
-                <div className="mb-4">
-                  <p className="text-sm text-gray-500 mb-2">Nome atual:</p>
-                  <p className="font-medium text-gray-700 bg-gray-50 p-2 rounded-md">{fileToRename.ObjectName}</p>
-                </div>
-                <div>
-                  <label htmlFor="newFileName" className="block text-sm font-medium text-gray-700 mb-1">
-                    Novo nome:
-                  </label>
-                  <input
-                    type="text"
-                    id="newFileName"
-                    value={newFileName}
-                    onChange={(e) => setNewFileName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5]"
-                    autoFocus
-                  />
-                  {renameError && <p className="mt-2 text-sm text-red-600">{renameError}</p>}
-                </div>
-              </div>
-              <div className="p-4 bg-gray-50 flex justify-end space-x-3 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowRenameModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isRenaming}
-                  className="px-4 py-2 bg-[#4b7bb5] border border-transparent rounded-md text-sm font-medium text-white hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4b7bb5] disabled:opacity-50 transition-colors"
-                >
-                  {isRenaming ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-1.5 inline animate-spin" />
-                      Renomeando...
-                    </>
-                  ) : (
-                    "Renomear"
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showCreateFolderModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="font-medium flex items-center">
-                <FolderPlus className="h-5 w-5 mr-2 text-[#4b7bb5]" />
-                <span className="ml-2">Criar Nova Pasta</span>
-              </h3>
-              <button
-                onClick={() => setShowCreateFolderModal(false)}
-                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <form onSubmit={submitCreateFolder}>
-              <div className="p-6">
-                <div>
-                  <label htmlFor="newFolderName" className="block text-sm font-medium text-gray-700 mb-1">
-                    Nome da pasta:
-                  </label>
-                  <input
-                    type="text"
-                    id="newFolderName"
-                    value={newFolderName}
-                    onChange={(e) => setNewFolderName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:border-[#4b7bb5]"
-                    autoFocus
-                    placeholder="Digite o nome da nova pasta"
-                  />
-                  {createFolderError && <p className="mt-2 text-sm text-red-600">{createFolderError}</p>}
-                </div>
-              </div>
-              <div className="p-4 bg-gray-50 flex justify-end space-x-3 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateFolderModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreatingFolder}
-                  className="px-4 py-2 bg-[#4b7bb5] border border-transparent rounded-md text-sm font-medium text-white hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4b7bb5] disabled:opacity-50 transition-colors"
-                >
-                  {isCreatingFolder ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-1.5 inline animate-spin" />
-                      Criando...
-                    </>
-                  ) : (
-                    "Criar Pasta"
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showMoveFileModal && fileToMove && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="font-medium flex items-center">
-                {fileToMove.IsDirectory ? (
-                  <FolderOpen className="h-5 w-5 mr-2 text-[#4b7bb5]" />
-                ) : (
-                  getFileIcon(fileToMove.ObjectName)
-                )}
-                <span className="ml-2">Mover {fileToMove.IsDirectory ? "pasta" : "arquivo"}</span>
-              </h3>
-              <button
-                onClick={() => setShowMoveFileModal(false)}
-                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <form onSubmit={handleMoveFile}>
-              <div className="p-6">
-                <div className="mb-4">
-                  <p className="text-sm text-gray-500 mb-2">Arquivo:</p>
-                  <p className="font-medium text-gray-700 bg-gray-50 p-2 rounded-md">{fileToMove.ObjectName}</p>
-                </div>
-                <div>
-                  <FolderSelector
-                    onSelect={(path) => setDestinationPath(path)}
-                    currentPath={getCurrentPathString()}
-                    excludePaths={fileToMove.IsDirectory ? [fileToMove.Path] : []}
-                  />
-                  {moveFileError && <p className="mt-2 text-sm text-red-600">{moveFileError}</p>}
-                  {destinationPath && (
-                    <div className="mt-3 p-2 bg-blue-50 rounded-md border border-blue-100">
-                      <p className="text-sm text-blue-700">Destino selecionado:</p>
-                      <p className="text-sm font-medium text-blue-800">{destinationPath}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="p-4 bg-gray-50 flex justify-end space-x-3 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowMoveFileModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isMovingFile || !destinationPath}
-                  className="px-4 py-2 bg-[#4b7bb5] border border-transparent rounded-md text-sm font-medium text-white hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4b7bb5] disabled:opacity-50 transition-colors"
-                >
-                  {isMovingFile ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-1.5 inline animate-spin" />
-                      Movendo...
-                    </>
-                  ) : (
-                    "Mover"
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal para mover múltiplos arquivos */}
-      <Dialog open={showMultiMoveModal} onOpenChange={setShowMultiMoveModal}>
-        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
-          <DialogHeader className="p-4 pb-2 border-b">
-            <DialogTitle className="flex items-center">
-              <MoveIcon className="h-5 w-5 mr-2 text-[#4b7bb5]" />
-              <span>Mover {selectedFiles.length} arquivo(s)</span>
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="grid grid-cols-1 md:grid-cols-5 h-[500px]">
-            {/* Painel esquerdo - Lista de pastas */}
-            <div className="md:col-span-2 border-r border-gray-200 h-full overflow-y-auto">
-              <div className="p-3 border-b bg-gray-50">
-                <h3 className="text-sm font-medium text-gray-700 flex items-center">
-                  <Folder className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-                  Pastas disponíveis
-                </h3>
-              </div>
-              <div className="overflow-y-auto h-[calc(100%-48px)]">
-                <div className="p-2">
-                  <button
-                    onClick={() => setMultiMoveDestination("")}
-                    className={`flex items-center w-full py-2 px-3 rounded-md text-left ${multiMoveDestination === "" ? "bg-[#4b7bb5] text-white" : "hover:bg-gray-100"}`}
-                  >
-                    <Home className="h-4 w-4 mr-2" />
-                    <span>Pasta raiz</span>
-                  </button>
-
-                  {availableFolders.map((folderPath) => {
-                    // Evitar pastas que são subpastas das pastas selecionadas
-                    if (selectedFiles.some((file) => file.IsDirectory && folderPath.startsWith(file.Path))) return null
-
-                    const folderName = folderPath.split("/").pop() || folderPath
-                    const isSelected = multiMoveDestination === folderPath
-
-                    return (
-                      <button
-                        key={folderPath}
-                        onClick={() => setMultiMoveDestination(folderPath)}
-                        className={`flex items-center w-full py-2 px-3 rounded-md text-left mt-1 ${isSelected ? "bg-[#4b7bb5] text-white" : "hover:bg-gray-100"}`}
-                      >
-                        <Folder className={`h-4 w-4 mr-2 ${isSelected ? "text-white" : "text-[#4b7bb5]"}`} />
-                        <span className="truncate">{folderName}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Painel direito - Prévia e detalhes */}
-            <div className="md:col-span-3 h-full overflow-y-auto flex flex-col">
-              <div className="p-3 border-b bg-gray-50">
-                <h3 className="text-sm font-medium text-gray-700 flex items-center">
-                  <Info className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-                  Detalhes da operação
-                </h3>
-              </div>
-
-              <div className="p-4 flex-1 overflow-y-auto">
-                {/* Destino selecionado */}
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-600 mb-2">Destino selecionado:</h4>
-                  {multiMoveDestination ? (
-                    <div className="bg-blue-50 p-3 rounded-md border border-blue-100 flex items-center">
-                      <Folder className="h-5 w-5 mr-2 text-[#4b7bb5]" />
-                      <span className="font-medium text-[#4b7bb5]">{multiMoveDestination}</span>
-                    </div>
-                  ) : (
-                    <div className="bg-yellow-50 p-3 rounded-md border border-yellow-100 flex items-center">
-                      <Home className="h-5 w-5 mr-2 text-amber-500" />
-                      <span className="font-medium text-amber-700">Pasta raiz</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Arquivos selecionados */}
-                <div>
-                  <h4 className="text-sm font-medium text-gray-600 mb-2">
-                    Arquivos a serem movidos ({selectedFiles.length}):
-                  </h4>
-                  <div className="bg-gray-50 rounded-md border border-gray-200 max-h-64 overflow-y-auto">
-                    {selectedFiles.map((file) => (
-                      <div key={file.Path} className="p-2 border-b border-gray-100 last:border-0 flex items-center">
-                        {file.IsDirectory ? (
-                          <Folder className="h-4 w-4 mr-2 text-[#4b7bb5]" />
-                        ) : (
-                          getFileIcon(file.ObjectName)
-                        )}
-                        <span className="text-sm truncate">{file.ObjectName}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Mensagem de erro */}
-                {multiMoveError && (
-                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
-                    <AlertCircle className="h-4 w-4 inline mr-2" />
-                    {multiMoveError}
-                  </div>
-                )}
-
-                {/* Progresso */}
-                {multiMoveProgress && (
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <div className="flex justify-between text-sm text-blue-700 mb-1">
-                      <span>Movendo arquivos...</span>
-                      <span>
-                        {multiMoveProgress.current + 1} de {multiMoveProgress.total}
-                      </span>
-                    </div>
-                    <div className="w-full bg-blue-200 rounded-full h-2">
-                      <div
-                        className="bg-[#4b7bb5] h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${((multiMoveProgress.current + 1) / multiMoveProgress.total) * 100}%` }}
-                      ></div>
-                    </div>
-                    <p className="text-xs text-blue-600 mt-1 truncate">Processando: {multiMoveProgress.currentFile}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
-                <Button variant="outline" onClick={() => setShowMultiMoveModal(false)} disabled={isMovingMultiple}>
-                  Cancelar
-                </Button>
-                <Button
-                  variant="default"
-                  onClick={handleMoveMultipleFiles}
-                  disabled={isMovingMultiple || selectedFiles.length === 0}
-                  className="bg-[#4b7bb5] hover:bg-[#3d649e]"
-                >
-                  {isMovingMultiple ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Movendo...
-                    </>
-                  ) : (
-                    <>
-                      <MoveIcon className="h-4 w-4 mr-2" />
-                      Mover arquivos
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-      {showFolderTasks && selectedFolderForTasks && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <FolderTasksPanel folderPath={selectedFolderForTasks} onClose={() => setShowFolderTasks(false)} />
-        </div>
-      )}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: "100%" }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </>
   )
-}
+})
+
+FileList.displayName = "FileList"
+
+// Manter a exportação default também
+export default FileList

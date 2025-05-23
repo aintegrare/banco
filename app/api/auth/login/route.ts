@@ -12,14 +12,56 @@ export async function POST(request: Request) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+    // Modo de demonstração se as variáveis não estiverem disponíveis
     if (!supabaseUrl || !supabaseAnonKey) {
-      console.error("API login: Variáveis de ambiente do Supabase não encontradas")
-      return NextResponse.json(
-        {
-          error: "Configuração do Supabase não encontrada. Verifique as variáveis de ambiente.",
-        },
-        { status: 500 },
-      )
+      console.log("API login: Usando modo de demonstração (variáveis de ambiente não encontradas)")
+
+      // Verificar credenciais de demonstração
+      if (email === "estrategia@designmarketing.com.br" && password === "Jivago14#") {
+        // Definir cookies para o modo de demonstração
+        const cookieStore = cookies()
+
+        cookieStore.set("auth-token", "demo-token", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          maxAge: 60 * 60 * 24 * 7, // 1 semana
+          path: "/",
+        })
+
+        cookieStore.set("refresh-token", "demo-refresh-token", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          maxAge: 60 * 60 * 24 * 30, // 30 dias
+          path: "/",
+        })
+
+        cookieStore.set("is-authenticated", "true", {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === "production",
+          maxAge: 60 * 60 * 24 * 7, // 1 semana
+          path: "/",
+        })
+
+        cookieStore.set("demo-mode", "true", {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === "production",
+          maxAge: 60 * 60 * 24 * 7, // 1 semana
+          path: "/",
+        })
+
+        return NextResponse.json({
+          success: true,
+          message: "Login em modo de demonstração",
+          demoMode: true,
+        })
+      } else {
+        return NextResponse.json(
+          {
+            error: "Credenciais inválidas para o modo de demonstração",
+          },
+          { status: 401 },
+        )
+      }
     }
 
     console.log("API login: Criando cliente Supabase")

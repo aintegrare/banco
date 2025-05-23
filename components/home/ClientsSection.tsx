@@ -99,7 +99,8 @@ export function ClientsSection() {
           </h2>
           <div className="w-20 h-1 bg-[#4072b0] dark:bg-[#6b91c1] mx-auto mt-4 mb-6 rounded-full"></div>
           <p className="mt-4 text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Empresas que confiam em nosso trabalho para impulsionar seus resultados.
+            Mais de 50 empresas confiam em nosso trabalho para impulsionar seus resultados. Aqui estão alguns dos nossos
+            parceiros.
           </p>
         </div>
 
@@ -176,7 +177,7 @@ export function ClientsSection() {
         <div className="mt-12 text-center">
           <div className="inline-block px-4 py-2 bg-[#4b7bb5]/10 dark:bg-[#6b91c1]/20 rounded-full">
             <p className="text-[#3d649e] dark:text-[#6b91c1] font-medium">
-              <span className="font-bold">{clients.length}+</span> clientes satisfeitos
+              <span className="font-bold">50+</span> clientes satisfeitos
             </p>
           </div>
         </div>

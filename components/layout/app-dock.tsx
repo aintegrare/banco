@@ -21,6 +21,7 @@ import {
   Share2,
 } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase/client"
+import { useEffect, useState } from "react"
 
 interface DockItemProps {
   href: string
@@ -99,6 +100,30 @@ function DockItem({ href, icon, label, isActive, badge, onClick }: DockItemProps
 export function AppDock() {
   const pathname = usePathname()
   const router = useRouter()
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  // Verificar se o usuário está autenticado
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const supabase = getSupabaseClient()
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        setIsAuthenticated(!!session)
+      } catch (error) {
+        console.error("Erro ao verificar autenticação:", error)
+        setIsAuthenticated(false)
+      }
+    }
+
+    checkAuth()
+  }, [pathname])
+
+  // Se não estiver autenticado ou estiver na página de login, não mostrar o dock
+  if (!isAuthenticated || pathname.includes("/admin/login")) {
+    return null
+  }
 
   // Usamos o método getSupabaseClient do nosso singleton em vez de createClientComponentClient
   const handleLogout = async () => {

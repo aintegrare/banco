@@ -14,37 +14,24 @@ export async function GET() {
     // Verificar variáveis de ambiente do Anthropic
     const anthropicApiKey = process.env.ANTHROPIC_API_KEY
 
-    // Verificar variáveis de ambiente do OpenAI
-    const openaiApiKey = process.env.OPENAI_API_KEY
-
     // Verificar variáveis de ambiente do OCR
     const ocrApiKey = process.env.OCR_API_KEY
 
-    // Verificar variáveis de ambiente do App
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL
-    const appVersion = process.env.NEXT_PUBLIC_APP_VERSION
-
     return NextResponse.json({
-      supabaseConfigured: !!(supabaseUrl && supabaseAnonKey && supabaseServiceKey),
+      supabaseConfigured: !!(supabaseUrl && supabaseAnonKey),
+      supabaseServiceConfigured: !!supabaseServiceKey,
       bunnyConfigured: !!(bunnyApiKey && bunnyStorageZone),
       anthropicConfigured: !!anthropicApiKey,
-      openaiConfigured: !!openaiApiKey,
       ocrConfigured: !!ocrApiKey,
-      appConfigured: !!(appUrl || appVersion),
-
-      // Detalhes para depuração (não incluir em produção)
-      debug: {
-        supabaseUrl: !!supabaseUrl,
-        supabaseAnonKey: !!supabaseAnonKey,
-        supabaseServiceKey: !!supabaseServiceKey,
-        bunnyApiKey: !!bunnyApiKey,
-        bunnyStorageZone: !!bunnyStorageZone,
-        anthropicApiKey: !!anthropicApiKey,
-        openaiApiKey: !!openaiApiKey,
-        ocrApiKey: !!ocrApiKey,
-        appUrl: !!appUrl,
-        appVersion: !!appVersion,
-      },
+      allConfigured: !!(
+        supabaseUrl &&
+        supabaseAnonKey &&
+        supabaseServiceKey &&
+        bunnyApiKey &&
+        bunnyStorageZone &&
+        anthropicApiKey &&
+        ocrApiKey
+      ),
     })
   } catch (error) {
     console.error("Erro ao verificar variáveis de ambiente:", error)
