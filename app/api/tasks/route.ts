@@ -1,89 +1,103 @@
 import { NextResponse } from "next/server"
-import { getTasks, createTask } from "@/lib/unified-task-manager"
-import type { TaskStatus, TaskPriority, CreateTaskInput } from "@/lib/unified-task-manager"
+import {
+  getSimpleTasks,
+  createSimpleTask,
+  type SimpleTaskFilters,
+  type SimpleCreateTaskInput,
+} from "@/lib/simple-task-service"
 
 export async function GET(request: Request) {
   try {
+    console.log("🌐 GET /api/tasks iniciado (versão simples)")
+
     const { searchParams } = new URL(request.url)
 
-    // Extrair parâmetros de consulta
-    const projectId = searchParams.get("project_id") ? Number.parseInt(searchParams.get("project_id")!) : undefined
-    console.log("Buscando tarefas para o projeto:", projectId)
+    const filters: SimpleTaskFilters = {}
 
-    const status = searchParams.get("status") as TaskStatus | undefined
+    if (searchParams.get("project_id")) {
+      filters.project_id = Number.parseInt(searchParams.get("project_id")!)
+    }
 
-    const priority = searchParams.get("priority") as TaskPriority | undefined
+    if (searchParams.get("status")) {
+      filters.status = searchParams.get("status")!
+    }
 
-    const assignedTo = searchParams.get("assigned_to") ? Number.parseInt(searchParams.get("assigned_to")!) : undefined
+    if (searchParams.get("priority")) {
+      filters.priority = searchParams.get("priority")!
+    }
 
-    const search = searchParams.get("search") || undefined
+    if (searchParams.get("search")) {
+      filters.search = searchParams.get("search")!
+    }
 
-    // Parâmetros de paginação
-    const limit = searchParams.get("limit") ? Number.parseInt(searchParams.get("limit")!) : undefined
+    if (searchParams.get("limit")) {
+      filters.limit = Number.parseInt(searchParams.get("limit")!)
+    }
 
-    const offset = searchParams.get("offset") ? Number.parseInt(searchParams.get("offset")!) : undefined
+    if (searchParams.get("offset")) {
+      filters.offset = Number.parseInt(searchParams.get("offset")!)
+    }
 
-    // Buscar tarefas com base nos filtros
-    const tasks = await getTasks({
-      project_id: projectId,
-      status,
-      priority,
-      assigned_to: assignedTo,
-      search,
-      limit,
-      offset,
+    console.log("📋 Filtros processados:", filters)
+
+    const tasks = await getSimpleTasks(filters)
+
+    console.log(`✅ GET /api/tasks concluído: ${tasks.length} tarefas`)
+
+    return NextResponse.json({
+      success: true,
+      data: tasks,
+      count: tasks.length,
     })
-
-    return NextResponse.json(tasks)
   } catch (error: any) {
-    console.error("Erro ao processar requisição de tarefas:", error)
-    return NextResponse.json({ error: error.message || "Erro ao buscar tarefas" }, { status: 500 })
+    console.error("❌ GET /api/tasks error:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message,
+      },
+      { status: 500 },
+    )
   }
 }
 
 export async function POST(request: Request) {
   try {
+    console.log("🌐 POST /api/tasks iniciado (versão simples)")
+
     const body = await request.json()
+    console.log("📝 Dados recebidos:", body)
 
-    const {
-      title,
-      description,
-      status,
-      priority,
-      project_id,
-      assigned_to,
-      due_date,
-      estimated_hours,
-      tags,
-      color,
-      creator,
-      assignee,
-    } = body
-
-    if (!title) {
-      return NextResponse.json({ error: "Título da tarefa é obrigatório" }, { status: 400 })
+    const input: SimpleCreateTaskInput = {
+      title: body.title,
+      description: body.description,
+      status: body.status,
+      priority: body.priority,
+      project_id: body.project_id,
+      assigned_to: body.assigned_to,
+      due_date: body.due_date,
+      estimated_hours: body.estimated_hours,
     }
 
-    const taskData: CreateTaskInput = {
-      title,
-      description,
-      status: status || "todo",
-      priority: priority || "medium",
-      project_id,
-      assigned_to,
-      due_date,
-      estimated_hours,
-      tags,
-      color: color || "#4b7bb5",
-      creator,
-      assignee,
-    }
+    const task = await createSimpleTask(input)
 
-    const newTask = await createTask(taskData)
+    console.log(`✅ POST /api/tasks concluído: tarefa ${task.id} criada`)
 
-    return NextResponse.json(newTask)
+    return NextResponse.json(
+      {
+        success: true,
+        data: task,
+      },
+      { status: 201 },
+    )
   } catch (error: any) {
-    console.error("Erro ao processar requisição de criação de tarefa:", error)
-    return NextResponse.json({ error: error.message || "Erro ao criar tarefa" }, { status: 500 })
+    console.error("❌ POST /api/tasks error:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message,
+      },
+      { status: 400 },
+    )
   }
 }

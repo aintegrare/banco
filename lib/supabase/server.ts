@@ -17,6 +17,11 @@ export function createClient() {
   })
 }
 
+// Função getSupabaseClient para compatibilidade com código existente
+export function getSupabaseClient() {
+  return createClient()
+}
+
 // Criar cliente apenas se as variáveis de ambiente estiverem disponíveis
 let supabase: ReturnType<typeof createSupabaseClient> | null = null
 

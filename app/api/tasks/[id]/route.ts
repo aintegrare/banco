@@ -1,103 +1,128 @@
 import { NextResponse } from "next/server"
-import { getTaskById, updateTask, deleteTask, updateTaskStatus } from "@/lib/unified-task-manager"
-import type { UpdateTaskInput } from "@/lib/unified-task-manager"
+import {
+  getSimpleTaskById,
+  updateSimpleTask,
+  updateSimpleTaskStatus,
+  deleteSimpleTask,
+} from "@/lib/simple-task-service"
+
+function extractTaskId(idParam: string): number {
+  const cleanId = idParam.trim()
+
+  if (cleanId.includes("example")) {
+    throw new Error(`ID de exemplo não permitido: "${cleanId}"`)
+  }
+
+  const numericId = Number.parseInt(cleanId, 10)
+
+  if (isNaN(numericId) || numericId <= 0) {
+    throw new Error(`ID inválido: "${cleanId}". Deve ser um número positivo.`)
+  }
+
+  return numericId
+}
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const id = Number.parseInt(params.id)
-    if (isNaN(id)) {
-      return NextResponse.json({ error: "ID de tarefa inválido" }, { status: 400 })
-    }
+    console.log(`🌐 GET /api/tasks/${params.id} iniciado (versão simples)`)
 
-    const task = await getTaskById(id)
-    return NextResponse.json(task)
+    const taskId = extractTaskId(params.id)
+    const task = await getSimpleTaskById(taskId)
+
+    return NextResponse.json({
+      success: true,
+      data: task,
+    })
   } catch (error: any) {
-    console.error(`Erro ao buscar tarefa ${params.id}:`, error)
-    return NextResponse.json({ error: error.message || "Erro ao buscar tarefa" }, { status: 500 })
+    console.error(`❌ GET /api/tasks/${params.id} error:`, error)
+    const status = error.message.includes("não encontrada") ? 404 : 400
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message,
+      },
+      { status },
+    )
   }
 }
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const id = Number.parseInt(params.id)
-    if (isNaN(id)) {
-      return NextResponse.json({ error: "ID de tarefa inválido" }, { status: 400 })
-    }
+    console.log(`🌐 PUT /api/tasks/${params.id} iniciado (versão simples)`)
 
+    const taskId = extractTaskId(params.id)
     const body = await request.json()
-    console.log(`Atualizando tarefa ${id} com dados:`, body)
 
-    const {
-      title,
-      description,
-      status,
-      priority,
-      project_id,
-      assigned_to,
-      due_date,
-      estimated_hours,
-      actual_hours,
-      tags,
-      subtasks,
-    } = body
+    const task = await updateSimpleTask(taskId, body)
 
-    const taskData: UpdateTaskInput = {
-      title,
-      description,
-      status,
-      priority,
-      project_id,
-      assigned_to,
-      due_date,
-      estimated_hours,
-      actual_hours,
-      tags,
-      subtasks,
+    return NextResponse.json({
+      success: true,
+      data: task,
+    })
+  } catch (error: any) {
+    console.error(`❌ PUT /api/tasks/${params.id} error:`, error)
+    const status = error.message.includes("não encontrada") ? 404 : 400
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message,
+      },
+      { status },
+    )
+  }
+}
+
+export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+  try {
+    console.log(`🌐 PATCH /api/tasks/${params.id} iniciado (versão simples)`)
+
+    const taskId = extractTaskId(params.id)
+    const body = await request.json()
+
+    let task
+    if (body.status) {
+      // Atualização otimizada para status
+      task = await updateSimpleTaskStatus(taskId, body.status)
+    } else {
+      // Atualização parcial normal
+      task = await updateSimpleTask(taskId, body)
     }
 
-    const updatedTask = await updateTask(id, taskData)
-    return NextResponse.json(updatedTask)
+    return NextResponse.json({
+      success: true,
+      data: task,
+    })
   } catch (error: any) {
-    console.error(`Erro ao atualizar tarefa ${params.id}:`, error)
-    return NextResponse.json({ error: error.message || "Erro ao atualizar tarefa" }, { status: 500 })
+    console.error(`❌ PATCH /api/tasks/${params.id} error:`, error)
+    const status = error.message.includes("não encontrada") ? 404 : 400
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message,
+      },
+      { status },
+    )
   }
 }
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const id = Number.parseInt(params.id)
-    if (isNaN(id)) {
-      return NextResponse.json({ error: "ID de tarefa inválido" }, { status: 400 })
-    }
+    console.log(`🌐 DELETE /api/tasks/${params.id} iniciado (versão simples)`)
 
-    await deleteTask(id)
-    return NextResponse.json({ success: true })
+    const taskId = extractTaskId(params.id)
+    await deleteSimpleTask(taskId)
+
+    return NextResponse.json({
+      success: true,
+    })
   } catch (error: any) {
-    console.error(`Erro ao excluir tarefa ${params.id}:`, error)
-    return NextResponse.json({ error: error.message || "Erro ao excluir tarefa" }, { status: 500 })
-  }
-}
-
-// Adicionar uma função PATCH específica para atualizar apenas o status
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  try {
-    const id = Number.parseInt(params.id)
-    if (isNaN(id)) {
-      return NextResponse.json({ error: "ID de tarefa inválido" }, { status: 400 })
-    }
-
-    const body = await request.json()
-    console.log(`Atualizando status da tarefa ${id} para:`, body.status)
-
-    if (!body.status) {
-      return NextResponse.json({ error: "Status não fornecido" }, { status: 400 })
-    }
-
-    // Usar a função específica para atualizar apenas o status
-    const updatedTask = await updateTaskStatus(id, body.status)
-    return NextResponse.json(updatedTask)
-  } catch (error: any) {
-    console.error(`Erro ao atualizar status da tarefa ${params.id}:`, error)
-    return NextResponse.json({ error: error.message || "Erro ao atualizar status da tarefa" }, { status: 500 })
+    console.error(`❌ DELETE /api/tasks/${params.id} error:`, error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message,
+      },
+      { status: 400 },
+    )
   }
 }

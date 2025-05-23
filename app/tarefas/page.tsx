@@ -12,7 +12,9 @@ import { useToast } from "@/components/ui/use-toast"
 import { ProjectTaskNav } from "@/components/shared/ProjectTaskNav"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { TasksKanbanView } from "@/components/tasks/tasks-kanban-view"
+import { TASK_STATUS, PRIORITY, type TaskFilters } from "@/lib/types"
+import { useSimpleTasks } from "@/hooks/use-simple-tasks"
+import { CompleteKanbanSystem } from "@/components/tasks/complete-kanban-system"
 
 interface Task {
   id: string | number
@@ -38,24 +40,46 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [filters, setFilters] = useState<TaskFilters>({ status: "", priority: "", project_id: undefined })
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [projectFilter, setProjectFilter] = useState(projectIdParam || "all")
-  const [priorityFilter, setPriorityFilter] = useState("all")
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editTaskId, setEditTaskId] = useState<string | number | null>(null)
   const [viewMode, setViewMode] = useState<"list" | "grid" | "byProject" | "kanban">("list")
   const [showFilters, setShowFilters] = useState(false)
   const { toast } = useToast()
+  const {
+    tasks: simpleTasks,
+    isLoading: simpleTasksLoading,
+    error: simpleTasksError,
+  } = useSimpleTasks(projectIdParam ? Number.parseInt(projectIdParam) : undefined)
+
+  const handleFilterChange = (key: keyof TaskFilters, value: any) => {
+    setFilters((prev) => ({
+      ...prev,
+      [key]: value,
+    }))
+  }
+
+  const clearFilters = () => {
+    setFilters({})
+    setSearchTerm("")
+  }
+
+  const activeFiltersCount = Object.keys(filters).filter(
+    (key) =>
+      filters[key as keyof TaskFilters] !== undefined &&
+      filters[key as keyof TaskFilters] !== null &&
+      filters[key as keyof TaskFilters] !== "",
+  ).length
 
   // Atualizar a URL quando o filtro de projeto mudar
   useEffect(() => {
-    if (projectFilter !== "all") {
-      router.push(`/tarefas?projeto=${projectFilter}`)
+    if (filters.project_id !== undefined && filters.project_id !== null) {
+      router.push(`/tarefas?projeto=${filters.project_id}`)
     } else if (projectIdParam) {
       router.push("/tarefas")
     }
-  }, [projectFilter, router, projectIdParam])
+  }, [filters.project_id, router, projectIdParam])
 
   // Buscar tarefas e projetos
   useEffect(() => {
@@ -82,8 +106,17 @@ export default function TasksPage() {
           throw new Error("Falha ao buscar tarefas")
         }
         const tasksData = await tasksResponse.json()
-        console.log("Tarefas carregadas:", tasksData.length)
-        setTasks(tasksData)
+        console.log("Tarefas carregadas:", tasksData)
+
+        // Garantir que tasks seja sempre um array
+        if (Array.isArray(tasksData)) {
+          setTasks(tasksData)
+        } else if (tasksData && tasksData.data && Array.isArray(tasksData.data)) {
+          setTasks(tasksData.data)
+        } else {
+          console.error("Formato de resposta inesperado:", tasksData)
+          setTasks([])
+        }
       } catch (error: any) {
         console.error("Erro ao buscar dados:", error)
         toast({
@@ -139,14 +172,16 @@ export default function TasksPage() {
       (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()))
 
     // Filtro de status
-    const matchesStatus = statusFilter === "all" || task.status === statusFilter
+    const matchesStatus =
+      filters.status === undefined || filters.status.length === 0 || filters.status.includes(task.status)
 
     // Filtro de projeto
     const matchesProject =
-      projectFilter === "all" || (task.project_id != null && task.project_id.toString() === projectFilter)
+      filters.project_id === undefined || (task.project_id != null && task.project_id === filters.project_id)
 
     // Filtro de prioridade
-    const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter
+    const matchesPriority =
+      filters.priority === undefined || filters.priority.length === 0 || filters.priority.includes(task.priority)
 
     return matchesSearch && matchesStatus && matchesProject && matchesPriority
   })
@@ -189,6 +224,8 @@ export default function TasksPage() {
         return "Média"
       case "low":
         return "Baixa"
+      case "urgent":
+        return "Urgente"
       default:
         return priority
     }
@@ -202,6 +239,8 @@ export default function TasksPage() {
         return "bg-orange-500"
       case "low":
         return "bg-green-500"
+      case "urgent":
+        return "bg-pink-500"
       default:
         return "bg-gray-500"
     }
@@ -248,42 +287,6 @@ export default function TasksPage() {
       title: "Tarefa atualizada",
       description: "A tarefa foi atualizada com sucesso!",
     })
-  }
-
-  const handleTaskStatusChanged = async (taskId: string | number, newStatus: string) => {
-    try {
-      console.log(`Atualizando status da tarefa ${taskId} para ${newStatus}`)
-
-      // Usar PATCH em vez de PUT e enviar apenas o status
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH", // Alterado de PUT para PATCH
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: newStatus }),
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error("Resposta de erro:", errorText)
-        throw new Error(`Falha ao atualizar status da tarefa: ${response.status} ${response.statusText}`)
-      }
-
-      const updatedTask = await response.json()
-      setTasks((prevTasks) => prevTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task)))
-
-      toast({
-        title: "Status atualizado",
-        description: "O status da tarefa foi atualizado com sucesso!",
-      })
-    } catch (error: any) {
-      console.error("Erro ao atualizar status da tarefa:", error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível atualizar o status da tarefa: " + error.message,
-        variant: "destructive",
-      })
-    }
   }
 
   const getProjectName = (projectId: string | number | null) => {
@@ -346,7 +349,10 @@ export default function TasksPage() {
                 <Input
                   placeholder="Buscar tarefas..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value)
+                    handleFilterChange("search", e.target.value || undefined)
+                  }}
                   className="pl-10"
                 />
               </div>
@@ -358,35 +364,47 @@ export default function TasksPage() {
               </Button>
               <div className={`flex-col sm:flex-row gap-2 ${showFilters ? "flex" : "hidden md:flex"}`}>
                 <div className="w-full sm:w-40">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <Select
+                    value={filters.status || "all"}
+                    onValueChange={(value) => handleFilterChange("status", value === "all" ? "" : value)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos os status</SelectItem>
-                      <SelectItem value="backlog">Backlog</SelectItem>
-                      <SelectItem value="todo">A Fazer</SelectItem>
-                      <SelectItem value="in-progress">Em Progresso</SelectItem>
-                      <SelectItem value="review">Em Revisão</SelectItem>
-                      <SelectItem value="done">Concluído</SelectItem>
+                      <SelectItem value={TASK_STATUS.BACKLOG}>Backlog</SelectItem>
+                      <SelectItem value={TASK_STATUS.TODO}>A Fazer</SelectItem>
+                      <SelectItem value={TASK_STATUS.IN_PROGRESS}>Em Progresso</SelectItem>
+                      <SelectItem value={TASK_STATUS.REVIEW}>Em Revisão</SelectItem>
+                      <SelectItem value={TASK_STATUS.DONE}>Concluído</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="w-full sm:w-40">
-                  <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <Select
+                    value={filters.priority || "all"}
+                    onValueChange={(value) => handleFilterChange("priority", value === "all" ? "" : value)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Prioridade" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todas as prioridades</SelectItem>
-                      <SelectItem value="high">Alta</SelectItem>
-                      <SelectItem value="medium">Média</SelectItem>
-                      <SelectItem value="low">Baixa</SelectItem>
+                      <SelectItem value={PRIORITY.LOW}>Baixa</SelectItem>
+                      <SelectItem value={PRIORITY.MEDIUM}>Média</SelectItem>
+                      <SelectItem value={PRIORITY.HIGH}>Alta</SelectItem>
+                      <SelectItem value={PRIORITY.URGENT}>Urgente</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="w-full sm:w-48">
-                  <Select value={projectFilter} onValueChange={setProjectFilter}>
+                  <Select
+                    value={filters.project_id?.toString() || "all"}
+                    onValueChange={(value) =>
+                      handleFilterChange("project_id", value === "all" ? undefined : Number.parseInt(value))
+                    }
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Projeto" />
                     </SelectTrigger>
@@ -405,22 +423,65 @@ export default function TasksPage() {
           </div>
         )}
 
-        {isLoading ? (
+        {/* Filtro por projeto */}
+        <div className="flex items-center gap-4 mb-4">
+          <label htmlFor="project-filter" className="text-sm font-medium text-gray-700">
+            Filtrar por projeto:
+          </label>
+          <select
+            id="project-filter"
+            value={projectIdParam || ""}
+            onChange={(e) => router.push(`/tarefas?projeto=${e.target.value}`)}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={simpleTasksLoading}
+          >
+            <option value="">Todos os projetos</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id.toString()}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+
+          {projectIdParam && (
+            <button onClick={() => router.push(`/tarefas`)} className="text-sm text-gray-500 hover:text-gray-700">
+              ❌ Limpar filtro
+            </button>
+          )}
+        </div>
+
+        {/* Status */}
+        {simpleTasksLoading && (
+          <div className="p-4 bg-blue-50 rounded-lg">
+            <p className="text-blue-600">Carregando tarefas...</p>
+          </div>
+        )}
+
+        {simpleTasksError && (
+          <div className="p-4 bg-red-50 rounded-lg">
+            <p className="text-red-600">Erro: {simpleTasksError}</p>
+          </div>
+        )}
+
+        {!simpleTasksLoading && !simpleTasksError && (
+          <div className="p-4 bg-green-50 rounded-lg">
+            <p className="text-green-600">
+              {simpleTasks.length} tarefas carregadas
+              {projectIdParam ? ` para o projeto ${projectIdParam}` : ""}
+            </p>
+          </div>
+        )}
+
+        {simpleTasksLoading ? (
           <div className="flex flex-col justify-center items-center py-12">
             <Loader2 size={30} className="text-[#4b7bb5] animate-spin mb-4" />
             <p className="text-gray-500">Carregando suas tarefas...</p>
           </div>
-        ) : filteredTasks.length > 0 ? (
+        ) : simpleTasks.length > 0 ? (
           <>
             {/* Visualização Kanban */}
             {viewMode === "kanban" && (
-              <TasksKanbanView
-                tasks={filteredTasks}
-                onTaskEdit={setEditTaskId}
-                onTaskStatusChange={handleTaskStatusChanged}
-                onTaskUpdated={handleTaskUpdated}
-                projects={projects}
-              />
+              <CompleteKanbanSystem projectId={projectIdParam ? Number.parseInt(projectIdParam) : undefined} />
             )}
 
             {/* Visualização em Lista */}
@@ -438,7 +499,7 @@ export default function TasksPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredTasks.map((task) => (
+                    {simpleTasks.map((task) => (
                       <tr
                         key={task.id}
                         className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer"
@@ -477,7 +538,7 @@ export default function TasksPage() {
             {/* Visualização em Grade */}
             {viewMode === "grid" && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredTasks.map((task) => (
+                {simpleTasks.map((task) => (
                   <Card
                     key={task.id}
                     className="cursor-pointer hover:shadow-md transition-shadow"
@@ -591,7 +652,7 @@ export default function TasksPage() {
             </div>
             <h3 className="text-lg font-medium text-gray-700 mb-2">Nenhuma tarefa encontrada</h3>
             <p className="text-gray-500 mb-6">
-              {searchTerm || statusFilter !== "all" || projectFilter !== "all" || priorityFilter !== "all"
+              {searchTerm || activeFiltersCount > 0
                 ? "Tente ajustar os filtros para ver mais resultados"
                 : "Comece criando sua primeira tarefa"}
             </p>
@@ -607,7 +668,7 @@ export default function TasksPage() {
       <CreateTaskDialog
         isOpen={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
-        initialProject={projectFilter !== "all" ? projectFilter : null}
+        initialProject={filters.project_id !== undefined ? filters.project_id : null}
         onTaskCreated={handleTaskCreated}
       />
 

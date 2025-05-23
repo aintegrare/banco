@@ -1,16 +1,29 @@
 import { NextResponse } from "next/server"
-import { getTaskStats } from "@/lib/unified-task-manager"
+import { taskService } from "@/lib/services/task-service"
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get("project_id") ? Number.parseInt(searchParams.get("project_id")!) : undefined
 
-    const stats = await getTaskStats(projectId)
+    console.log("📊 Buscando estatísticas de tarefas", projectId ? `para projeto ${projectId}` : "gerais")
 
-    return NextResponse.json(stats)
+    const stats = await taskService.getTaskStats(projectId)
+
+    console.log("✅ Estatísticas calculadas:", stats)
+
+    return NextResponse.json({
+      success: true,
+      data: stats,
+    })
   } catch (error: any) {
-    console.error("Erro ao processar requisição de estatísticas de tarefas:", error)
-    return NextResponse.json({ error: error.message || "Erro ao buscar estatísticas de tarefas" }, { status: 500 })
+    console.error("❌ Erro em GET /api/tasks/stats:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message,
+      },
+      { status: 500 },
+    )
   }
 }
