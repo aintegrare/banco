@@ -2,6 +2,7 @@
 const BUNNY_API_KEY = process.env.BUNNY_API_KEY || ""
 const BUNNY_STORAGE_ZONE = process.env.BUNNY_STORAGE_ZONE || ""
 const BUNNY_STORAGE_REGION = process.env.BUNNY_STORAGE_REGION || ""
+const BUNNY_PULLZONE_URL = process.env.BUNNY_PULLZONE_URL || `https://integrare.b-cdn.net`
 
 // Adicionar estas constantes no início do arquivo, após as constantes existentes
 const DEFAULT_CACHE_TIME = 60 * 60 * 24 * 7 // 7 dias em segundos
@@ -33,8 +34,6 @@ const CACHE_CONFIG = {
 
 // URLs corretas conforme configuração do Bunny.net
 const BUNNY_STORAGE_URL = `https://storage.bunnycdn.com/${BUNNY_STORAGE_ZONE}`
-// URL fixa da Pull Zone - sem incluir o nome da zona de armazenamento
-const BUNNY_PULLZONE_URL = `https://integrare.b-cdn.net`
 
 // Adicionar logs para depuração
 console.log(`Bunny Config: URL de Storage: ${BUNNY_STORAGE_URL}`)
@@ -815,24 +814,8 @@ export function getBunnyPublicUrl(filePath: string): string {
   // Normalizar o caminho do arquivo
   const normalizedPath = filePath.replace(/\/+/g, "/").replace(/^\//, "")
 
-  // CORREÇÃO: Não forçar mais o caminho "documents/clientes"
-  // Apenas verificar se o caminho está correto e normalizar
-
-  // Remover qualquer prefixo "zona-de-guardar/" se existir
-  const cleanPath = normalizedPath.replace(/^zona-de-guardar\//, "")
-
-  // Log para depuração
-  console.log(`Bunny URL: Gerando URL pública para caminho: ${filePath} -> ${cleanPath}`)
-
-  // Verificar se o caminho termina com uma barra (diretório) e não tem um nome de arquivo
-  if (cleanPath.endsWith("/") || cleanPath === "") {
-    console.warn(`Bunny URL: Caminho parece ser um diretório ou está vazio: ${cleanPath}`)
-  }
-
   // Retornar a URL pública correta
-  const publicUrl = `${BUNNY_PULLZONE_URL}/${cleanPath}`
-  console.log(`Bunny URL: URL pública gerada: ${publicUrl}`)
-  return publicUrl
+  return `${BUNNY_PULLZONE_URL}/${normalizedPath}`
 }
 
 // Função para criar um cliente Bunny.net
@@ -909,7 +892,6 @@ export function getBunnyHeaders(): Record<string, string> {
 
   return {
     AccessKey: apiKey,
-    // Adicionar outros headers necessários para autenticação
     Accept: "application/json, application/pdf, */*",
     "User-Agent": "Integrare-PDF-Processor/1.0",
   }
@@ -940,8 +922,6 @@ export function fixBunnyUrl(url: string): string {
 
   return url
 }
-
-// Adicionar esta nova função após a função fixBunnyUrl
 
 // Função para garantir que as URLs de documentos incluam o caminho correto para clientes
 export function ensureCorrectDocumentPath(url: string): string {
@@ -1035,28 +1015,30 @@ export async function createBunnyDirectory(directoryPath: string): Promise<boole
 
     console.log(`Bunny Create Directory: Tentando criar diretório: ${formattedPath}`)
 
-    // No Bunny.net, para criar um diretório vazio, precisamos criar um arquivo temporário dentro dele
-    // e depois deletar esse arquivo, assim o diretório permanece
-    const tempFilePath = `${formattedPath}.bunnydir`
+    // No Bunny.net, para criar um diretório vazio, precisamos fazer uma requisição PUT com corpo vazio
+    const url = `${BUNNY_STORAGE_URL}/${formattedPath}`
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        AccessKey: BUNNY_API_KEY,
+        "Content-Type": "application/octet-stream",
+      },
+      body: "",
+    })
 
-    console.log(`Bunny Create Directory: Criando arquivo temporário: ${tempFilePath}`)
+    if (!response.ok) {
+      throw new Error(`Erro ao criar diretório no Bunny.net: ${response.status}`)
+    }
 
-    // Criar um arquivo temporário vazio
-    const tempFileUrl = await uploadFileToBunny(tempFilePath, "", "text/plain")
-    console.log(`Bunny Create Directory: Arquivo temporário criado: ${tempFilePath}`)
-
-    // Excluir o arquivo temporário para deixar apenas o diretório
-    await deleteBunnyFile(tempFilePath)
-    console.log(`Bunny Create Directory: Arquivo temporário removido, diretório criado com sucesso: ${formattedPath}`)
-
+    console.log(`Bunny Create Directory: Diretório criado com sucesso: ${formattedPath}`)
     return true
   } catch (error) {
-    console.error("Bunny Create Directory: Erro geral:", error)
+    console.error("Erro ao criar diretório:", error)
     throw error
   }
 }
 
-// Adicionar esta nova função para mover arquivos entre diretórios
+// Função para mover arquivos entre diretórios
 export async function moveBunnyFile(sourcePath: string, destinationPath: string): Promise<string> {
   try {
     if (!BUNNY_API_KEY || !BUNNY_STORAGE_ZONE) {
@@ -1121,7 +1103,7 @@ export async function moveBunnyFile(sourcePath: string, destinationPath: string)
   }
 }
 
-// Adicionar esta nova função para purgar o cache de um arquivo na Pull Zone
+// Função para purgar o cache de um arquivo na Pull Zone
 export async function purgeBunnyCache(filePath: string): Promise<boolean> {
   try {
     if (!process.env.BUNNY_API_KEY) {
@@ -1166,7 +1148,7 @@ export async function purgeBunnyCache(filePath: string): Promise<boolean> {
   }
 }
 
-// Adicionar esta nova função para verificar o status do cache de um arquivo
+// Função para verificar o status do cache de um arquivo
 export async function checkCacheStatus(url: string): Promise<{
   cached: boolean
   age?: number
@@ -1197,7 +1179,7 @@ export async function checkCacheStatus(url: string): Promise<{
   }
 }
 
-// Adicionar esta nova função para obter a configuração de cache recomendada para um tipo de arquivo
+// Função para obter a configuração de cache recomendada para um tipo de arquivo
 export function getRecommendedCacheConfig(fileType: string): {
   maxAge: number
   cacheControl: string

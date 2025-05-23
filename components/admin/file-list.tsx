@@ -1,171 +1,178 @@
 "use client"
 
 import type React from "react"
-import { forwardRef, useImperativeHandle, useState, useEffect, useCallback } from "react"
+
+import { useState, useEffect, useCallback } from "react"
 import { useDropzone } from "react-dropzone"
 import {
+  Box,
+  Button,
+  Typography,
+  Paper,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   IconButton,
-  Typography,
+  TextField,
   Breadcrumbs,
   Link,
-  TextField,
-  InputAdornment,
   CircularProgress,
-  Box,
   Alert,
   Snackbar,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
 } from "@mui/material"
-import FolderIcon from "@mui/icons-material/Folder"
-import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile"
-import DeleteIcon from "@mui/icons-material/Delete"
-import UploadIcon from "@mui/icons-material/Upload"
-import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder"
-import SearchIcon from "@mui/icons-material/Search"
-import { styled } from "@mui/material/styles"
-import { deleteFile, getFiles, uploadFile, createDirectory } from "@/lib/api"
+import {
+  Folder as FolderIcon,
+  InsertDriveFile as FileIcon,
+  Delete as DeleteIcon,
+  CloudUpload as UploadIcon,
+  CreateNewFolder as CreateNewFolderIcon,
+  Search as SearchIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  Refresh as RefreshIcon,
+} from "@mui/icons-material"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { getSupabaseClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
 
 interface File {
   name: string
   type: "directory" | "file"
   modified: string
   size: number
+  path: string
+  url?: string
 }
 
 interface FileListProps {
   initialDirectory?: string
 }
 
-// Adicionar interface para o ref
-interface FileListRef {
-  fetchFiles: () => void
-  refresh: () => void
-}
-
-const Item = styled(Paper)(({ theme }) => ({
-  backgroundColor: theme.palette.mode === "dark" ? "#1A2027" : "#fff",
-  ...theme.typography.body2,
-  padding: theme.spacing(1),
-  textAlign: "left",
-  color: theme.palette.text.secondary,
-}))
-
-// Modificar a exportação para usar forwardRef
-export const FileList = forwardRef<FileListRef, FileListProps>(({ initialDirectory = "documents" }, ref) => {
+export { FileList }
+export default function FileList({ initialDirectory = "documents" }: FileListProps) {
   const [files, setFiles] = useState<File[]>([])
   const [currentPath, setCurrentPath] = useState<string[]>([initialDirectory])
   const [searchQuery, setSearchQuery] = useState("")
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [creatingDirectory, setCreatingDirectory] = useState(false)
-  const [newDirectoryName, setNewDirectoryName] = useState("")
-  const [snackbarOpen, setSnackbarOpen] = useState(false)
-  const [snackbarMessage, setSnackbarMessage] = useState("")
-  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">("success")
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const router = useRouter()
+  const [creatingFolder, setCreatingFolder] = useState(false)
+  const [newFolderName, setNewFolderName] = useState("")
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [fileToDelete, setFileToDelete] = useState<File | null>(null)
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success" as "success" | "error" | "info" | "warning",
+  })
 
   const getCurrentPathString = () => currentPath.join("/")
 
-  const fetchFiles = useCallback(async (path: string) => {
+  const fetchFiles = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
-      const filesData = await getFiles(path)
-      // Garantir que filesData é um array válido
-      if (Array.isArray(filesData)) {
-        setFiles(filesData)
+      const response = await fetch(`/api/files?directory=${getCurrentPathString()}`)
+      if (!response.ok) {
+        throw new Error(`Erro ao buscar arquivos: ${response.status}`)
+      }
+      const data = await response.json()
+
+      if (data.files && Array.isArray(data.files)) {
+        // Transformar os dados para o formato esperado pelo componente
+        const formattedFiles = data.files.map((file: any) => ({
+          name: file.ObjectName,
+          type: file.IsDirectory ? "directory" : "file",
+          modified: file.LastChanged,
+          size: Math.floor(file.Length / 1024), // Converter para KB
+          path: file.Path,
+          url: file.PublicUrl,
+        }))
+        setFiles(formattedFiles)
       } else {
         setFiles([])
-        console.warn("Dados de arquivos inválidos recebidos:", filesData)
+        console.warn("Formato de dados inválido:", data)
       }
-    } catch (error: any) {
-      console.error("Error fetching files:", error)
-      setSnackbarMessage(`Error fetching files: ${error.message}`)
-      setSnackbarSeverity("error")
-      setSnackbarOpen(true)
-      setFiles([]) // Definir array vazio em caso de erro
+    } catch (err) {
+      console.error("Erro ao buscar arquivos:", err)
+      setError(err instanceof Error ? err.message : "Erro desconhecido ao buscar arquivos")
+      setFiles([])
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [currentPath])
 
-  // Verificar autenticação com Supabase
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const supabase = getSupabaseClient()
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-
-        if (!session) {
-          router.push("/admin/login")
-          return
-        }
-
-        setIsAuthenticated(true)
-        fetchFiles(getCurrentPathString())
-      } catch (error) {
-        console.error("Erro ao verificar autenticação:", error)
-        router.push("/admin/login")
-      }
-    }
-
-    checkAuth()
-  }, [fetchFiles, router])
+    fetchFiles()
+  }, [fetchFiles])
 
   const handlePathClick = (index: number) => {
     const newPath = currentPath.slice(0, index + 1)
     setCurrentPath(newPath)
-    fetchFiles(newPath.join("/"))
   }
 
   const handleDirectoryClick = (directoryName: string) => {
-    const newPath = [...currentPath, directoryName]
-    setCurrentPath(newPath)
-    fetchFiles(newPath.join("/"))
+    setCurrentPath([...currentPath, directoryName])
+  }
+
+  const handleParentDirectory = () => {
+    if (currentPath.length > 1) {
+      setCurrentPath(currentPath.slice(0, -1))
+    }
   }
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(event.target.value || "")
+    setSearchQuery(event.target.value)
   }
 
-  // Adicionar verificações de segurança no filtro
   const filteredFiles = files.filter((file) => {
     if (!file || !file.name) return false
-    const fileName = file.name.toLowerCase()
-    const query = (searchQuery || "").toLowerCase()
-    return fileName.includes(query)
+    return file.name.toLowerCase().includes(searchQuery.toLowerCase())
   })
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
+      if (acceptedFiles.length === 0) return
+
       setUploading(true)
       try {
-        await Promise.all(
-          acceptedFiles.map(async (file: any) => {
-            await uploadFile(getCurrentPathString(), file)
-          }),
-        )
-        setSnackbarMessage("Files uploaded successfully!")
-        setSnackbarSeverity("success")
-        setSnackbarOpen(true)
-        fetchFiles(getCurrentPathString()) // Refresh file list
-      } catch (error: any) {
-        console.error("Error uploading files:", error)
-        setSnackbarMessage(`Error uploading files: ${error.message}`)
-        setSnackbarSeverity("error")
-        setSnackbarOpen(true)
+        for (const file of acceptedFiles) {
+          const formData = new FormData()
+          formData.append("file", file)
+          formData.append("directory", getCurrentPathString())
+
+          const response = await fetch("/api/files/upload", {
+            method: "POST",
+            body: formData,
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(errorData.message || `Erro ao fazer upload: ${response.status}`)
+          }
+        }
+
+        setSnackbar({
+          open: true,
+          message: `${acceptedFiles.length} arquivo(s) enviado(s) com sucesso!`,
+          severity: "success",
+        })
+
+        // Atualizar a lista de arquivos
+        fetchFiles()
+      } catch (err) {
+        console.error("Erro ao fazer upload:", err)
+        setSnackbar({
+          open: true,
+          message: err instanceof Error ? err.message : "Erro ao fazer upload de arquivos",
+          severity: "error",
+        })
       } finally {
         setUploading(false)
       }
@@ -175,142 +182,214 @@ export const FileList = forwardRef<FileListRef, FileListProps>(({ initialDirecto
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop })
 
-  const handleDeleteFile = async (fileName: string) => {
-    try {
-      await deleteFile(getCurrentPathString(), fileName)
-      setSnackbarMessage("File deleted successfully!")
-      setSnackbarSeverity("success")
-      setSnackbarOpen(true)
-      fetchFiles(getCurrentPathString()) // Refresh file list
-    } catch (error: any) {
-      console.error("Error deleting file:", error)
-      setSnackbarMessage(`Error deleting file: ${error.message}`)
-      setSnackbarSeverity("error")
-      setSnackbarOpen(true)
-    }
+  const handleDeleteClick = (file: File) => {
+    setFileToDelete(file)
+    setShowDeleteDialog(true)
   }
 
-  const handleCreateDirectory = async () => {
-    if (!newDirectoryName.trim()) {
-      setSnackbarMessage("Please enter a directory name")
-      setSnackbarSeverity("error")
-      setSnackbarOpen(true)
-      return
-    }
+  const handleDeleteConfirm = async () => {
+    if (!fileToDelete) return
 
-    setCreatingDirectory(true)
     try {
-      await createDirectory(getCurrentPathString(), newDirectoryName)
-      setSnackbarMessage("Directory created successfully!")
-      setSnackbarSeverity("success")
-      setSnackbarOpen(true)
-      fetchFiles(getCurrentPathString()) // Refresh file list
-      setNewDirectoryName("")
-    } catch (error: any) {
-      console.error("Error creating directory:", error)
-      setSnackbarMessage(`Error creating directory: ${error.message}`)
-      setSnackbarSeverity("error")
-      setSnackbarOpen(true)
+      const response = await fetch("/api/files/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ path: fileToDelete.path }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || `Erro ao excluir: ${response.status}`)
+      }
+
+      setSnackbar({
+        open: true,
+        message: "Arquivo excluído com sucesso!",
+        severity: "success",
+      })
+
+      // Atualizar a lista de arquivos
+      fetchFiles()
+    } catch (err) {
+      console.error("Erro ao excluir arquivo:", err)
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : "Erro ao excluir arquivo",
+        severity: "error",
+      })
     } finally {
-      setCreatingDirectory(false)
+      setShowDeleteDialog(false)
+      setFileToDelete(null)
     }
   }
 
-  const handleCloseSnackbar = (event?: React.SyntheticEvent | Event, reason?: string) => {
-    if (reason === "clickaway") {
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) {
+      setSnackbar({
+        open: true,
+        message: "Nome da pasta não pode estar vazio",
+        severity: "error",
+      })
       return
     }
-    setSnackbarOpen(false)
+
+    setCreatingFolder(true)
+    try {
+      const response = await fetch("/api/files/create-directory", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ path: `${getCurrentPathString()}/${newFolderName}` }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || `Erro ao criar pasta: ${response.status}`)
+      }
+
+      setSnackbar({
+        open: true,
+        message: "Pasta criada com sucesso!",
+        severity: "success",
+      })
+
+      // Limpar o campo e atualizar a lista
+      setNewFolderName("")
+      fetchFiles()
+    } catch (err) {
+      console.error("Erro ao criar pasta:", err)
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : "Erro ao criar pasta",
+        severity: "error",
+      })
+    } finally {
+      setCreatingFolder(false)
+    }
   }
 
-  // Adicionar useImperativeHandle para expor métodos
-  useImperativeHandle(ref, () => ({
-    fetchFiles: () => fetchFiles(getCurrentPathString()),
-    refresh: () => fetchFiles(getCurrentPathString()),
-  }))
-
-  // Se não estiver autenticado, não renderizar nada
-  if (!isAuthenticated) {
-    return null
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false })
   }
 
   return (
-    <>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-        <Breadcrumbs aria-label="breadcrumb">
-          <Link underline="hover" color="inherit" href="#" onClick={() => handlePathClick(0)}>
-            Home
-          </Link>
-          {currentPath.slice(1).map((path, index) => {
-            const pathIndex = index + 1
-            return (
-              <Link
-                key={pathIndex}
-                underline="hover"
-                color="inherit"
-                href="#"
-                onClick={() => handlePathClick(pathIndex)}
-              >
-                {path}
-              </Link>
-            )
-          })}
+    <Box sx={{ width: "100%" }}>
+      {/* Breadcrumbs de navegação */}
+      <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+        <Breadcrumbs aria-label="breadcrumb" sx={{ flexGrow: 1 }}>
+          {currentPath.map((segment, index) => (
+            <Link
+              key={index}
+              component="button"
+              variant="body1"
+              onClick={() => handlePathClick(index)}
+              color={index === currentPath.length - 1 ? "text.primary" : "inherit"}
+              sx={{ textDecoration: "none" }}
+            >
+              {segment}
+            </Link>
+          ))}
         </Breadcrumbs>
 
-        <TextField
-          size="small"
-          placeholder="Search files"
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-          value={searchQuery}
-          onChange={handleSearchChange}
-        />
-      </Box>
-
-      <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
-        <div
-          {...getRootProps()}
-          style={{ border: "1px dashed gray", padding: "20px", textAlign: "center", cursor: "pointer" }}
-        >
-          <input {...getInputProps()} />
-          {uploading ? (
-            <CircularProgress size={24} />
-          ) : isDragActive ? (
-            <Typography>Drop the files here ...</Typography>
-          ) : (
-            <Typography>
-              Drag 'n' drop some files here, or click to select files <UploadIcon />
-            </Typography>
-          )}
-        </div>
-
-        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-          <TextField
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button
+            variant="outlined"
             size="small"
-            label="New directory name"
-            value={newDirectoryName}
-            onChange={(e) => setNewDirectoryName(e.target.value)}
-            disabled={creatingDirectory}
-          />
-          <IconButton onClick={handleCreateDirectory} disabled={creatingDirectory || !newDirectoryName.trim()}>
-            {creatingDirectory ? <CircularProgress size={24} /> : <CreateNewFolderIcon />}
-          </IconButton>
+            startIcon={<ArrowUpwardIcon />}
+            onClick={handleParentDirectory}
+            disabled={currentPath.length <= 1}
+          >
+            Voltar
+          </Button>
+          <Button variant="outlined" size="small" startIcon={<RefreshIcon />} onClick={fetchFiles} disabled={loading}>
+            Atualizar
+          </Button>
         </Box>
       </Box>
 
+      {/* Barra de pesquisa e criação de pasta */}
+      <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+        <TextField
+          label="Pesquisar"
+          variant="outlined"
+          size="small"
+          value={searchQuery}
+          onChange={handleSearchChange}
+          InputProps={{
+            startAdornment: <SearchIcon sx={{ color: "action.active", mr: 1 }} />,
+          }}
+          sx={{ flexGrow: 1 }}
+        />
+
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <TextField
+            label="Nova pasta"
+            variant="outlined"
+            size="small"
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            disabled={creatingFolder}
+          />
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<CreateNewFolderIcon />}
+            onClick={handleCreateFolder}
+            disabled={creatingFolder || !newFolderName.trim()}
+          >
+            {creatingFolder ? <CircularProgress size={24} /> : "Criar"}
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Área de upload */}
+      <Paper
+        {...getRootProps()}
+        sx={{
+          p: 2,
+          mb: 2,
+          border: "2px dashed",
+          borderColor: isDragActive ? "primary.main" : "divider",
+          bgcolor: isDragActive ? "action.hover" : "background.paper",
+          textAlign: "center",
+          cursor: "pointer",
+        }}
+      >
+        <input {...getInputProps()} />
+        {uploading ? (
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <CircularProgress size={40} sx={{ mb: 1 }} />
+            <Typography>Enviando arquivos...</Typography>
+          </Box>
+        ) : isDragActive ? (
+          <Typography>Solte os arquivos aqui...</Typography>
+        ) : (
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <UploadIcon sx={{ fontSize: 40, mb: 1, color: "action.active" }} />
+            <Typography>Arraste e solte arquivos aqui, ou clique para selecionar</Typography>
+          </Box>
+        )}
+      </Paper>
+
+      {/* Mensagem de erro */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* Tabela de arquivos */}
       <TableContainer component={Paper}>
-        <Table sx={{ minWidth: 650 }} aria-label="simple table">
+        <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Modified</TableCell>
-              <TableCell>Size</TableCell>
-              <TableCell align="right">Actions</TableCell>
+              <TableCell>Nome</TableCell>
+              <TableCell>Modificado</TableCell>
+              <TableCell>Tamanho</TableCell>
+              <TableCell align="right">Ações</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -323,40 +402,45 @@ export const FileList = forwardRef<FileListRef, FileListProps>(({ initialDirecto
             ) : filteredFiles.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} align="center">
-                  No files found.
+                  Nenhum arquivo encontrado.
                 </TableCell>
               </TableRow>
             ) : (
               filteredFiles.map((file) => (
-                <TableRow key={file.name} sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
-                  <TableCell component="th" scope="row">
-                    {file.type === "directory" ? (
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer" }}
-                        onClick={() => handleDirectoryClick(file.name)}
+                <TableRow key={file.name} hover>
+                  <TableCell>
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      {file.type === "directory" ? (
+                        <FolderIcon sx={{ mr: 1, color: "primary.main" }} />
+                      ) : (
+                        <FileIcon sx={{ mr: 1, color: "text.secondary" }} />
+                      )}
+                      <Link
+                        component="button"
+                        variant="body2"
+                        onClick={() =>
+                          file.type === "directory" ? handleDirectoryClick(file.name) : window.open(file.url, "_blank")
+                        }
+                        sx={{ textDecoration: "none" }}
                       >
-                        <FolderIcon color="primary" />
-                        {file.name || "Unnamed"}
-                      </Box>
-                    ) : (
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        <InsertDriveFileIcon />
-                        {file.name || "Unnamed"}
-                      </Box>
-                    )}
+                        {file.name}
+                      </Link>
+                    </Box>
                   </TableCell>
                   <TableCell>
                     {file.modified
                       ? formatDistanceToNow(new Date(file.modified), { addSuffix: true, locale: ptBR })
-                      : "Unknown"}
+                      : "-"}
                   </TableCell>
-                  <TableCell>{file.size ? `${file.size} KB` : "Unknown"}</TableCell>
+                  <TableCell>{file.type === "directory" ? "-" : `${file.size} KB`}</TableCell>
                   <TableCell align="right">
-                    {file.type === "file" && (
-                      <IconButton aria-label="delete" onClick={() => handleDeleteFile(file.name)}>
-                        <DeleteIcon />
-                      </IconButton>
-                    )}
+                    <IconButton
+                      color="error"
+                      onClick={() => handleDeleteClick(file)}
+                      disabled={file.type === "directory"}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
                   </TableCell>
                 </TableRow>
               ))
@@ -365,21 +449,33 @@ export const FileList = forwardRef<FileListRef, FileListProps>(({ initialDirecto
         </Table>
       </TableContainer>
 
+      {/* Diálogo de confirmação de exclusão */}
+      <Dialog open={showDeleteDialog} onClose={() => setShowDeleteDialog(false)}>
+        <DialogTitle>Confirmar exclusão</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Tem certeza que deseja excluir o arquivo "{fileToDelete?.name}"? Esta ação não pode ser desfeita.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDeleteDialog(false)}>Cancelar</Button>
+          <Button onClick={handleDeleteConfirm} color="error" autoFocus>
+            Excluir
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar para mensagens */}
       <Snackbar
-        open={snackbarOpen}
+        open={snackbar.open}
         autoHideDuration={6000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: "100%" }}>
-          {snackbarMessage}
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: "100%" }}>
+          {snackbar.message}
         </Alert>
       </Snackbar>
-    </>
+    </Box>
   )
-})
-
-FileList.displayName = "FileList"
-
-// Manter a exportação default também
-export default FileList
+}

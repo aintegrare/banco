@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js"
 import { defaultEmbeddingProvider, generateSimpleEmbedding } from "./embeddings"
 import { extractPDFText } from "./pdf-extractor"
+import { createBunnyDirectory, deleteBunnyFile, listBunnyFiles, uploadFileToBunny } from "./bunny"
 
 // Configuração do cliente Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -392,144 +393,79 @@ export function splitTextIntoChunks(text: string, chunkSize: number) {
 }
 
 // Função para criar diretório
-export async function createDirectory(parentDirectory: string, directoryName: string) {
+export async function createDirectory(path: string, directoryName: string) {
   try {
-    console.log(`API: Criando diretório: ${directoryName} em ${parentDirectory}`)
+    console.log(`API: Criando diretório: ${path}/${directoryName}`)
 
-    const response = await fetch("/api/create-directory", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        directory: parentDirectory ? `${parentDirectory}/${directoryName}` : directoryName,
-      }),
-    })
+    // Criar diretório no Bunny.net
+    const directoryPath = path ? `${path}/${directoryName}` : directoryName
+    await createBunnyDirectory(directoryPath)
 
-    if (!response.ok) {
-      throw new Error(`Erro ao criar diretório: ${response.status}`)
-    }
-
-    return await response.json()
+    return { success: true }
   } catch (error) {
     console.error("Erro ao criar diretório:", error)
     throw error
   }
 }
 
-// Função para obter lista de arquivos
-export async function getFiles(directory: string) {
+// Função para listar arquivos
+export async function listFiles(path: string) {
   try {
-    const response = await fetch(`/api/files?directory=${encodeURIComponent(directory)}`)
+    console.log(`API: Listando arquivos em: ${path}`)
+    const files = await listBunnyFiles(path)
 
-    if (!response.ok) {
-      throw new Error(`Erro ao buscar arquivos: ${response.status}`)
-    }
-
-    const data = await response.json()
-    return data.files || []
+    // Transformar os dados para o formato esperado pelo componente FileList
+    return files.map((file: any) => ({
+      name: file.ObjectName,
+      type: file.IsDirectory ? "directory" : "file",
+      modified: file.LastChanged,
+      size: Math.floor(file.Length / 1024), // Converter para KB
+      path: file.Path,
+      url: file.PublicUrl,
+    }))
   } catch (error) {
-    console.error("Erro ao buscar arquivos:", error)
+    console.error("Erro ao listar arquivos:", error)
     throw error
   }
 }
 
 // Função para fazer upload de arquivo
-export async function uploadFile(directory: string, file: File) {
+export async function uploadFile(path: string, file: File) {
   try {
-    console.log(`API: Fazendo upload do arquivo: ${file.name} para ${directory}`)
+    console.log(`API: Fazendo upload de arquivo para: ${path}/${file.name}`)
 
-    const formData = new FormData()
-    formData.append("file", file)
-    formData.append("directory", directory)
+    // Converter o arquivo para ArrayBuffer
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
 
-    const response = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    })
+    // Fazer upload para o Bunny.net
+    const filePath = path ? `${path}/${file.name}` : file.name
+    await uploadFileToBunny(filePath, buffer, file.type)
 
-    if (!response.ok) {
-      throw new Error(`Erro ao fazer upload: ${response.status}`)
-    }
-
-    return await response.json()
+    return { success: true }
   } catch (error) {
-    console.error("Erro ao fazer upload:", error)
+    console.error("Erro ao fazer upload de arquivo:", error)
     throw error
   }
 }
 
-// Função para excluir um arquivo
-export async function deleteFile(directory: string, fileName: string) {
+// Função para excluir arquivo
+export async function deleteFile(path: string, fileName: string) {
   try {
-    const path = directory ? `${directory}/${fileName}` : fileName
+    console.log(`API: Excluindo arquivo: ${path}/${fileName}`)
 
-    const response = await fetch(`/api/files/${encodeURIComponent(path)}`, {
-      method: "DELETE",
-    })
+    // Excluir arquivo do Bunny.net
+    const filePath = path ? `${path}/${fileName}` : fileName
+    await deleteBunnyFile(filePath)
 
-    if (!response.ok) {
-      throw new Error(`Erro ao excluir arquivo: ${response.status}`)
-    }
-
-    return await response.json()
+    return { success: true }
   } catch (error) {
     console.error("Erro ao excluir arquivo:", error)
     throw error
   }
 }
 
-// Função para renomear um arquivo ou diretório
-export async function renameFile(oldPath: string, newName: string) {
-  try {
-    const response = await fetch("/api/files/rename", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        oldPath,
-        newName,
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`Erro ao renomear: ${response.status}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.error("Erro ao renomear:", error)
-    throw error
-  }
-}
-
-// Função para mover um arquivo para outro diretório
-export async function moveFile(sourcePath: string, destinationPath: string) {
-  try {
-    const response = await fetch("/api/files/move", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        sourcePath,
-        destinationPath,
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`Erro ao mover arquivo: ${response.status}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.error("Erro ao mover arquivo:", error)
-    throw error
-  }
-}
-
-// Atualizar a função processDocument para usar o novo extrator de PDF e metadados
+// Função para processar documento
 export async function processDocument(documentId: number, chunkSize = 1000) {
   try {
     console.log(`Processando documento com ID: ${documentId}`)

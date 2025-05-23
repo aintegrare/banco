@@ -1,4 +1,3 @@
-import { createWorker } from "tesseract.js"
 import * as pdfjs from "pdfjs-dist"
 
 // Configurar o worker do PDF.js
@@ -25,65 +24,9 @@ export async function extractPDFTextWithOCR(pdfBuffer: Buffer): Promise<string> 
       return await extractPDFTextWithOCRServerless(pdfBuffer)
     }
 
-    // Carregar o PDF usando PDF.js
-    try {
-      const loadingTask = pdfjs.getDocument({ data: pdfBuffer })
-      const pdf = await loadingTask.promise
-
-      console.log(`OCR Extractor: PDF carregado, ${pdf.numPages} páginas encontradas`)
-
-      // Criar worker do Tesseract
-      const worker = await createWorker("por")
-      console.log("OCR Extractor: Worker do Tesseract inicializado")
-
-      let fullText = ""
-
-      // Processar cada página do PDF
-      for (let pageNum = 1; pageNum <= Math.min(pdf.numPages, 20); pageNum++) {
-        console.log(`OCR Extractor: Processando página ${pageNum}/${pdf.numPages}`)
-
-        // Obter a página
-        const page = await pdf.getPage(pageNum)
-
-        // Renderizar a página como uma imagem
-        const viewport = page.getViewport({ scale: 2.0 }) // Escala maior para melhor qualidade
-        const canvas = document.createElement("canvas")
-        const context = canvas.getContext("2d")
-
-        if (!context) {
-          throw new Error("Não foi possível criar contexto de canvas")
-        }
-
-        canvas.height = viewport.height
-        canvas.width = viewport.width
-
-        await page.render({
-          canvasContext: context,
-          viewport: viewport,
-        }).promise
-
-        // Converter canvas para imagem
-        const imageData = canvas.toDataURL("image/png")
-
-        // Reconhecer texto na imagem usando Tesseract
-        const { data } = await worker.recognize(imageData)
-
-        // Adicionar texto reconhecido ao resultado
-        fullText += data.text + "\n\n"
-
-        console.log(`OCR Extractor: Página ${pageNum} processada, ${data.text.length} caracteres extraídos`)
-      }
-
-      // Terminar o worker do Tesseract
-      await worker.terminate()
-      console.log(`OCR Extractor: Extração OCR concluída, ${fullText.length} caracteres extraídos no total`)
-
-      return fullText
-    } catch (browserOcrError) {
-      console.error("OCR Extractor: Erro na extração OCR no navegador:", browserOcrError)
-      console.log("OCR Extractor: Tentando usar API externa como fallback")
-      return await extractPDFTextWithOCRServerless(pdfBuffer)
-    }
+    // No ambiente do navegador, informar que OCR não está disponível
+    console.log("OCR Extractor: Ambiente de navegador detectado, OCR não disponível")
+    return "A extração OCR só está disponível no servidor."
   } catch (error) {
     console.error("OCR Extractor: Erro na extração OCR:", error)
     throw new Error(`Falha na extração OCR do PDF: ${error instanceof Error ? error.message : String(error)}`)

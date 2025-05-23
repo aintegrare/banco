@@ -21,22 +21,38 @@ export async function extractPDFText(pdfUrl: string): Promise<string> {
     const pdfBuffer = await pdfResponse.arrayBuffer()
 
     // Importar pdf-parse dinamicamente para evitar problemas com SSR
-    const pdfParse = (await import("pdf-parse")).default
-
-    // Extrair o texto do PDF
-    const data = await pdfParse(Buffer.from(pdfBuffer))
-
-    // Verificar se o texto foi extraído com sucesso
-    if (!data.text || data.text.trim().length === 0) {
-      console.warn("PDF Extractor: Nenhum texto extraído do PDF")
-      return "Não foi possível extrair texto deste PDF. O arquivo pode estar protegido, ser uma imagem digitalizada ou estar corrompido."
+    let pdfParse
+    try {
+      // Usar dynamic import para carregar apenas no servidor
+      if (typeof window === "undefined") {
+        pdfParse = (await import("pdf-parse")).default
+      } else {
+        // No cliente, usar uma abordagem alternativa ou mostrar mensagem
+        return "A extração de PDF só está disponível no servidor."
+      }
+    } catch (importError) {
+      console.error("Erro ao importar pdf-parse:", importError)
+      return "Não foi possível carregar o extrator de PDF."
     }
 
-    console.log(`PDF Extractor: Extração concluída, ${data.text.length} caracteres extraídos`)
+    // Extrair o texto do PDF (apenas no servidor)
+    if (pdfParse) {
+      const data = await pdfParse(Buffer.from(pdfBuffer))
 
-    // Limpar e normalizar o texto extraído
-    const cleanedText = cleanPdfText(data.text)
-    return cleanedText
+      // Verificar se o texto foi extraído com sucesso
+      if (!data.text || data.text.trim().length === 0) {
+        console.warn("PDF Extractor: Nenhum texto extraído do PDF")
+        return "Não foi possível extrair texto deste PDF. O arquivo pode estar protegido, ser uma imagem digitalizada ou estar corrompido."
+      }
+
+      console.log(`PDF Extractor: Extração concluída, ${data.text.length} caracteres extraídos`)
+
+      // Limpar e normalizar o texto extraído
+      const cleanedText = cleanPdfText(data.text)
+      return cleanedText
+    }
+
+    return "A extração de PDF não está disponível neste ambiente."
   } catch (error) {
     console.error("PDF Extractor: Erro na extração:", error)
     return `Erro na extração do PDF: ${error instanceof Error ? error.message : String(error)}`
