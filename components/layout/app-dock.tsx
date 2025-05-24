@@ -106,14 +106,25 @@ export function AppDock() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Verificar se estamos em modo de demonstração
+        const demoMode = localStorage.getItem("demoMode") === "true" || document.cookie.includes("demo-mode=true")
+
+        if (demoMode) {
+          console.log("Modo de demonstração ativo no AppDock")
+          setIsAuthenticated(true)
+          return
+        }
+
         const supabase = getSupabaseClient()
         const {
           data: { session },
         } = await supabase.auth.getSession()
         setIsAuthenticated(!!session)
       } catch (error) {
-        console.error("Erro ao verificar autenticação:", error)
-        setIsAuthenticated(false)
+        console.error("Erro ao verificar autenticação no AppDock:", error)
+        // Verificar se estamos em modo de demonstração como fallback
+        const demoMode = localStorage.getItem("demoMode") === "true" || document.cookie.includes("demo-mode=true")
+        setIsAuthenticated(demoMode)
       }
     }
 

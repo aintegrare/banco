@@ -7,6 +7,9 @@ import { ExportImportDialog } from "@/components/export-import-dialog"
 import { Download, Upload } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase/client"
 import { useRouter, usePathname } from "next/navigation"
+import { env } from "@/lib/env"
+import { DemoModeToggle } from "@/components/demo-mode-toggle"
+import { AppDock } from "@/components/layout/app-dock"
 
 interface AdminLayoutProps {
   children: React.ReactNode
@@ -24,6 +27,28 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     const checkAuth = async () => {
       try {
         setIsLoading(true)
+
+        // Verificar se estamos em modo de demonstração
+        const demoMode = localStorage.getItem("demoMode") === "true"
+
+        // Se estamos em modo de demonstração, não precisamos verificar autenticação
+        if (demoMode) {
+          console.log("Modo de demonstração ativo, ignorando verificação de autenticação")
+          setIsAuthenticated(true)
+          setIsLoading(false)
+          return
+        }
+
+        // Verificar se as variáveis do Supabase estão configuradas
+        if (!env.isSupabaseConfigured()) {
+          console.warn("Configuração do Supabase não encontrada, ativando modo de demonstração")
+          localStorage.setItem("demoMode", "true")
+          setIsAuthenticated(true)
+          setIsLoading(false)
+          return
+        }
+
+        // Tentar obter a sessão do Supabase
         const supabase = getSupabaseClient()
         const {
           data: { session },
@@ -37,6 +62,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         }
       } catch (error) {
         console.error("Erro ao verificar autenticação:", error)
+        // Em caso de erro, ativar modo de demonstração
+        localStorage.setItem("demoMode", "true")
+        setIsAuthenticated(true)
       } finally {
         setIsLoading(false)
       }
@@ -60,7 +88,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       <div className="flex-1 p-4">
         {children}
         <OfflineIndicator />
+        {isAuthenticated && !pathname.includes("/admin/login") && <DemoModeToggle />}
       </div>
+
+      {/* App Dock - só mostrar se autenticado */}
+      {isAuthenticated && !pathname.includes("/admin/login") && <AppDock />}
 
       {/* Floating Action Button for Export/Import - só mostrar se autenticado */}
       {isAuthenticated && !pathname.includes("/admin/login") && (

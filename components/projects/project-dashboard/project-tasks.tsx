@@ -50,8 +50,26 @@ export function ProjectTasks({ tasks: initialTasks, projectId }: ProjectTasksPro
         }
 
         const data = await response.json()
-        console.log(`Tarefas recebidas: ${data.length}`, data)
+        console.log(`Tarefas recebidas:`, data)
 
+        // Verificar se data é um array antes de chamar filter
+        if (!Array.isArray(data)) {
+          console.error("Dados recebidos não são um array:", data)
+          // Se data não for um array, mas tiver uma propriedade 'tasks' que seja um array
+          if (data && Array.isArray(data.tasks)) {
+            console.log("Usando data.tasks como fonte de dados")
+            setTasks(
+              data.tasks.filter((task: Task) => task.project_id && task.project_id.toString() === projectId.toString()),
+            )
+          } else {
+            // Se não for um array e não tiver propriedade tasks, inicializa com array vazio
+            console.log("Inicializando com array vazio")
+            setTasks([])
+          }
+          return
+        }
+
+        // Se chegou aqui, data é um array
         // Filtrando explicitamente pelo project_id para garantir
         const filteredTasks = data.filter(
           (task: Task) => task.project_id && task.project_id.toString() === projectId.toString(),
@@ -66,6 +84,8 @@ export function ProjectTasks({ tasks: initialTasks, projectId }: ProjectTasksPro
           description: "Não foi possível carregar as tarefas do projeto",
           variant: "destructive",
         })
+        // Em caso de erro, inicializa com array vazio
+        setTasks([])
       } finally {
         setIsLoading(false)
       }

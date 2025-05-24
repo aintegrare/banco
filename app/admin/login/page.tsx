@@ -21,6 +21,8 @@ export default function LoginPage() {
       try {
         const response = await fetch("/api/check-env-vars")
         const data = await response.json()
+
+        // Verificar se as variáveis críticas do Supabase estão configuradas
         if (!data.supabaseConfigured) {
           setEnvInfo(
             "Configuração do Supabase não encontrada. O sistema funcionará em modo de demonstração com funcionalidades limitadas.",
@@ -28,6 +30,21 @@ export default function LoginPage() {
           setIsDemoMode(true)
           // Preencher a senha de demonstração automaticamente
           setPassword("Jivago14#")
+
+          // Definir um cookie para o modo de demonstração
+          document.cookie = "demo-mode=true; path=/; max-age=86400"
+        }
+
+        // Mostrar informações sobre variáveis faltantes
+        if (data.missingVars && Object.values(data.missingVars).some((arr) => arr.length > 0)) {
+          const missingList = Object.entries(data.missingVars)
+            .filter(([_, vars]) => (vars as string[]).length > 0)
+            .map(([category, vars]) => `${category}: ${(vars as string[]).join(", ")}`)
+            .join("; ")
+
+          setEnvInfo(
+            `Algumas variáveis de ambiente estão faltando: ${missingList}. Algumas funcionalidades podem estar limitadas.`,
+          )
         }
       } catch (error) {
         console.error("Erro ao verificar variáveis de ambiente:", error)
@@ -35,6 +52,9 @@ export default function LoginPage() {
         setIsDemoMode(true)
         // Preencher a senha de demonstração automaticamente
         setPassword("Jivago14#")
+
+        // Definir um cookie para o modo de demonstração
+        document.cookie = "demo-mode=true; path=/; max-age=86400"
       }
     }
 
@@ -63,6 +83,16 @@ export default function LoginPage() {
     try {
       console.log("Enviando solicitação de login")
 
+      // Se estiver em modo de demonstração, fazer login direto
+      if (isDemoMode) {
+        console.log("Login em modo de demonstração")
+        localStorage.setItem("isAuthenticated", "true")
+        localStorage.setItem("demoMode", "true")
+        document.cookie = "demo-mode=true; path=/; max-age=86400"
+        setLoginSuccess(true)
+        return
+      }
+
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
@@ -82,7 +112,13 @@ export default function LoginPage() {
       if (!response.ok) {
         // Mensagem de erro mais detalhada
         if (response.status === 500 && data.error?.includes("Configuração do Supabase")) {
-          throw new Error("Erro de configuração do servidor. Por favor, contate o administrador.")
+          // Ativar modo de demonstração em caso de erro de configuração
+          setIsDemoMode(true)
+          localStorage.setItem("demoMode", "true")
+          document.cookie = "demo-mode=true; path=/; max-age=86400"
+          setMessage("Erro de configuração do Supabase. Ativando modo de demonstração.")
+          setLoginSuccess(true)
+          return
         } else {
           throw new Error(data.error || "Falha ao fazer login")
         }
@@ -91,6 +127,8 @@ export default function LoginPage() {
       // Verificar se está em modo de demonstração
       if (data.demoMode) {
         setIsDemoMode(true)
+        localStorage.setItem("demoMode", "true")
+        document.cookie = "demo-mode=true; path=/; max-age=86400"
         setMessage("Login em modo de demonstração. Algumas funcionalidades podem estar limitadas.")
       }
 
