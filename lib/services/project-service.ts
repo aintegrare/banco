@@ -71,7 +71,8 @@ export class ProjectService {
         end_date: input.end_date || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        progress: 0,
+        progress: input.progress || 0,
+        color: input.color || "#4b7bb5",
       }
 
       const { data, error } = await this.supabase.from("projects").insert(projectData).select().single()
@@ -101,6 +102,7 @@ export class ProjectService {
       if (input.start_date !== undefined) updateData.start_date = input.start_date
       if (input.end_date !== undefined) updateData.end_date = input.end_date
       if (input.progress !== undefined) updateData.progress = input.progress
+      if (input.color !== undefined) updateData.color = input.color
 
       const { data, error } = await this.supabase.from("projects").update(updateData).eq("id", id).select().single()
 
@@ -142,10 +144,15 @@ export class ProjectService {
   private getStatusLabel(status: string): string {
     const labels = {
       planning: "Planejamento",
+      planejamento: "Planejamento",
       active: "Ativo",
+      ativo: "Ativo",
       on_hold: "Em Espera",
+      pausado: "Em Espera",
       completed: "Concluído",
+      concluído: "Concluído",
       cancelled: "Cancelado",
+      cancelado: "Cancelado",
     }
     return labels[status as keyof typeof labels] || status
   }

@@ -47,41 +47,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Nome do projeto é obrigatório" }, { status: 400 })
     }
 
-    // Verificar quais colunas existem na tabela projects
-    const { data: tableInfo, error: tableError } = await supabase.from("projects").select("*").limit(1)
-
-    if (tableError) {
-      console.error("Erro ao verificar estrutura da tabela:", tableError)
-    }
-
-    // Criar objeto com apenas as colunas que existem
+    // Criar objeto com dados do projeto
     const projectData: Record<string, any> = {
       name,
-      description,
-      status: status || "em_andamento",
+      description: description || null,
+      status: status || "planning", // Valor padrão
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }
 
-    // Adicionar colunas opcionais apenas se existirem na tabela
-    if (tableInfo && tableInfo.length > 0) {
-      const sampleProject = tableInfo[0]
-
-      if ("start_date" in sampleProject) projectData.start_date = start_date
-      if ("end_date" in sampleProject) projectData.end_date = end_date
-      if ("progress" in sampleProject) projectData.progress = progress || 0
-      if ("color" in sampleProject) projectData.color = color || "#4b7bb5"
-    }
+    // Adicionar campos opcionais apenas se fornecidos
+    if (start_date) projectData.start_date = start_date
+    if (end_date) projectData.end_date = end_date
+    if (progress !== undefined) projectData.progress = progress || 0
+    if (color) projectData.color = color || "#4b7bb5"
 
     console.log("Dados do projeto a serem inseridos:", projectData)
 
     // Inserir o projeto
     const { data: project, error } = await supabase.from("projects").insert(projectData).select().single()
 
-    if (error) throw error
+    if (error) {
+      console.error("Erro detalhado ao criar projeto:", error)
+      throw error
+    }
 
     return NextResponse.json(project)
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro ao criar projeto:", error)
-    return NextResponse.json({ error: "Erro ao criar projeto" }, { status: 500 })
+    return NextResponse.json({ error: "Erro ao criar projeto", details: error.message }, { status: 500 })
   }
 }

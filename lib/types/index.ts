@@ -79,41 +79,54 @@ export interface TaskFilters {
 // Tipos para projetos
 export const PROJECT_STATUS = {
   PLANNING: "planning",
+  PLANEJAMENTO: "planejamento",
   ACTIVE: "active",
+  ATIVO: "ativo",
   ON_HOLD: "on_hold",
+  PAUSADO: "pausado",
   COMPLETED: "completed",
+  CONCLUIDO: "concluído",
   CANCELLED: "cancelled",
+  CANCELADO: "cancelado",
 } as const
 
 export type ProjectStatus = (typeof PROJECT_STATUS)[keyof typeof PROJECT_STATUS]
 
-export interface Project {
+export interface DbProject {
   id: number
   name: string
   description?: string | null
-  status: ProjectStatus
+  status: string
   client_id?: number | null
   start_date?: string | null
   end_date?: string | null
   created_at: string
   updated_at: string
   progress?: number | null
+  color?: string | null
+}
+
+export interface Project extends DbProject {
+  // Campos computados/virtuais
+  isOverdue?: boolean
+  statusLabel?: string
 }
 
 export interface CreateProjectInput {
   name: string
   description?: string | null
-  status?: ProjectStatus
+  status?: string
   client_id?: number | null
   start_date?: string | null
   end_date?: string | null
   progress?: number | null
+  color?: string | null
 }
 
 export interface UpdateProjectInput extends Partial<CreateProjectInput> {}
 
 export interface ProjectFilters {
-  status?: ProjectStatus[]
+  status?: string[]
   client_id?: number
   search?: string
   limit?: number
