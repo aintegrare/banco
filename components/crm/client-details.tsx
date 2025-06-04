@@ -177,12 +177,19 @@ export function ClientDetails({ clientId }: ClientDetailsProps) {
   }
 
   const getInitials = (name: string) => {
+    if (!name) return "??"
     return name
       .split(" ")
       .map((part) => part[0])
       .join("")
       .toUpperCase()
       .substring(0, 2)
+  }
+
+  // Função segura para capitalizar a primeira letra
+  const capitalizeFirstLetter = (text?: string) => {
+    if (!text) return ""
+    return text.charAt(0).toUpperCase() + text.slice(1)
   }
 
   if (loading) {
@@ -240,12 +247,14 @@ export function ClientDetails({ clientId }: ClientDetailsProps) {
                 <CardDescription className="text-lg mt-1">{client.company}</CardDescription>
               </div>
             </div>
-            <Badge variant="secondary" className={`${statusColorMap[client.status]} text-white`}>
-              {client.status.charAt(0).toUpperCase() + client.status.slice(1)}
-            </Badge>
+            {client.status && (
+              <Badge variant="secondary" className={`${statusColorMap[client.status] || "bg-gray-400"} text-white`}>
+                {capitalizeFirstLetter(client.status)}
+              </Badge>
+            )}
           </CardHeader>
           <CardContent>
-            {(client.status === "lead" || client.status === "oportunidade") && (
+            {client.status && (client.status === "lead" || client.status === "oportunidade") && (
               <div className="mb-6">
                 <div className="flex justify-between mb-2 text-sm">
                   <span>Progresso</span>
@@ -317,7 +326,7 @@ export function ClientDetails({ clientId }: ClientDetailsProps) {
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <span className="font-medium">Valor:</span>
-                    <span className="font-bold text-[#4b7bb5]">{formatCurrency(client.value)}</span>
+                    <span className="font-bold text-[#4b7bb5]">{formatCurrency(client.value || 0)}</span>
                   </div>
                 </div>
               </div>

@@ -141,6 +141,8 @@ export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps)
         description: "Não foi possível carregar os clientes",
         variant: "destructive",
       })
+      // Definir uma lista vazia para evitar erros
+      setClients([])
     } finally {
       setLoading(false)
     }
@@ -280,7 +282,7 @@ export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps)
     } else if (sortField === "value") {
       comparison = a.value - b.value
     } else if (sortField === "status") {
-      comparison = a.status.localeCompare(b.status)
+      comparison = (a.status || "").localeCompare(b.status || "")
     }
 
     return sortDirection === "asc" ? comparison : -comparison
@@ -296,12 +298,19 @@ export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps)
   )
 
   const getInitials = (name: string) => {
+    if (!name) return "??"
     return name
       .split(" ")
       .map((part) => part[0])
       .join("")
       .toUpperCase()
       .substring(0, 2)
+  }
+
+  // Função segura para capitalizar a primeira letra
+  const capitalizeFirstLetter = (text?: string) => {
+    if (!text) return ""
+    return text.charAt(0).toUpperCase() + text.slice(1)
   }
 
   return (
@@ -483,11 +492,18 @@ export function CrmClientsList({ defaultFilter = "todos" }: CrmClientsListProps)
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className={`${statusColorMap[client.status]} text-white`}>
-                          {client.status.charAt(0).toUpperCase() + client.status.slice(1)}
-                        </Badge>
+                        {client.status ? (
+                          <Badge
+                            variant="secondary"
+                            className={`${statusColorMap[client.status] || "bg-gray-400"} text-white`}
+                          >
+                            {capitalizeFirstLetter(client.status)}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">Não definido</Badge>
+                        )}
                       </TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(client.value)}</TableCell>
+                      <TableCell className="text-right font-medium">{formatCurrency(client.value || 0)}</TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
