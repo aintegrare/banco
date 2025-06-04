@@ -3,11 +3,11 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, Info } from "lucide-react"
 
 export default function LoginPage() {
-  const [email] = useState("estrategia@designmarketing.com.br")
-  const [password, setPassword] = useState("")
+  const [email, setEmail] = useState("estrategia@designmarketing.com.br")
+  const [password, setPassword] = useState("Jivago14#")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
@@ -24,12 +24,8 @@ export default function LoginPage() {
 
         // Verificar se as variáveis críticas do Supabase estão configuradas
         if (!data.supabaseConfigured) {
-          setEnvInfo(
-            "Configuração do Supabase não encontrada. O sistema funcionará em modo de demonstração com funcionalidades limitadas.",
-          )
+          setEnvInfo("Configuração do Supabase não encontrada. O sistema funcionará em modo de demonstração.")
           setIsDemoMode(true)
-          // Preencher a senha de demonstração automaticamente
-          setPassword("Jivago14#")
 
           // Definir um cookie para o modo de demonstração
           document.cookie = "demo-mode=true; path=/; max-age=86400"
@@ -43,15 +39,14 @@ export default function LoginPage() {
             .join("; ")
 
           setEnvInfo(
-            `Algumas variáveis de ambiente estão faltando: ${missingList}. Algumas funcionalidades podem estar limitadas.`,
+            `Algumas variáveis de ambiente estão faltando: ${missingList}. Funcionando em modo de demonstração.`,
           )
+          setIsDemoMode(true)
         }
       } catch (error) {
         console.error("Erro ao verificar variáveis de ambiente:", error)
-        setEnvInfo("Não foi possível verificar a configuração. O sistema tentará funcionar em modo de demonstração.")
+        setEnvInfo("Não foi possível verificar a configuração. Funcionando em modo de demonstração.")
         setIsDemoMode(true)
-        // Preencher a senha de demonstração automaticamente
-        setPassword("Jivago14#")
 
         // Definir um cookie para o modo de demonstração
         document.cookie = "demo-mode=true; path=/; max-age=86400"
@@ -79,19 +74,10 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError("")
+    setMessage("")
 
     try {
       console.log("Enviando solicitação de login")
-
-      // Se estiver em modo de demonstração, fazer login direto
-      if (isDemoMode) {
-        console.log("Login em modo de demonstração")
-        localStorage.setItem("isAuthenticated", "true")
-        localStorage.setItem("demoMode", "true")
-        document.cookie = "demo-mode=true; path=/; max-age=86400"
-        setLoginSuccess(true)
-        return
-      }
 
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -110,18 +96,15 @@ export default function LoginPage() {
       console.log("Dados da resposta:", data)
 
       if (!response.ok) {
-        // Mensagem de erro mais detalhada
-        if (response.status === 500 && data.error?.includes("Configuração do Supabase")) {
-          // Ativar modo de demonstração em caso de erro de configuração
-          setIsDemoMode(true)
-          localStorage.setItem("demoMode", "true")
-          document.cookie = "demo-mode=true; path=/; max-age=86400"
-          setMessage("Erro de configuração do Supabase. Ativando modo de demonstração.")
-          setLoginSuccess(true)
-          return
+        // Verificar se é sugestão para usar demo
+        if (data.suggestDemo) {
+          setError(data.error)
+          setMessage("Dica: Use as credenciais pré-preenchidas para acessar o modo de demonstração.")
         } else {
-          throw new Error(data.error || "Falha ao fazer login")
+          setError(data.error || "Falha ao fazer login")
         }
+        setLoading(false)
+        return
       }
 
       // Verificar se está em modo de demonstração
@@ -129,14 +112,16 @@ export default function LoginPage() {
         setIsDemoMode(true)
         localStorage.setItem("demoMode", "true")
         document.cookie = "demo-mode=true; path=/; max-age=86400"
-        setMessage("Login em modo de demonstração. Algumas funcionalidades podem estar limitadas.")
+        setMessage("Login em modo de demonstração realizado com sucesso!")
+      } else {
+        setMessage("Login realizado com sucesso!")
       }
 
       // Marcar login como bem-sucedido para acionar o redirecionamento
       setLoginSuccess(true)
     } catch (err: any) {
       console.error("Erro no login:", err)
-      setError(err.message || "Erro ao fazer login")
+      setError("Erro de conexão. Verifique sua internet e tente novamente.")
       setLoading(false)
     }
   }
@@ -169,8 +154,7 @@ export default function LoginPage() {
         throw new Error(data.error || "Erro ao criar usuário administrador")
       }
 
-      setPassword("Jivago14#")
-      setMessage("Usuário administrador criado com sucesso! Senha: Jivago14#")
+      setMessage("Usuário administrador criado com sucesso!")
     } catch (err: any) {
       console.error("Erro capturado:", err)
       setError(err.message || "Erro ao criar usuário administrador")
@@ -186,6 +170,7 @@ export default function LoginPage() {
 
         {message && (
           <Alert className="mb-4 bg-green-50 border-green-200">
+            <Info className="h-4 w-4 text-green-700 mr-2" />
             <AlertDescription className="text-green-700">{message}</AlertDescription>
           </Alert>
         )}
@@ -197,17 +182,16 @@ export default function LoginPage() {
           </Alert>
         )}
 
-        {isDemoMode && (
-          <Alert className="mb-4 bg-blue-50 border-blue-200">
-            <AlertDescription className="text-blue-700 text-sm">
-              <strong>Modo de Demonstração Ativo</strong>
-              <br />
-              Email: estrategia@designmarketing.com.br
-              <br />
-              Senha: Jivago14#
-            </AlertDescription>
-          </Alert>
-        )}
+        <Alert className="mb-4 bg-blue-50 border-blue-200">
+          <Info className="h-4 w-4 text-blue-700 mr-2" />
+          <AlertDescription className="text-blue-700 text-sm">
+            <strong>Credenciais de Demonstração</strong>
+            <br />
+            Email: estrategia@designmarketing.com.br
+            <br />
+            Senha: Jivago14#
+          </AlertDescription>
+        </Alert>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
@@ -215,8 +199,9 @@ export default function LoginPage() {
             <input
               type="email"
               value={email}
-              readOnly
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50"
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#4b7bb5] focus:border-[#4b7bb5]"
+              required
             />
           </div>
 
@@ -226,7 +211,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#4b7bb5] focus:border-[#4b7bb5]"
               required
             />
           </div>
@@ -241,7 +226,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#4b7bb5] hover:bg-[#3d649e] disabled:opacity-50"
+            className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#4b7bb5] hover:bg-[#3d649e] disabled:opacity-50 transition-colors"
           >
             {loading ? "Entrando..." : "Entrar"}
           </button>
@@ -261,7 +246,7 @@ export default function LoginPage() {
             <button
               onClick={handleCreateAdmin}
               disabled={loading}
-              className="mt-4 w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+              className="mt-4 w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
             >
               {loading ? "Processando..." : "Criar Usuário Administrador"}
             </button>
