@@ -49,29 +49,28 @@ export function ProjectTasks({ tasks: initialTasks, projectId }: ProjectTasksPro
           throw new Error("Falha ao buscar tarefas")
         }
 
-        const data = await response.json()
-        console.log(`Tarefas recebidas:`, data)
+        const result = await response.json()
+        console.log(`Resposta recebida:`, result)
 
-        // Verificar se data é um array antes de chamar filter
-        if (!Array.isArray(data)) {
-          console.error("Dados recebidos não são um array:", data)
-          // Se data não for um array, mas tiver uma propriedade 'tasks' que seja um array
-          if (data && Array.isArray(data.tasks)) {
-            console.log("Usando data.tasks como fonte de dados")
-            setTasks(
-              data.tasks.filter((task: Task) => task.project_id && task.project_id.toString() === projectId.toString()),
-            )
-          } else {
-            // Se não for um array e não tiver propriedade tasks, inicializa com array vazio
-            console.log("Inicializando com array vazio")
-            setTasks([])
-          }
-          return
+        // Verificar a estrutura da resposta e extrair o array de tarefas
+        let tasksArray: Task[] = []
+
+        if (result && result.success === true && Array.isArray(result.data)) {
+          console.log("Usando result.data como fonte de dados")
+          tasksArray = result.data
+        } else if (Array.isArray(result)) {
+          console.log("A resposta já é um array")
+          tasksArray = result
+        } else if (result && Array.isArray(result.tasks)) {
+          console.log("Usando result.tasks como fonte de dados")
+          tasksArray = result.tasks
+        } else {
+          console.error("Estrutura de dados não reconhecida:", result)
+          tasksArray = []
         }
 
-        // Se chegou aqui, data é um array
         // Filtrando explicitamente pelo project_id para garantir
-        const filteredTasks = data.filter(
+        const filteredTasks = tasksArray.filter(
           (task: Task) => task.project_id && task.project_id.toString() === projectId.toString(),
         )
 
