@@ -1,6 +1,10 @@
+import { CardDescription } from "@/components/ui/card"
+import { CardContent } from "@/components/ui/card"
+import { CardTitle } from "@/components/ui/card"
+import { CardHeader } from "@/components/ui/card"
 import type React from "react"
-import { PageHeader } from "@/components/layout/page-header"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { PageHeader } from "@/components/page-header"
+import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Calendar,
@@ -13,20 +17,87 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   FileImage,
+  CheckSquare,
+  BarChart3,
 } from "lucide-react"
 import Link from "next/link"
 
 export default function AdminDashboard() {
-  return (
-    <div className="container mx-auto px-4 py-6">
-      <PageHeader title="Dashboard" description="Bem-vindo ao painel administrativo da Integrare" />
+  // Dados de exemplo para o dashboard
+  const stats = [
+    {
+      title: "Clientes",
+      value: "24",
+      description: "Total de clientes ativos",
+      icon: <Users className="h-8 w-8 text-[#4b7bb5]" />,
+      href: "/admin/clientes",
+    },
+    {
+      title: "Projetos",
+      value: "12",
+      description: "Projetos em andamento",
+      icon: <FolderKanban className="h-8 w-8 text-[#4b7bb5]" />,
+      href: "/admin/projetos",
+    },
+    {
+      title: "Tarefas",
+      value: "48",
+      description: "Tarefas pendentes",
+      icon: <CheckSquare className="h-8 w-8 text-[#4b7bb5]" />,
+      href: "/admin/tarefas",
+    },
+    {
+      title: "Documentos",
+      value: "156",
+      description: "Documentos armazenados",
+      icon: <FileText className="h-8 w-8 text-[#4b7bb5]" />,
+      href: "/admin/documentos",
+    },
+    {
+      title: "Relatórios",
+      value: "8",
+      description: "Relatórios disponíveis",
+      icon: <BarChart3 className="h-8 w-8 text-[#4b7bb5]" />,
+      href: "/admin/relatorios",
+    },
+    {
+      title: "Agenda",
+      value: "5",
+      description: "Eventos próximos",
+      icon: <Calendar className="h-8 w-8 text-[#4b7bb5]" />,
+      href: "/admin/agenda",
+    },
+  ]
 
-      <Tabs defaultValue="overview" className="space-y-6">
+  return (
+    <div className="container mx-auto py-8">
+      <PageHeader title="Dashboard Administrativo" description="Bem-vindo ao painel administrativo da Integrare" />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+        {stats.map((stat, index) => (
+          <Link href={stat.href} key={index} className="block">
+            <Card className="p-6 hover:shadow-md transition-shadow duration-200 hover:border-[#4b7bb5]/50">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
+                  <p className="text-3xl font-bold mt-2 text-[#4b7bb5]">{stat.value}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
+                </div>
+                <div className="bg-[#4b7bb5]/10 p-3 rounded-full">{stat.icon}</div>
+              </div>
+            </Card>
+          </Link>
+        ))}
+      </div>
+
+      <Tabs defaultValue="overview" className="space-y-6 mt-12">
         <TabsList className="bg-white border border-gray-200">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="projects">Projetos</TabsTrigger>
           <TabsTrigger value="tasks">Tarefas</TabsTrigger>
           <TabsTrigger value="files">Arquivos</TabsTrigger>
+          <TabsTrigger value="reports">Relatórios</TabsTrigger>
+          <TabsTrigger value="calendar">Agenda</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -198,6 +269,30 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <p>Conteúdo da aba de arquivos...</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reports">
+          <Card>
+            <CardHeader>
+              <CardTitle>Relatórios</CardTitle>
+              <CardDescription>Visualize e gerencie seus relatórios.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p>Conteúdo da aba de relatórios...</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="calendar">
+          <Card>
+            <CardHeader>
+              <CardTitle>Agenda</CardTitle>
+              <CardDescription>Visualize e gerencie sua agenda.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p>Conteúdo da aba de agenda...</p>
             </CardContent>
           </Card>
         </TabsContent>
