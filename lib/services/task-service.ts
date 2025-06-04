@@ -60,7 +60,7 @@ export class TaskService {
         throw new Error(`Erro ao buscar tarefas: ${error.message}`)
       }
 
-      return (data as DbTask[]).map(this.enrichTask)
+      return (data || []).map(this.enrichTask)
     } catch (error) {
       console.error("Erro no TaskService.getTasks:", error)
       throw error
@@ -244,13 +244,15 @@ export class TaskService {
         throw new Error(`Erro ao buscar estatísticas: ${error.message}`)
       }
 
+      const tasks = data || []
+
       const stats = {
-        total: data.length,
+        total: tasks.length,
         byStatus: {} as Record<TaskStatus, number>,
         byPriority: {} as Record<string, number>,
       }
 
-      data.forEach((task) => {
+      tasks.forEach((task) => {
         // Count by status
         stats.byStatus[task.status as TaskStatus] = (stats.byStatus[task.status as TaskStatus] || 0) + 1
 
@@ -318,7 +320,8 @@ export class TaskService {
         return 0
       }
 
-      return data.length > 0 ? (data[0].order_position || 0) + 1 : 0
+      const tasks = data || []
+      return tasks.length > 0 ? (tasks[0].order_position || 0) + 1 : 0
     } catch (error) {
       console.warn("Erro ao calcular order_position, usando 0:", error)
       return 0

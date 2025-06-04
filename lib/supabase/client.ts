@@ -12,8 +12,7 @@ export function getSupabaseClient() {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Variáveis de ambiente do Supabase não encontradas")
-    throw new Error("Supabase URL and key must be defined")
+    throw new Error("Supabase URL and Anon Key must be defined")
   }
 
   try {

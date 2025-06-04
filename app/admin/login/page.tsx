@@ -154,7 +154,7 @@ export default function LoginPage() {
         throw new Error(data.error || "Erro ao criar usuário administrador")
       }
 
-      setMessage("Usuário administrador criado com sucesso!")
+      setMessage(data.message || "Usuário administrador criado com sucesso!")
     } catch (err: any) {
       console.error("Erro capturado:", err)
       setError(err.message || "Erro ao criar usuário administrador")

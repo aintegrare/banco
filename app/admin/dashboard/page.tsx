@@ -1,20 +1,59 @@
-import { ProjectStats } from "@/components/dashboard/project-stats"
-import { TaskDashboard } from "@/components/tasks/task-dashboard"
+import { Suspense } from "react"
+import { Shell } from "@/components/shell"
+import { MainNav } from "@/components/main-nav"
+import { Section } from "@/components/section"
+import { ProjectsOverview } from "@/components/dashboard/projects-overview"
+import { TasksOverview } from "@/components/dashboard/tasks-overview"
+import { AdsOverview } from "@/components/dashboard/ads-overview"
+import { ClientsOverview } from "@/components/dashboard/clients-overview"
+import { RecentActivity } from "@/components/dashboard/recent-activity"
+import { PerformanceMetrics } from "@/components/dashboard/performance-metrics"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export default function DashboardPage() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-8">Dashboard</h1>
+    <Shell>
+      <MainNav
+        items={[
+          {
+            title: "Dashboard",
+            href: "/admin/dashboard",
+          },
+        ]}
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <TaskDashboard />
-        </div>
+      <div className="grid gap-6">
+        <Section title="Visão Geral">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <Suspense fallback={<Skeleton className="h-[120px] w-full" />}>
+              <ProjectsOverview />
+            </Suspense>
+            <Suspense fallback={<Skeleton className="h-[120px] w-full" />}>
+              <TasksOverview />
+            </Suspense>
+            <Suspense fallback={<Skeleton className="h-[120px] w-full" />}>
+              <AdsOverview />
+            </Suspense>
+            <Suspense fallback={<Skeleton className="h-[120px] w-full" />}>
+              <ClientsOverview />
+            </Suspense>
+          </div>
+        </Section>
 
-        <div>
-          <ProjectStats />
+        <div className="grid gap-6 md:grid-cols-2">
+          <Section title="Atividades Recentes">
+            <Suspense fallback={<Skeleton className="h-[300px] w-full" />}>
+              <RecentActivity />
+            </Suspense>
+          </Section>
+
+          <Section title="Métricas de Desempenho">
+            <Suspense fallback={<Skeleton className="h-[300px] w-full" />}>
+              <PerformanceMetrics />
+            </Suspense>
+          </Section>
         </div>
       </div>
-    </div>
+    </Shell>
   )
 }

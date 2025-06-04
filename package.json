@@ -70,7 +70,7 @@
     "react-intersection-observer": "latest",
     "react-resizable-panels": "^2.1.7",
     "reactflow": "latest",
-    "recharts": "2.15.0",
+    "recharts": "latest",
     "sonner": "latest",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",

@@ -26,19 +26,26 @@ export async function POST(request: Request) {
 
     console.log("API create-admin: Verificando se o usuário já existe")
 
-    // Verificar se o usuário já existe
-    const { data: existingUser, error: getUserError } = await supabase.auth.admin.getUserByEmail(email)
+    // Verificar se o usuário já existe usando o método correto
+    const { data: existingUsers, error: getUserError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle()
 
-    if (getUserError && getUserError.message !== "User not found") {
+    if (getUserError && getUserError.message !== "No rows found") {
       console.error("API create-admin: Erro ao verificar usuário existente:", getUserError)
       return NextResponse.json({ error: getUserError.message }, { status: 500 })
     }
 
-    if (existingUser) {
+    // Se o usuário já existe, tentar atualizar a senha
+    if (existingUsers) {
       console.log("API create-admin: Usuário já existe, atualizando senha")
 
-      // Atualizar senha do usuário existente
-      const { error: updateError } = await supabase.auth.admin.updateUserById(existingUser.id, { password })
+      // Usar o método de redefinição de senha
+      const { error: updateError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${process.env.NEXT_PUBLIC_URL || "http://localhost:3000"}/admin/login`,
+      })
 
       if (updateError) {
         console.error("API create-admin: Erro ao atualizar senha:", updateError)
@@ -47,17 +54,19 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         success: true,
-        message: "Senha do usuário administrador atualizada com sucesso",
+        message: "Email de redefinição de senha enviado com sucesso",
       })
     }
 
     console.log("API create-admin: Criando novo usuário")
 
-    // Criar novo usuário
-    const { data, error: createError } = await supabase.auth.admin.createUser({
+    // Criar novo usuário com o método correto
+    const { data, error: createError } = await supabase.auth.signUp({
       email,
       password,
-      email_confirm: true,
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_URL || "http://localhost:3000"}/admin/login`,
+      },
     })
 
     if (createError) {
@@ -65,11 +74,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: createError.message }, { status: 500 })
     }
 
-    console.log("API create-admin: Usuário criado com sucesso:", data.user.id)
+    console.log("API create-admin: Usuário criado com sucesso:", data.user?.id)
+
+    // Adicionar o usuário à tabela de administradores se necessário
+    try {
+      await supabase.from("admins").insert({
+        user_id: data.user?.id,
+        role: "admin",
+        created_at: new Date().toISOString(),
+      })
+    } catch (error) {
+      console.warn("API create-admin: Aviso - Não foi possível adicionar à tabela de admins:", error)
+      // Continuar mesmo se falhar, pois o usuário já foi criado
+    }
 
     return NextResponse.json({
       success: true,
-      message: "Usuário administrador criado com sucesso",
+      message: "Usuário administrador criado com sucesso. Verifique seu email para confirmar a conta.",
     })
   } catch (error: any) {
     console.error("API create-admin: Erro inesperado:", error)
