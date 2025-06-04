@@ -1,10 +1,10 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
-import { Save, Loader2 } from "lucide-react"
+import { Save, Loader2, Cloud, Database, MessageSquare, ScanText, Brain } from "lucide-react"
 import Link from "next/link"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function ConfiguracoesPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -59,10 +59,69 @@ export default function ConfiguracoesPage() {
     }, 3000)
   }
 
+  const configSections = [
+    {
+      title: "Bunny CDN",
+      description: "Configurações do Bunny CDN para armazenamento e entrega de conteúdo",
+      href: "/admin/configuracoes/bunny",
+      icon: <Cloud className="h-6 w-6 text-[#4b7bb5]" />,
+    },
+    {
+      title: "Cache",
+      description: "Gerenciar configurações de cache do sistema",
+      href: "/admin/configuracoes/cache",
+      icon: <Database className="h-6 w-6 text-[#4b7bb5]" />,
+    },
+    {
+      title: "Chat (Jaque)",
+      description: "Configurações do assistente de chat AI",
+      href: "/admin/configuracoes/chat",
+      icon: <MessageSquare className="h-6 w-6 text-[#4b7bb5]" />,
+    },
+    {
+      title: "Embeddings",
+      description: "Configurações de embeddings e busca semântica",
+      href: "/admin/configuracoes/embeddings",
+      icon: <Brain className="h-6 w-6 text-[#4b7bb5]" />,
+    },
+    {
+      title: "Funções SQL",
+      description: "Gerenciar funções SQL personalizadas",
+      href: "/admin/configuracoes/funcoes-sql",
+      icon: <Database className="h-6 w-6 text-[#4b7bb5]" />,
+    },
+    {
+      title: "OCR",
+      description: "Configurações de reconhecimento óptico de caracteres",
+      href: "/admin/configuracoes/ocr",
+      icon: <ScanText className="h-6 w-6 text-[#4b7bb5]" />,
+    },
+  ]
+
   return (
     <div className="min-h-screen bg-[#f2f1ef]">
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-[#4072b0] mb-6">Configurações do Sistema</h1>
+
+        {/* Seções de Configuração */}
+        <div className="mb-8">
+          <h2 className="text-xl font-bold text-[#4072b0] mb-4">Seções de Configuração</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            {configSections.map((section, index) => (
+              <Link key={index} href={section.href} className="block">
+                <Card className="h-full transition-all hover:shadow-lg hover:scale-105 border-l-4 border-l-[#4b7bb5]">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-lg font-bold text-[#4b7bb5]">{section.title}</CardTitle>
+                    {section.icon}
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription className="text-sm text-gray-600">{section.description}</CardDescription>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
 
         <div className="grid md:grid-cols-2 gap-6">
           <div className="bg-white rounded-xl shadow-md p-6">
@@ -146,24 +205,11 @@ export default function ConfiguracoesPage() {
           </div>
 
           <div className="bg-white rounded-xl shadow-md p-6">
-            <h2 className="text-xl font-bold text-[#4072b0] mb-4">Configurações do Bunny.net</h2>
+            <h2 className="text-xl font-bold text-[#4072b0] mb-4">Status do Sistema</h2>
 
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-1">Pull Zone</h3>
-                <p className="text-xs text-gray-500 mb-2">
-                  Para acessar os arquivos publicamente, é necessário configurar uma Pull Zone no painel do Bunny.net.
-                </p>
-                <Link
-                  href="/admin/configuracoes/bunny"
-                  className="inline-flex items-center px-4 py-2 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:ring-offset-2 text-sm"
-                >
-                  Ver instruções de configuração
-                </Link>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-1">Status da conexão</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-1">Status da conexão Bunny.net</h3>
                 {connectionStatus ? (
                   <div
                     className={`px-4 py-2 rounded-md ${connectionStatus.success ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"} flex items-center`}
@@ -204,32 +250,18 @@ export default function ConfiguracoesPage() {
                   </details>
                 )}
               </div>
-            </div>
-          </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <h2 className="text-xl font-bold text-[#4072b0] mb-4">Configurações de Armazenamento</h2>
-
-            <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Zona de Armazenamento</label>
+                <h3 className="text-sm font-medium text-gray-700 mb-1">Zona de Armazenamento</h3>
                 <div className="px-4 py-2 bg-gray-100 rounded-md text-gray-700">
                   {process.env.BUNNY_STORAGE_ZONE || "Não configurado"}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Região</label>
+                <h3 className="text-sm font-medium text-gray-700 mb-1">Região</h3>
                 <div className="px-4 py-2 bg-gray-100 rounded-md text-gray-700">
                   {process.env.BUNNY_STORAGE_REGION || "de"} (Frankfurt, Alemanha)
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status da API</label>
-                <div className="px-4 py-2 bg-green-100 rounded-md text-green-700 flex items-center">
-                  <span className="h-2 w-2 bg-green-500 rounded-full mr-2"></span>
-                  Conectado
                 </div>
               </div>
 
@@ -244,35 +276,6 @@ export default function ConfiguracoesPage() {
                     <span>250MB de 1GB</span>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Adicionar um novo card para configurações de OCR na seção de configurações */}
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <h2 className="text-xl font-bold text-[#4072b0] mb-4">Configurações de OCR</h2>
-
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-1">Status do OCR</h3>
-                <div className="px-4 py-2 bg-green-100 rounded-md text-green-700 flex items-center">
-                  <span className="h-2 w-2 bg-green-500 rounded-full mr-2"></span>
-                  Ativo
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-1">Idioma Principal</h3>
-                <div className="px-4 py-2 bg-gray-100 rounded-md text-gray-700">Português</div>
-              </div>
-
-              <div>
-                <Link
-                  href="/admin/configuracoes/ocr"
-                  className="inline-flex items-center px-4 py-2 bg-[#4b7bb5] text-white rounded-md hover:bg-[#3d649e] focus:outline-none focus:ring-2 focus:ring-[#4b7bb5] focus:ring-offset-2 text-sm"
-                >
-                  Configurar OCR
-                </Link>
               </div>
             </div>
           </div>

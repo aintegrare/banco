@@ -6,12 +6,11 @@ import Link from "next/link"
 import { motion } from "framer-motion"
 import {
   LayoutDashboard,
-  FileText,
   FolderKanban,
   Settings,
   Search,
   Wrench,
-  BarChart3,
+  CheckSquare,
   Calendar,
   MessageSquare,
   Globe,
@@ -19,6 +18,7 @@ import {
   LogOut,
   Users,
   Share2,
+  FolderOpen,
 } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase/client"
 import { useEffect, useState } from "react"
@@ -152,34 +152,37 @@ export function AppDock() {
     if (path === "/admin" && pathname === "/") return true
 
     // Verificações específicas para projetos e tarefas
-    if (path === "/projetos" && pathname.startsWith("/projetos")) return true
-    if (path === "/tarefas" && pathname.startsWith("/tarefas")) return true
+    if (path === "/admin/projetos" && pathname.startsWith("/admin/projetos")) return true
+    if (path === "/admin/tarefas" && pathname.startsWith("/admin/tarefas")) return true
     if (path === "/admin/clientes" && pathname.startsWith("/admin/clientes")) return true
+    if (path === "/admin/crm" && pathname.startsWith("/admin/crm")) return true
+    if (path === "/admin/blog" && pathname.startsWith("/admin/blog")) return true
+    if (path === "/admin/arquivos" && pathname.startsWith("/admin/arquivos")) return true
 
     return pathname.startsWith(path)
   }
 
   // Categorias de itens do dock
   const mainItems = [
-    { href: "/admin", icon: <LayoutDashboard size={24} />, label: "Dashboard" },
-    { href: "/admin/arquivos", icon: <FileText size={24} />, label: "Arquivos" },
-    { href: "/projetos", icon: <FolderKanban size={24} />, label: "Projetos" },
-    { href: "/tarefas", icon: <BarChart3 size={24} />, label: "Tarefas" },
-    { href: "/admin/blog", icon: <FileImage size={24} />, label: "Blog" },
+    { href: "/admin", icon: <LayoutDashboard size={20} />, label: "Dashboard" },
+    { href: "/admin/arquivos", icon: <FolderOpen size={20} />, label: "Arquivos" },
+    { href: "/admin/projetos", icon: <FolderKanban size={20} />, label: "Projetos" },
+    { href: "/admin/tarefas", icon: <CheckSquare size={20} />, label: "Tarefas" },
+    { href: "/admin/blog", icon: <FileImage size={20} />, label: "Blog" },
   ]
 
   const marketingItems = [
-    { href: "/admin/crm", icon: <Users size={24} />, label: "CRM" },
-    { href: "/admin/smp", icon: <Share2 size={24} />, label: "SMP" },
-    { href: "/admin/agenda", icon: <Calendar size={24} />, label: "Agenda" },
+    { href: "/admin/crm", icon: <Users size={20} />, label: "CRM" },
+    { href: "/admin/smp", icon: <Share2 size={20} />, label: "SMP" },
+    { href: "/admin/agenda", icon: <Calendar size={20} />, label: "Agenda" },
   ]
 
   const toolsItems = [
-    { href: "/admin/ferramentas", icon: <Wrench size={24} />, label: "Ferramentas" },
-    { href: "/admin/chat", icon: <MessageSquare size={24} />, label: "Chat" },
-    { href: "/search", icon: <Search size={24} />, label: "Busca" },
-    { href: "/admin/site", icon: <Globe size={24} />, label: "Site/" },
-    { href: "/admin/configuracoes", icon: <Settings size={24} />, label: "Config" },
+    { href: "/admin/ferramentas", icon: <Wrench size={20} />, label: "Ferramentas" },
+    { href: "/admin/chat", icon: <MessageSquare size={20} />, label: "Chat" },
+    { href: "/search", icon: <Search size={20} />, label: "Busca" },
+    { href: "/", icon: <Globe size={20} />, label: "Site" },
+    { href: "/admin/configuracoes", icon: <Settings size={20} />, label: "Config" },
   ]
 
   return (
@@ -193,7 +196,6 @@ export function AppDock() {
             icon={item.icon}
             label={item.label}
             isActive={isActive(item.href)}
-            badge={item.badge}
           />
         ))}
 
@@ -206,7 +208,6 @@ export function AppDock() {
               icon={item.icon}
               label={item.label}
               isActive={isActive(item.href)}
-              badge={item.badge}
             />
           ))}
         </div>
@@ -220,19 +221,18 @@ export function AppDock() {
               icon={item.icon}
               label={item.label}
               isActive={isActive(item.href)}
-              badge={item.badge}
             />
           ))}
         </div>
 
         {/* Botão de logout */}
-        <DockItem href="#" icon={<LogOut size={24} />} label="Sair" isActive={false} onClick={handleLogout} />
+        <DockItem href="#" icon={<LogOut size={20} />} label="Sair" isActive={false} onClick={handleLogout} />
 
         {/* Menu de mais opções para telas menores */}
         <div className="md:hidden">
           <DockItem
             href="#"
-            icon={<span className="flex items-center justify-center w-6 h-6">•••</span>}
+            icon={<span className="flex items-center justify-center w-5 h-5 text-lg">•••</span>}
             label="Mais"
             isActive={false}
           />

@@ -3,7 +3,18 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { BarChart3, File, FolderOpen, Home, SearchCode, Settings, Users, FileText, Handshake } from "lucide-react"
+import {
+  BarChart3,
+  File,
+  FolderOpen,
+  Home,
+  SearchCode,
+  Settings,
+  FileText,
+  Handshake,
+  CheckSquare,
+  MessageSquare,
+} from "lucide-react"
 
 const navigation = [
   {
@@ -16,12 +27,17 @@ const navigation = [
       },
       {
         title: "Projetos",
-        href: "/admin/projects",
+        href: "/admin/projetos",
         icon: BarChart3,
       },
       {
+        title: "Tarefas",
+        href: "/admin/tarefas",
+        icon: CheckSquare,
+      },
+      {
         title: "Arquivos",
-        href: "/admin/files",
+        href: "/admin/arquivos",
         icon: FolderOpen,
       },
       {
@@ -40,24 +56,24 @@ const navigation = [
     title: "Avançado",
     items: [
       {
-        title: "Busca",
-        href: "/admin/search",
-        icon: SearchCode,
-      },
-      {
-        title: "Diagnósticos",
-        href: "/admin/diagnostics",
+        title: "Documentos",
+        href: "/admin/documentos",
         icon: File,
       },
       {
+        title: "Ferramentas",
+        href: "/admin/ferramentas",
+        icon: SearchCode,
+      },
+      {
         title: "Configurações",
-        href: "/admin/settings",
+        href: "/admin/configuracoes",
         icon: Settings,
       },
       {
-        title: "Usuários",
-        href: "/admin/users",
-        icon: Users,
+        title: "Chat",
+        href: "/admin/chat",
+        icon: MessageSquare,
       },
     ],
   },

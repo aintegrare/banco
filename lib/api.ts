@@ -2,7 +2,6 @@ import { createClient } from "@supabase/supabase-js"
 import { defaultEmbeddingProvider, generateSimpleEmbedding } from "./embeddings"
 import { extractPDFText } from "./pdf-extractor"
 import { createBunnyDirectory, deleteBunnyFile, listBunnyFiles, uploadFileToBunny } from "./bunny"
-import { env } from "./env"
 
 // Configuração do cliente Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -723,82 +722,5 @@ export async function deleteDocument(documentId: number) {
   } catch (error) {
     console.error("Erro ao excluir documento:", error)
     throw error
-  }
-}
-
-// Função para verificar a configuração do Bunny
-export async function checkBunnyConfiguration() {
-  try {
-    const apiKey = env.BUNNY_API_KEY
-    const storageZone = env.BUNNY_STORAGE_ZONE
-
-    if (!apiKey || !storageZone) {
-      return {
-        success: false,
-        message: "Credenciais do Bunny não configuradas",
-        details: {
-          apiKeyConfigured: !!apiKey,
-          storageZoneConfigured: !!storageZone,
-        },
-      }
-    }
-
-    // Testar a conexão com a API do Bunny
-    const url = `https://storage.bunnycdn.com/${storageZone}/`
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        AccessKey: apiKey,
-        Accept: "application/json",
-      },
-    })
-
-    if (!response.ok) {
-      return {
-        success: false,
-        message: `Erro ao conectar com o Bunny: ${response.status} ${response.statusText}`,
-        details: {
-          status: response.status,
-          statusText: response.statusText,
-          apiKeyConfigured: true,
-          storageZoneConfigured: true,
-        },
-      }
-    }
-
-    // Tentar ler a resposta como JSON
-    let data
-    try {
-      data = await response.json()
-    } catch (error) {
-      return {
-        success: false,
-        message: "Erro ao processar resposta do Bunny",
-        details: {
-          error: error instanceof Error ? error.message : String(error),
-          apiKeyConfigured: true,
-          storageZoneConfigured: true,
-        },
-      }
-    }
-
-    return {
-      success: true,
-      message: "Conexão com o Bunny estabelecida com sucesso",
-      details: {
-        apiKeyConfigured: true,
-        storageZoneConfigured: true,
-        files: Array.isArray(data) ? data.length : "Resposta não é um array",
-        data: data,
-      },
-    }
-  } catch (error) {
-    return {
-      success: false,
-      message: "Erro ao verificar configuração do Bunny",
-      details: {
-        error: error instanceof Error ? error.message : String(error),
-      },
-    }
   }
 }

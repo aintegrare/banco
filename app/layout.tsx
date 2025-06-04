@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     locale: "pt_BR",
     type: "website",
   },
-    generator: 'v0.dev'
+  generator: "v0.dev",
 }
 
 export default function RootLayout({
@@ -34,12 +34,12 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/favicon.png" />
       </head>
       <body className={`${inter.className} pb-20 w-full mx-auto`}>
-        <ThemeProvider attribute="class" defaultTheme="light">
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           <GlobalHeader />
           {children}
           <AppDock />

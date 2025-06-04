@@ -9,10 +9,11 @@ import {
   PenToolIcon as Tool,
   FolderOpen,
   FileSearch,
-  Database,
   MessageSquare,
   FileText,
   Users,
+  FolderKanban,
+  CheckSquare,
 } from "lucide-react"
 
 const navItems = [
@@ -23,7 +24,7 @@ const navItems = [
   },
   {
     title: "Blog",
-    href: "/blog/admin",
+    href: "/admin/blog",
     icon: FileText,
   },
   {
@@ -42,6 +43,21 @@ const navItems = [
     icon: Users,
   },
   {
+    title: "CRM",
+    href: "/admin/crm",
+    icon: Users,
+  },
+  {
+    title: "Projetos",
+    href: "/admin/projetos",
+    icon: FolderKanban,
+  },
+  {
+    title: "Tarefas",
+    href: "/admin/tarefas",
+    icon: CheckSquare,
+  },
+  {
     title: "Ferramentas",
     href: "/admin/ferramentas",
     icon: Tool,
@@ -52,13 +68,8 @@ const navItems = [
     icon: Settings,
   },
   {
-    title: "Embeddings",
-    href: "/admin/configuracoes/embeddings",
-    icon: Database,
-  },
-  {
     title: "Chat (Jaque)",
-    href: "/admin/configuracoes/chat",
+    href: "/admin/chat",
     icon: MessageSquare,
   },
 ]
